@@ -3,30 +3,36 @@ import ParallaxSection from '../components/hero/ParallaxSection.jsx';
 
 export function Home() {
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-16 px-6 py-12">
-      <HeroCarousel />
-      <section className="grid gap-8 text-center md:grid-cols-3">
-        <div className="space-y-4">
-          <h2 className="text-3xl font-poppins font-semibold text-teal">Why PPP?</h2>
-          <p className="text-sm text-charcoal/70">
-            Purchasing power parity (PPP) helps you convert budgets into experiences. PPP Pocket blends travel inspiration with
-            financial clarity so your dollars stay powerful wherever you land.
-          </p>
-        </div>
-        <div className="space-y-4">
-          <h2 className="text-3xl font-poppins font-semibold text-teal">Real-time runway</h2>
-          <p className="text-sm text-charcoal/70">
-            Quickly visualize how long your balance lasts across cities with budget sliders and PPP-adjusted costs.
-          </p>
-        </div>
-        <div className="space-y-4">
-          <h2 className="text-3xl font-poppins font-semibold text-teal">Shareable insights</h2>
-          <p className="text-sm text-charcoal/70">
-            Export beautiful summary cards to align with your travel companions, investors, or future self.
-          </p>
+    <div className="flex flex-col gap-20 bg-mist pb-20">
+      <div className="mx-auto w-full max-w-6xl px-6 pt-12">
+        <HeroCarousel />
+      </div>
+      <section className="bg-offwhite/60 py-16">
+        <div className="mx-auto grid max-w-6xl gap-10 px-6 text-left md:grid-cols-3">
+          <div className="space-y-4">
+            <h2 className="text-3xl font-semibold text-navy">Why PPP?</h2>
+            <p className="text-sm text-slate/80">
+              Purchasing power parity reframes your Capital One balance as a travel compass. Instantly see how familiar dollars
+              unlock premium experiences around the world.
+            </p>
+          </div>
+          <div className="space-y-4">
+            <h2 className="text-3xl font-semibold text-navy">Real-time runway</h2>
+            <p className="text-sm text-slate/80">
+              Forecast months of runway across destinations with PPP multipliers, live FX hooks, and guided travel budgeting.
+            </p>
+          </div>
+          <div className="space-y-4">
+            <h2 className="text-3xl font-semibold text-navy">Shareable insights</h2>
+            <p className="text-sm text-slate/80">
+              Craft export-ready summaries that align travel partners and keep every journey grounded in financial confidence.
+            </p>
+          </div>
         </div>
       </section>
-      <ParallaxSection />
+      <div className="mx-auto w-full max-w-6xl px-6">
+        <ParallaxSection />
+      </div>
     </div>
   );
 }

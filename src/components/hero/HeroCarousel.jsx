@@ -5,24 +5,52 @@ import { Link } from 'react-router-dom';
 
 const slides = [
   {
-    city: 'Atlanta',
-    country: 'United States',
-    image: new URL('../../assets/cities/atlanta.svg', import.meta.url).href
+    city: 'Paris',
+    country: 'France',
+    image:
+      'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=1600&q=80'
   },
   {
     city: 'Lisbon',
     country: 'Portugal',
-    image: new URL('../../assets/cities/lisbon.svg', import.meta.url).href
+    image:
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1600&q=80'
   },
   {
     city: 'Mexico City',
     country: 'Mexico',
-    image: new URL('../../assets/cities/mexico-city.svg', import.meta.url).href
+    image:
+      'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1600&q=80'
   },
   {
     city: 'Bangkok',
     country: 'Thailand',
-    image: new URL('../../assets/cities/bangkok.svg', import.meta.url).href
+    image:
+      'https://images.unsplash.com/photo-1496417263034-38ec4f0b665a?auto=format&fit=crop&w=1600&q=80'
+  },
+  {
+    city: 'New York',
+    country: 'United States',
+    image:
+      'https://images.unsplash.com/photo-1526402464715-78f0ce5c0f0c?auto=format&fit=crop&w=1600&q=80'
+  },
+  {
+    city: 'London',
+    country: 'United Kingdom',
+    image:
+      'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&w=1600&q=80'
+  },
+  {
+    city: 'Tokyo',
+    country: 'Japan',
+    image:
+      'https://images.unsplash.com/photo-1505060895512-9677c03c0f06?auto=format&fit=crop&w=1600&q=80'
+  },
+  {
+    city: 'Dubai',
+    country: 'United Arab Emirates',
+    image:
+      'https://images.unsplash.com/photo-1526481280695-3c46901f3f50?auto=format&fit=crop&w=1600&q=80'
   }
 ];
 
@@ -45,14 +73,18 @@ export function HeroCarousel() {
   const activeSlide = slides[index];
 
   return (
-    <section className="relative flex min-h-[70vh] flex-col items-center justify-center overflow-hidden rounded-[2.5rem] border border-white/40 bg-charcoal/90 text-offwhite shadow-2xl shadow-teal/20">
+    <section className="relative flex min-h-[80vh] w-full flex-col items-center justify-center overflow-hidden rounded-[2.5rem] border border-white/30 bg-slate text-offwhite shadow-2xl shadow-navy/30 md:min-h-screen"
+      role="region"
+      aria-roledescription="carousel"
+      aria-label="Featured destinations"
+    >
       <div className="absolute inset-0">
         <AnimatePresence mode="wait">
           <motion.img
             key={activeSlide.city}
             src={activeSlide.image}
             alt={`${activeSlide.city} skyline`}
-            className="h-full w-full object-cover opacity-90"
+            className="h-full w-full object-cover"
             variants={variants}
             initial="initial"
             animate="animate"
@@ -60,41 +92,71 @@ export function HeroCarousel() {
             transition={{ duration: 1.1 }}
           />
         </AnimatePresence>
-        <div className="absolute inset-0 bg-gradient-to-b from-charcoal/40 via-charcoal/50 to-charcoal/80" aria-hidden="true" />
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-slate/80 via-slate/30 to-transparent"
+          aria-hidden="true"
+        />
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-navy/40 via-transparent to-red/20"
+          aria-hidden="true"
+        />
       </div>
-      <div className="relative z-10 flex flex-col items-center gap-6 px-6 text-center md:max-w-2xl">
+      <div
+        className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-6 px-6 text-center md:max-w-3xl"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         <motion.span
           key={`${activeSlide.city}-label`}
           initial={{ y: 16, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6 }}
-          className="rounded-full bg-white/10 px-4 py-2 text-sm uppercase tracking-[0.3em]"
+          className="rounded-full bg-white/20 px-4 py-2 text-xs font-medium uppercase tracking-[0.4em] text-offwhite/80"
         >
           {activeSlide.city}, {activeSlide.country}
         </motion.span>
-        <h1 className="text-4xl font-poppins font-semibold tracking-tight text-offwhite sm:text-5xl">
+        <h1 className="text-4xl font-semibold tracking-tight text-offwhite drop-shadow-lg sm:text-6xl">
           Same dollars, smarter world.
         </h1>
-        <p className="max-w-xl text-base text-offwhite/80 sm:text-lg">
+        <p className="max-w-2xl text-base text-offwhite/80 sm:text-xl">
           See where your money goes the farthest with PPP-adjusted insights across the globe.
         </p>
-        <Button as={Link} to="/dashboard" variant="primary" className="text-base">
-          Explore your PPP dashboard
+        <Button
+          as={Link}
+          to="/dashboard"
+          variant="primary"
+          className="text-base"
+          aria-label="Connect my Capital One account and view dashboard"
+        >
+          Connect my Capital One Account
         </Button>
       </div>
-      <div className="absolute bottom-8 flex gap-2">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-slate/70 to-transparent" aria-hidden="true" />
+      <motion.div
+        key={`${activeSlide.city}-caption`}
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.6 }}
+        className="absolute bottom-10 left-8 flex max-w-sm flex-col items-start gap-1 rounded-2xl bg-black/30 px-5 py-4 text-left backdrop-blur"
+      >
+        <span className="text-xs uppercase tracking-[0.3em] text-offwhite/70">Destination</span>
+        <p className="text-lg font-semibold text-white">{activeSlide.city}</p>
+        <p className="text-sm text-offwhite/70">{activeSlide.country}</p>
+      </motion.div>
+      <nav className="absolute bottom-8 flex gap-3" aria-label="Carousel slide controls">
         {slides.map((slide, idx) => (
           <button
             key={slide.city}
             type="button"
             onClick={() => setIndex(idx)}
-            className={`h-2 w-8 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-offwhite ${
-              idx === index ? 'bg-offwhite/90' : 'bg-white/30'
+            className={`h-2 w-10 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-offwhite ${
+              idx === index ? 'bg-offwhite' : 'bg-white/40'
             }`}
             aria-label={`Show ${slide.city}`}
+            aria-current={idx === index}
           />
         ))}
-      </div>
+      </nav>
     </section>
   );
 }
