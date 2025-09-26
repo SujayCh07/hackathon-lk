@@ -21,21 +21,17 @@ const items = [
 ];
 
 export function ParallaxSection() {
-  const { style } = useParallax(0.18);
+  const { style } = useParallax(0.2);
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-offwhite via-offwhite/60 to-mist/80 py-16">
-      <motion.div
-        style={style}
-        className="pointer-events-none absolute inset-x-0 top-0 h-full bg-[radial-gradient(circle_at_top_left,_rgba(0,40,120,0.18),_transparent_55%)]"
-        aria-hidden="true"
-      />
+    <section className="relative mt-20 overflow-hidden rounded-[2.5rem] border border-white/50 bg-white/70 py-16 shadow-xl shadow-teal/10">
+      <motion.div style={style} className="pointer-events-none absolute inset-0 bg-gradient-to-r from-turquoise/10 via-sand/20 to-teal/10" aria-hidden="true" />
       <div className="relative mx-auto grid max-w-6xl gap-8 px-6 md:grid-cols-3">
         {items.map((item) => (
-          <Card key={item.title} className="bg-white/80 backdrop-blur">
-            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-navy/60">{item.accent}</p>
-            <h3 className="font-poppins mt-2 text-2xl font-semibold text-slate">{item.title}</h3>
-            <p className="mt-3 text-base text-slate/70">{item.description}</p>
+          <Card key={item.title} className="bg-offwhite/80">
+            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-teal/70">{item.accent}</p>
+            <h3 className="mt-2 font-poppins text-xl font-semibold text-charcoal">{item.title}</h3>
+            <p className="mt-3 text-sm text-charcoal/70">{item.description}</p>
           </Card>
         ))}
       </div>
