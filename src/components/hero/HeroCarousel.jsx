@@ -73,7 +73,8 @@ export function HeroCarousel() {
   const activeSlide = slides[index];
 
   return (
-    <section className="relative flex min-h-[80vh] w-full flex-col items-center justify-center overflow-hidden rounded-[2.5rem] border border-white/30 bg-slate text-offwhite shadow-2xl shadow-navy/30 md:min-h-screen"
+    <section
+      className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-charcoal text-offwhite"
       role="region"
       aria-roledescription="carousel"
       aria-label="Featured destinations"
@@ -93,32 +94,32 @@ export function HeroCarousel() {
           />
         </AnimatePresence>
         <div
-          className="absolute inset-0 bg-gradient-to-t from-slate/80 via-slate/30 to-transparent"
+          className="absolute inset-0 bg-gradient-to-t from-charcoal/85 via-charcoal/20 to-transparent"
           aria-hidden="true"
         />
         <div
-          className="absolute inset-0 bg-gradient-to-r from-navy/40 via-transparent to-red/20"
+          className="absolute inset-0 bg-gradient-to-r from-navy/50 via-transparent to-red/30"
           aria-hidden="true"
         />
       </div>
       <div
-        className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-6 px-6 text-center md:max-w-3xl"
+        className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-6 px-6 text-center"
         aria-live="polite"
         aria-atomic="true"
       >
-        <motion.span
-          key={`${activeSlide.city}-label`}
+        <motion.div
+          key={`${activeSlide.city}-eyebrow`}
           initial={{ y: 16, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6 }}
-          className="rounded-full bg-white/20 px-4 py-2 text-xs font-medium uppercase tracking-[0.4em] text-offwhite/80"
+          className="rounded-full bg-white/15 px-4 py-2 text-xs font-medium uppercase tracking-[0.4em] text-offwhite/80"
         >
-          {activeSlide.city}, {activeSlide.country}
-        </motion.span>
-        <h1 className="text-4xl font-semibold tracking-tight text-offwhite drop-shadow-lg sm:text-6xl">
+          Global PPP intelligence
+        </motion.div>
+        <h1 className="font-poppins text-4xl font-semibold tracking-tight text-offwhite drop-shadow-lg sm:text-6xl">
           Same dollars, smarter world.
         </h1>
-        <p className="max-w-2xl text-base text-offwhite/80 sm:text-xl">
+        <p className="max-w-3xl text-base text-offwhite/80 sm:text-xl">
           See where your money goes the farthest with PPP-adjusted insights across the globe.
         </p>
         <Button
@@ -131,17 +132,19 @@ export function HeroCarousel() {
           Connect my Capital One Account
         </Button>
       </div>
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-slate/70 to-transparent" aria-hidden="true" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-charcoal/70 to-transparent" aria-hidden="true" />
       <motion.div
         key={`${activeSlide.city}-caption`}
-        initial={{ y: 20, opacity: 0 }}
+        initial={{ y: 24, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6 }}
-        className="absolute bottom-10 left-8 flex max-w-sm flex-col items-start gap-1 rounded-2xl bg-black/30 px-5 py-4 text-left backdrop-blur"
+        className="absolute bottom-12 left-8 flex flex-col gap-1 text-left"
+        aria-live="polite"
       >
-        <span className="text-xs uppercase tracking-[0.3em] text-offwhite/70">Destination</span>
-        <p className="text-lg font-semibold text-white">{activeSlide.city}</p>
-        <p className="text-sm text-offwhite/70">{activeSlide.country}</p>
+        <p className="font-poppins text-3xl font-semibold uppercase tracking-[0.2em] text-offwhite drop-shadow-lg">
+          {activeSlide.city}
+        </p>
+        <p className="text-sm font-medium uppercase tracking-[0.35em] text-offwhite/70">{activeSlide.country}</p>
       </motion.div>
       <nav className="absolute bottom-8 flex gap-3" aria-label="Carousel slide controls">
         {slides.map((slide, idx) => (
@@ -153,7 +156,8 @@ export function HeroCarousel() {
               idx === index ? 'bg-offwhite' : 'bg-white/40'
             }`}
             aria-label={`Show ${slide.city}`}
-            aria-current={idx === index}
+            aria-current={idx === index ? 'true' : undefined}
+            aria-pressed={idx === index}
           />
         ))}
       </nav>
