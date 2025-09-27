@@ -11,7 +11,6 @@ import LoginPage from './pages/LoginPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import Settings from './pages/Settings.jsx';
 import { useAuth } from './hooks/useAuth.js';
-import Personalize from './pages/Personalize.jsx';
 
 function App() {
   const location = useLocation();
@@ -49,14 +48,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/personalize"
-            element={
-              <ProtectedRoute>
-                <Personalize />
               </ProtectedRoute>
             }
           />

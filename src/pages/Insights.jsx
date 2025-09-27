@@ -192,9 +192,6 @@ export function Insights() {
   const { totals } = useTransactions();
   const { adjustPrice, getPPPRatio, calculateRunway } = usePPP();
   const [rows, setRows] = useState([0]);
-  const { user } = useAuth();
-  const userId = user?.id ?? null;
-  const { data: personalization } = usePersonalization(userId);
 
   const addRow = () => {
     if (rows.length < 5) {
@@ -204,34 +201,6 @@ export function Insights() {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-12">
-      {personalization && (
-        <Card className="bg-white/85">
-          <CardHeader>
-            <CardTitle>Personalised focus</CardTitle>
-            <p className="text-sm text-charcoal/70">
-              We’re tuning insights for {personalization.travelStyle ?? 'your travel style'} with a {personalization.budgetFocus ?? 'Balanced'} budget focus.
-            </p>
-          </CardHeader>
-          <CardContent className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.25em] text-slate/60">
-            {personalization.travelInterests?.map((interest) => (
-              <span key={interest} className="rounded-full bg-teal/10 px-3 py-1 text-teal/80">
-                {interest}
-              </span>
-            ))}
-            {personalization.favoriteCategories?.map((category) => (
-              <span key={category} className="rounded-full bg-coral/10 px-3 py-1 text-coral/80">
-                {category}
-              </span>
-            ))}
-            {personalization.preferredContinents?.map((continent) => (
-              <span key={continent} className="rounded-full bg-navy/10 px-3 py-1 text-navy">
-                {continent}
-              </span>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
       <Card className="bg-white/85">
         <CardHeader>
           <CardTitle>Smart-Spend insights</CardTitle>

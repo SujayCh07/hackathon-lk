@@ -31,32 +31,6 @@ function normaliseCountry(country) {
   };
 }
 
-function normaliseStringArray(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) {
-    return value
-      .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
-      .filter((entry) => entry.length > 0);
-  }
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) {
-        return parsed
-          .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
-          .filter((entry) => entry.length > 0);
-      }
-    } catch (error) {
-      // fall back to comma separated parsing
-    }
-    return value
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0);
-  }
-  return [];
-}
-
 const EMPTY_ADDRESS = {
   raw: "",
   formatted: "",
@@ -178,15 +152,11 @@ function mapProfile(row) {
   return {
     name: row.name?.trim() || null,
     monthlyBudget: normaliseNumber(row.monthly_budget),
-    monthlyBudgetGoal: normaliseNumber(row.monthly_budget_goal),
     currentCity: normaliseCity(row.current_city),
     homeCity: normaliseCity(row.home_city),
     currentCountry: normaliseCountry(row.current_country),
     homeCountry: normaliseCountry(row.home_country),
     streetAddress: normaliseStreetAddress(row.street_address),
-    travelInterests: normaliseStringArray(row.travel_interests),
-    preferredContinents: normaliseStringArray(row.preferred_continents),
-    favoriteCategories: normaliseStringArray(row.favorite_categories),
   };
 }
 
@@ -207,11 +177,7 @@ export function useUserProfile(userId) {
         `
         name,
         monthly_budget,
-        monthly_budget_goal,
         street_address,
-        travel_interests,
-        preferred_continents,
-        favorite_categories,
         current_city:ppp_city!user_profile_current_city_code_fkey(code, name, flag, ppp),
         home_city:ppp_city!user_profile_home_city_code_fkey(code, name, flag, ppp),
         current_country:country_ref!user_profile_current_country_fkey(code, country),
