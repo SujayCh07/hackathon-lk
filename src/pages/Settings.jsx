@@ -142,7 +142,6 @@ export default function Settings() {
       active = false;
     };
   }, []);
-
   const totalBalance = useMemo(() => {
     if (!Array.isArray(nessie?.accounts)) {
       return 0;
