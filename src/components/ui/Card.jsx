@@ -4,7 +4,7 @@ export function Card({ as: Component = 'div', className, children, ...props }) {
   return (
     <Component
       className={clsx(
-        'rounded-3xl bg-white/80 backdrop-blur shadow-lg shadow-navy/10 border border-white/40 p-6',
+        'rounded-3xl border border-white/40 bg-gradient-to-br from-white/90 via-white/75 to-sky/10 p-6 shadow-xl shadow-navy/10 backdrop-blur-sm ring-1 ring-white/40',
         'transition-transform duration-300 hover:-translate-y-1 focus-within:-translate-y-1',
         className
       )}

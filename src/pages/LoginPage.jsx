@@ -58,66 +58,74 @@ export function LoginPage() {
       </div>
 
       {/* Right side login form */}
-      <div className="flex h-full flex-col justify-center bg-white px-8 sm:px-12 md:px-16 lg:px-24">
-        <h2 className="text-2xl font-semibold text-navy">Log In</h2>
-        <p className="mt-2 text-sm text-charcoal/70">
-          Unlock your personalized PPP Pocket experience.
-        </p>
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-semibold text-charcoal"
+      <div className="relative flex h-full flex-col justify-center overflow-hidden bg-gradient-to-br from-white/95 via-sky/10 to-offwhite/90 px-8 sm:px-12 md:px-16 lg:px-24">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -right-16 -top-24 h-64 w-64 rounded-full bg-gradient-to-br from-red/30 via-red/10 to-transparent blur-3xl" />
+          <div className="absolute -left-28 bottom-[-18%] h-80 w-80 rounded-full bg-gradient-to-tr from-navy/25 via-sky/20 to-transparent blur-3xl" />
+          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-white/80 via-white/50 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white/70 via-white/40 to-transparent" />
+        </div>
+        <div className="relative">
+          <h2 className="text-2xl font-semibold text-navy">Log In</h2>
+          <p className="mt-2 text-sm text-charcoal/70">
+            Unlock your personalized PPP Pocket experience.
+          </p>
+          <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-semibold text-charcoal"
+              >
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal shadow-inner shadow-white/40 focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                placeholder="you@example.com"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-semibold text-charcoal"
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal shadow-inner shadow-white/40 focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                placeholder="••••••••"
+              />
+            </div>
+            {formError && <p className="text-sm text-coral">{formError}</p>}
+            <Button
+              type="submit"
+              className="w-full justify-center"
+              disabled={isSubmitting}
             >
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-2 w-full rounded-2xl border border-navy/20 bg-offwhite px-4 py-3 text-sm text-charcoal focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
-              placeholder="you@example.com"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-semibold text-charcoal"
+              {isSubmitting ? "Signing in…" : "Sign in"}
+            </Button>
+          </form>
+          <p className="mt-6 text-center text-sm text-charcoal/70">
+            Need an account?{" "}
+            <Link
+              to={`/signup?redirectTo=${encodeURIComponent(redirectTo)}`}
+              className="font-semibold text-red hover:underline"
             >
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-2 w-full rounded-2xl border border-navy/20 bg-offwhite px-4 py-3 text-sm text-charcoal focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
-              placeholder="••••••••"
-            />
-          </div>
-          {formError && <p className="text-sm text-coral">{formError}</p>}
-          <Button
-            type="submit"
-            className="w-full justify-center"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Signing in…" : "Sign in"}
-          </Button>
-        </form>
-        <p className="mt-6 text-center text-sm text-charcoal/70">
-          Need an account?{" "}
-          <Link
-            to={`/signup?redirectTo=${encodeURIComponent(redirectTo)}`}
-            className="font-semibold text-red hover:underline"
-          >
-            Create one
-          </Link>
-        </p>
+              Create one
+            </Link>
+          </p>
+        </div>
       </div>
     </section>
   );
