@@ -127,12 +127,12 @@ export function HeroCarousel({ showLogo = false }) {
 
       {/* Central content — no clunky box; soft radial glow behind text */}
       <div className="relative z-10 flex h-full w-full flex-col items-center justify-center px-4 py-20 text-center sm:px-6">
-        <div className="relative mx-auto w-full max-w-4xl">
+        <div className="relative w-full max-w-4xl mx-auto">
           {/* subtle behind-text glow only */}
           <div
             aria-hidden="true"
             className="pointer-events-none absolute -inset-x-16 -inset-y-10 -z-10 rounded-[2rem]
-                       bg-[radial-gradient(ellipse_at_center,rgba(6,16,40,0.75),rgba(6,16,40,0.45)_55%,transparent_75%)]
+                       bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.55),rgba(0,0,0,0.25)_45%,transparent_70%)]
                        blur-sm"
           />
           <motion.div
@@ -140,19 +140,19 @@ export function HeroCarousel({ showLogo = false }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: "easeOut" }}
-            className="flex w-full flex-col items-center gap-6 rounded-[2rem] bg-charcoal/70 px-8 py-12 text-center shadow-[0_40px_80px_rgba(6,16,40,0.45)] backdrop-blur-xl sm:px-12"
+            className="flex w-full flex-col items-center gap-6"
           >
             {showLogo && (
               <div className="flex items-center justify-center">
                 <img
                   src={logo}
                   alt="Parity logo"
-                  className="h-16 w-auto drop-shadow-[0_6px_22px_rgba(0,0,0,0.45)]"
+                  className="h-12 w-auto drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]"
                 />
               </div>
             )}
-            <span className="rounded-full bg-white/20 px-5 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-offwhite/90">
-              Global Parity intelligence
+            <span className="rounded-full bg-white/15 px-5 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-offwhite/90">
+              Global PPP intelligence
             </span>
             <h1 className="font-poppins text-4xl font-bold leading-tight text-white drop-shadow-lg sm:text-5xl lg:text-6xl">
               Same dollars, smarter world.
