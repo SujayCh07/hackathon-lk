@@ -89,101 +89,109 @@ export function SignupPage() {
       </div>
 
       {/* Right side signup form */}
-      <div className="flex h-full flex-col justify-center bg-white px-8 sm:px-12 md:px-16 lg:px-24">
-        <h2 className="text-2xl font-semibold text-navy">Sign Up</h2>
-        <p className="mt-2 text-sm text-charcoal/70">
-          Tell us who you are and we’ll handle your account integration automatically.
-        </p>
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-          <div>
-            <label
-              htmlFor="signup-display-name"
-              className="block text-sm font-semibold text-charcoal"
+      <div className="relative flex h-full flex-col justify-center overflow-hidden bg-gradient-to-br from-white/95 via-sky/10 to-offwhite/90 px-8 sm:px-12 md:px-16 lg:px-24">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -right-12 -top-24 h-64 w-64 rounded-full bg-gradient-to-br from-red/30 via-red/10 to-transparent blur-3xl" />
+          <div className="absolute -left-28 bottom-[-18%] h-80 w-80 rounded-full bg-gradient-to-tr from-navy/25 via-sky/20 to-transparent blur-3xl" />
+          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-white/80 via-white/50 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white/70 via-white/40 to-transparent" />
+        </div>
+        <div className="relative">
+          <h2 className="text-2xl font-semibold text-navy">Sign Up</h2>
+          <p className="mt-2 text-sm text-charcoal/70">
+            Tell us who you are and we’ll handle your account integration automatically.
+          </p>
+          <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+            <div>
+              <label
+                htmlFor="signup-display-name"
+                className="block text-sm font-semibold text-charcoal"
+              >
+                Full name
+              </label>
+              <input
+                id="signup-display-name"
+                type="text"
+                required
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal shadow-inner shadow-white/40 focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                placeholder="What is your full name?"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="signup-email"
+                className="block text-sm font-semibold text-charcoal"
+              >
+                Email
+              </label>
+              <input
+                id="signup-email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal shadow-inner shadow-white/40 focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                placeholder="you@example.com"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="signup-password"
+                className="block text-sm font-semibold text-charcoal"
+              >
+                Password
+              </label>
+              <input
+                id="signup-password"
+                type="password"
+                autoComplete="new-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal shadow-inner shadow-white/40 focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                placeholder="Create a secure password"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="signup-confirm-password"
+                className="block text-sm font-semibold text-charcoal"
+              >
+                Confirm password
+              </label>
+              <input
+                id="signup-confirm-password"
+                type="password"
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal shadow-inner shadow-white/40 focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                placeholder="Re-enter your password"
+              />
+            </div>
+            {formError && <p className="text-sm text-coral">{formError}</p>}
+            {message && <p className="text-sm text-teal">{message}</p>}
+            <Button
+              type="submit"
+              className="w-full justify-center"
+              disabled={isSubmitting}
             >
-              Full name
-            </label>
-            <input
-              id="signup-display-name"
-              type="text"
-              required
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="mt-2 w-full rounded-2xl border border-navy/20 bg-offwhite px-4 py-3 text-sm text-charcoal focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
-              placeholder="What is your full name?"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="signup-email"
-              className="block text-sm font-semibold text-charcoal"
+              {isSubmitting ? "Creating account…" : "Create account"}
+            </Button>
+          </form>
+          <p className="mt-6 text-center text-sm text-charcoal/70">
+            Already have an account?{" "}
+            <Link
+              to={`/login?redirectTo=${encodeURIComponent(redirectTo)}`}
+              className="font-semibold text-red hover:underline"
             >
-              Email
-            </label>
-            <input
-              id="signup-email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-2 w-full rounded-2xl border border-navy/20 bg-offwhite px-4 py-3 text-sm text-charcoal focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
-              placeholder="you@example.com"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="signup-password"
-              className="block text-sm font-semibold text-charcoal"
-            >
-              Password
-            </label>
-            <input
-              id="signup-password"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-2 w-full rounded-2xl border border-navy/20 bg-offwhite px-4 py-3 text-sm text-charcoal focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
-              placeholder="Create a secure password"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="signup-confirm-password"
-              className="block text-sm font-semibold text-charcoal"
-            >
-              Confirm password
-            </label>
-            <input
-              id="signup-confirm-password"
-              type="password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="mt-2 w-full rounded-2xl border border-navy/20 bg-offwhite px-4 py-3 text-sm text-charcoal focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
-              placeholder="Re-enter your password"
-            />
-          </div>
-          {formError && <p className="text-sm text-coral">{formError}</p>}
-          {message && <p className="text-sm text-teal">{message}</p>}
-          <Button
-            type="submit"
-            className="w-full justify-center"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Creating account…" : "Create account"}
-          </Button>
-        </form>
-        <p className="mt-6 text-center text-sm text-charcoal/70">
-          Already have an account?{" "}
-          <Link
-            to={`/login?redirectTo=${encodeURIComponent(redirectTo)}`}
-            className="font-semibold text-red hover:underline"
-          >
-            Log in
-          </Link>
-        </p>
+              Log in
+            </Link>
+          </p>
+        </div>
       </div>
     </section>
   );
