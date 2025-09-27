@@ -26,7 +26,6 @@ export function SignupPage() {
       setFormError('Please choose a display name.');
       return;
     }
-
     if (password !== confirmPassword) {
       setFormError('Passwords do not match.');
       return;
@@ -115,6 +114,7 @@ export function SignupPage() {
               placeholder="Create a secure password"
             />
           </div>
+
           <div>
             <label htmlFor="signup-confirm-password" className="block text-sm font-semibold text-charcoal">
               Confirm password
