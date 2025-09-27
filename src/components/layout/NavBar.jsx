@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Button from '../ui/Button.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
+import { UserCircleIcon } from '@heroicons/react/24/outline'; // account icon
 
 const authenticatedLinks = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -18,6 +19,7 @@ export function NavBar() {
   const { user, signOut, isLoading } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const links = user ? authenticatedLinks : [];
+
   const identityLabel = useMemo(() => {
     const metadata = user?.user_metadata ?? {};
     return (
@@ -25,7 +27,7 @@ export function NavBar() {
       metadata.name?.trim() ||
       [metadata.first_name, metadata.last_name].filter(Boolean).join(' ').trim() ||
       user?.email ||
-      'Logged in'
+      'Account'
     );
   }, [user]);
 
@@ -69,10 +71,17 @@ export function NavBar() {
           ))}
         </div>
 
+        {/* Account / Auth buttons */}
         <div className="hidden items-center gap-3 md:flex">
           {user ? (
             <>
-              <span className="text-sm font-semibold text-navy/70">{identityLabel}</span>
+              <NavLink
+                to="../../../components/user-account-menu"
+                className="flex items-center gap-2 text-sm font-semibold text-navy/70 hover:text-navy"
+              >
+                <UserCircleIcon className="h-5 w-5 text-navy/70" />
+                <span>{identityLabel}</span>
+              </NavLink>
               <Button
                 type="button"
                 variant="secondary"
@@ -124,15 +133,24 @@ export function NavBar() {
               ))}
               <li className="pt-3">
                 {user ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="w-full text-sm"
-                    onClick={handleSignOut}
-                    disabled={isSigningOut || isLoading}
-                  >
-                    {isSigningOut ? 'Signing out…' : 'Sign out'}
-                  </Button>
+                  <div className="space-y-2">
+                    <NavLink
+                      to="/settings"
+                      className="flex items-center gap-2 text-sm font-semibold text-navy/70 hover:text-navy"
+                    >
+                      <UserCircleIcon className="h-5 w-5 text-navy/70" />
+                      <span>{identityLabel}</span>
+                    </NavLink>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="w-full text-sm"
+                      onClick={handleSignOut}
+                      disabled={isSigningOut || isLoading}
+                    >
+                      {isSigningOut ? 'Signing out…' : 'Sign out'}
+                    </Button>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     <Button as={NavLink} to="/login" variant="secondary" className="w-full text-sm">
