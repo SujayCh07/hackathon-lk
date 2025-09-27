@@ -1,12 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useMemo, useState } from 'react';
 import Button from '../components/ui/Button.jsx';
 import { SettingsSection } from '../components/settings/SettingsSection.jsx';
-import { Toast } from '../components/ui/Toast.jsx';
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import { supabase } from '../lib/supabase.js';
-import { upsertUserProfile } from '../lib/userProfile.js';
 
 function formatCurrency(amount, currency = 'USD') {
   try {
@@ -41,39 +38,6 @@ export default function Settings() {
   const [countries, setCountries] = useState([]);
   const [countriesLoading, setCountriesLoading] = useState(false);
   const [countriesError, setCountriesError] = useState(null);
-  const [toast, setToast] = useState(null);
-
-  const dismissToast = useCallback(() => {
-    setToast(null);
-  }, []);
-
-  const showToast = useCallback((nextToast) => {
-    setToast({
-      id: Date.now(),
-      type: nextToast.type ?? 'info',
-      title: nextToast.title ?? '',
-      description: nextToast.description ?? '',
-      duration: typeof nextToast.duration === 'number' ? nextToast.duration : 4000
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!toast) {
-      return undefined;
-    }
-
-    if (typeof toast.duration !== 'number' || toast.duration <= 0) {
-      return undefined;
-    }
-
-    const timeout = setTimeout(() => {
-      setToast(null);
-    }, toast.duration);
-
-    return () => {
-      clearTimeout(timeout);
-    };
-  }, [toast]);
 
   const countryOptions = useMemo(() => {
     const map = new Map();
@@ -178,7 +142,6 @@ export default function Settings() {
       active = false;
     };
   }, []);
-
   const totalBalance = useMemo(() => {
     if (!Array.isArray(nessie?.accounts)) {
       return 0;
@@ -192,94 +155,62 @@ export default function Settings() {
   const headlineCurrency = nessie?.accounts?.[0]?.currencyCode ?? 'USD';
 
   async function handleSaveProfile(event) {
-    event.preventDefault();
-    if (!userId) {
-      return;
-    }
+  event.preventDefault();
+  if (!userId) return;
 
-    const trimmedName = displayName.trim();
-    const normalisedBudget = monthlyBudget.trim();
-    const normalisedAddress = streetAddress.trim();
-    const normalisedCurrentCountry =
-      typeof currentCountryCode === 'string' && currentCountryCode.trim().length > 0
-        ? currentCountryCode.trim().toUpperCase()
-        : null;
-    const normalisedHomeCountry =
-      typeof homeCountryCode === 'string' && homeCountryCode.trim().length > 0
-        ? homeCountryCode.trim().toUpperCase()
-        : null;
-    const parsedBudget = normalisedBudget === '' ? null : Number(normalisedBudget);
+  const trimmedName = displayName.trim();
+  const normalisedBudget = monthlyBudget.trim();
+  const normalisedCurrentCountry =
+    typeof currentCountryCode === "string" && currentCountryCode.trim().length > 0
+      ? currentCountryCode.trim().toUpperCase()
+      : null;
+  const normalisedHomeCountry =
+    typeof homeCountryCode === "string" && homeCountryCode.trim().length > 0
+      ? homeCountryCode.trim().toUpperCase()
+      : null;
+  const parsedBudget = normalisedBudget === "" ? null : Number(normalisedBudget);
 
-    if (parsedBudget != null && Number.isNaN(parsedBudget)) {
-      const message = 'Monthly budget must be a valid number.';
-      setProfileStatus({ type: 'error', message });
-      showToast({
-        type: 'error',
-        title: 'Check your monthly budget',
-        description: message
-      });
-      return;
-    }
-
-    setSavingProfile(true);
-    setProfileStatus(null);
-
-    try {
-      const updatedProfile = await upsertUserProfile({
-        userId,
-        name: trimmedName || null,
-        monthlyBudget: parsedBudget,
-        streetAddress: normalisedAddress || null,
-        currentCountryCode: normalisedCurrentCountry,
-        homeCountryCode: normalisedHomeCountry
-      });
-
-      if (trimmedName) {
-        const { error: metadataError } = await supabase.auth.updateUser({
-          data: {
-            ...(user?.user_metadata ?? {}),
-            displayName: trimmedName
-          }
-        });
-
-        if (metadataError) {
-          throw metadataError;
-        }
-      }
-
-      if (updatedProfile) {
-        setDisplayName(updatedProfile.name ?? trimmedName ?? '');
-        setMonthlyBudget(
-          updatedProfile.monthlyBudget != null ? String(updatedProfile.monthlyBudget) : ''
-        );
-        setStreetAddress(updatedProfile.streetAddress ?? '');
-        setCurrentCountryCode(updatedProfile.currentCountry?.code ?? '');
-        setHomeCountryCode(updatedProfile.homeCountry?.code ?? '');
-      }
-
-      try {
-        await refreshProfile();
-      } catch (refreshError) {
-        console.warn('Failed to refresh profile after save', refreshError);
-      }
-
-      showToast({
-        type: 'success',
-        title: 'Settings saved',
-        description: 'Your profile preferences are now up to date.'
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update profile settings.';
-      setProfileStatus({ type: 'error', message });
-      showToast({
-        type: 'error',
-        title: 'Could not save settings',
-        description: message
-      });
-    } finally {
-      setSavingProfile(false);
-    }
+  if (parsedBudget != null && Number.isNaN(parsedBudget)) {
+    setProfileStatus({ type: "error", message: "Monthly budget must be a valid number." });
+    return;
   }
+
+  setSavingProfile(true);
+  setProfileStatus(null);
+
+  try {
+    const updates = {
+      user_id: userId,
+      name: trimmedName || null,
+      monthly_budget: parsedBudget,
+      current_country_code: normalisedCurrentCountry,
+      home_country_code: normalisedHomeCountry
+    };
+
+    const { error } = await supabase
+      .from("user_profile")
+      .upsert(updates, { onConflict: "user_id" });
+
+    if (error) throw error;
+
+    // Also update Supabase auth metadata
+    if (trimmedName) {
+      const { error: metadataError } = await supabase.auth.updateUser({
+        data: { displayName: trimmedName }
+      });
+      if (metadataError) throw metadataError;
+    }
+
+    await refreshProfile();
+    setProfileStatus({ type: "success", message: "Profile settings updated successfully." });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update profile settings.";
+    setProfileStatus({ type: "error", message });
+  } finally {
+    setSavingProfile(false);
+  }
+}
+
 
   async function handleRefreshAccounts() {
     if (typeof refreshNessie !== 'function') {
@@ -297,60 +228,45 @@ export default function Settings() {
   }
 
   return (
-    <>
-      <AnimatePresence>
-        {toast ? (
-          <motion.div
-            key={toast.id}
-            initial={{ opacity: 0, y: -16, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -16, scale: 0.95 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="fixed inset-x-0 top-4 z-50 flex justify-center px-4 sm:inset-auto sm:right-6 sm:top-6 sm:w-auto"
+    <main className="mx-auto w-full max-w-6xl px-6 py-12">
+      <header className="mb-10 space-y-2">
+        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-red/80">Account</p>
+        <h1 className="text-4xl font-bold tracking-tight text-navy">Settings</h1>
+        <p className="max-w-2xl text-base text-slate/80">
+          Update your personal details, budgeting preferences, and refresh your linked Capital One data.
+        </p>
+      </header>
+
+      <div className="space-y-6">
+        {profileStatus ? (
+          <div
+            className={
+              profileStatus.type === 'error'
+                ? 'rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-sm text-red'
+                : 'rounded-2xl border border-emerald-400/40 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700'
+            }
           >
-            <Toast
-              type={toast.type}
-              title={toast.title}
-              description={toast.description}
-              onDismiss={dismissToast}
-            />
-          </motion.div>
+            {profileStatus.message}
+          </div>
         ) : null}
-      </AnimatePresence>
 
-      <main className="mx-auto w-full max-w-6xl px-6 py-12">
-        <header className="mb-10 space-y-2">
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-red/80">Account</p>
-          <h1 className="text-4xl font-bold tracking-tight text-navy">Settings</h1>
-          <p className="max-w-2xl text-base text-slate/80">
-            Update your personal details, budgeting preferences, and refresh your linked Capital One data.
-          </p>
-        </header>
+        {profileError ? (
+          <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-sm text-red">
+            {profileError.message || 'We were unable to load your profile information.'}
+          </div>
+        ) : null}
 
-        <div className="space-y-6">
-          {profileStatus?.type === 'error' ? (
-            <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-sm text-red">
-              {profileStatus.message}
-            </div>
-          ) : null}
-
-          {profileError ? (
-            <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-sm text-red">
-              {profileError.message || 'We were unable to load your profile information.'}
-            </div>
-          ) : null}
-
-          <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-            <SettingsSection
-              title="Profile"
-              description="Control how your name appears across PPP Pocket and track your monthly travel savings target."
-              actions={
-                <Button type="submit" form="profile-form" className="px-5 py-2 text-sm" disabled={savingProfile}>
-                  {savingProfile ? 'Saving…' : 'Save changes'}
-                </Button>
-              }
-            >
-              <form id="profile-form" onSubmit={handleSaveProfile} className="grid gap-6">
+        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+          <SettingsSection
+            title="Profile"
+            description="Control how your name appears across PPP Pocket and track your monthly travel savings target."
+            actions={
+              <Button type="submit" form="profile-form" className="px-5 py-2 text-sm" disabled={savingProfile}>
+                {savingProfile ? 'Saving…' : 'Save changes'}
+              </Button>
+            }
+          >
+            <form id="profile-form" onSubmit={handleSaveProfile} className="grid gap-6">
               <div className="grid gap-2">
                 <label htmlFor="display-name" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
                   Display name
@@ -470,10 +386,10 @@ export default function Settings() {
                 </div>
               ) : null}
             </form>
-            </SettingsSection>
+          </SettingsSection>
 
-            <SettingsSection
-              title="Capital One sync"
+          <SettingsSection
+            title="Capital One sync"
             description="See the latest balances pulled from your demo Capital One account and refresh whenever you need."
             actions={
               <Button
@@ -529,9 +445,8 @@ export default function Settings() {
               </div>
             ) : null}
           </SettingsSection>
-          </div>
         </div>
-      </main>
-    </>
+      </div>
+    </main>
   );
 }
