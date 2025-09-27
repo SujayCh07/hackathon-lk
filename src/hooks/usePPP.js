@@ -98,25 +98,17 @@ export function usePPP() {
     }
   }, []); // No dependencies since it's a pure function
 
-  const calculateRunway = async (monthlyBudgetUSD, fromCountry, toCountry, monthlyCostInTargetCountry) => {
-    try {
-      console.log(`Calculating runway: ${monthlyBudgetUSD}/month budget for ${toCountry}`);
-      
-      // Use the new simplified runway calculation
-      const result = await calculateBudgetRunway(monthlyBudgetUSD, toCountry);
-      
-      if (typeof result === 'number') {
-        console.log(`Runway calculated: ${result.toFixed(2)} months worth of expenses`);
-        return result;
-      } else {
-        console.warn(`Runway calculation failed: ${result}`);
-        return 0;
-      }
-    } catch (error) {
-      console.error('Error calculating runway:', error);
-      return 0;
-    }
-  };
+
+const calculateRunway = useCallback(async (monthlyBudgetUSD, fromCountry, toCountry, monthlyCost) => {
+  try {
+    const result = await calculateBudgetRunway(monthlyBudgetUSD, toCountry);
+    return typeof result === 'number' ? result : 0;
+  } catch (err) {
+    console.error('calculateRunway failed:', err);
+    return 0;
+  }
+}, []);
+
 
   const getPPPRatio = useCallback(async (fromCountry, toCountry) => {
     try {
