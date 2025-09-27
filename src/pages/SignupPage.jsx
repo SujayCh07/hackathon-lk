@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
+import { upsertUserProfileName, upsertUserRow } from '../lib/userIdentity.js';
 import Button from '../components/ui/Button.jsx';
 
 export function SignupPage() {
@@ -32,13 +33,14 @@ export function SignupPage() {
 
     setIsSubmitting(true);
 
-    // ✅ Create account with Supabase
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { display_name: displayName.trim() }, // stored in user metadata
-      },
+        data: {
+          displayName: displayName.trim()
+        }
+      }
     });
 
     if (error) {
@@ -47,19 +49,17 @@ export function SignupPage() {
       return;
     }
 
-    // ✅ Store user identity in your `users` table
-    if (data?.user) {
+    if (data.user) {
       await persistUserIdentity(data.user, displayName.trim());
     }
 
-    // ✅ Redirect user if auto-confirmation is enabled
     if (data.session) {
       navigate(redirectTo, { replace: true });
-    } else {
-      // Otherwise tell them to check email
-      setMessage('Account created!');
-      setIsSubmitting(false);
+      return;
     }
+
+    setMessage('Check your inbox for a confirmation email before signing in.');
+    setIsSubmitting(false);
   }
 
   return (
@@ -67,27 +67,23 @@ export function SignupPage() {
       <div className="w-full max-w-md rounded-3xl border border-navy/10 bg-white/95 p-8 shadow-xl shadow-navy/10">
         <h1 className="text-2xl font-semibold text-navy">Create your account</h1>
         <p className="mt-2 text-sm text-charcoal/70">
-          We’ll link your account and prepare your Nessie sandbox data as soon as you confirm your email address.
+          We’ll keep your Nessie sandbox data in sync as soon as you confirm your email address.
         </p>
-
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-          {/* Username */}
           <div>
             <label htmlFor="signup-display-name" className="block text-sm font-semibold text-charcoal">
-              Username
+              Display name
             </label>
             <input
               id="signup-display-name"
               type="text"
               required
               value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
+              onChange={(event) => setDisplayName(event.target.value)}
               className="mt-2 w-full rounded-2xl border border-navy/20 bg-offwhite px-4 py-3 text-sm text-charcoal focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
-              placeholder="What's your full name?"
+              placeholder="How should we greet you?"
             />
           </div>
-
-          {/* Email */}
           <div>
             <label htmlFor="signup-email" className="block text-sm font-semibold text-charcoal">
               Email
@@ -98,13 +94,11 @@ export function SignupPage() {
               autoComplete="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               className="mt-2 w-full rounded-2xl border border-navy/20 bg-offwhite px-4 py-3 text-sm text-charcoal focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
               placeholder="you@example.com"
             />
           </div>
-
-          {/* Password */}
           <div>
             <label htmlFor="signup-password" className="block text-sm font-semibold text-charcoal">
               Password
@@ -115,13 +109,11 @@ export function SignupPage() {
               autoComplete="new-password"
               required
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               className="mt-2 w-full rounded-2xl border border-navy/20 bg-offwhite px-4 py-3 text-sm text-charcoal focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
               placeholder="Create a secure password"
             />
           </div>
-
-          {/* Confirm password */}
           <div>
             <label htmlFor="signup-confirm-password" className="block text-sm font-semibold text-charcoal">
               Confirm password
@@ -132,29 +124,20 @@ export function SignupPage() {
               autoComplete="new-password"
               required
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={(event) => setConfirmPassword(event.target.value)}
               className="mt-2 w-full rounded-2xl border border-navy/20 bg-offwhite px-4 py-3 text-sm text-charcoal focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
               placeholder="Re-enter your password"
             />
           </div>
-
-          {/* Errors & messages */}
           {formError && <p className="text-sm text-coral">{formError}</p>}
           {message && <p className="text-sm text-teal">{message}</p>}
-
-          {/* Submit button */}
           <Button type="submit" className="w-full justify-center" disabled={isSubmitting}>
             {isSubmitting ? 'Creating account…' : 'Create account'}
           </Button>
         </form>
-
-        {/* Already have account */}
         <p className="mt-6 text-center text-sm text-charcoal/70">
           Already have an account?{' '}
-          <Link
-            to={`/login?redirectTo=${encodeURIComponent(redirectTo)}`}
-            className="font-semibold text-red hover:underline"
-          >
+          <Link to={`/login?redirectTo=${encodeURIComponent(redirectTo)}`} className="font-semibold text-red hover:underline">
             Sign in
           </Link>
         </p>
@@ -165,20 +148,15 @@ export function SignupPage() {
 
 export default SignupPage;
 
-// 🔹 Persist user identity to Supabase tables
 async function persistUserIdentity(user, displayName) {
-  if (!user?.id) return;
+  if (!user?.id) {
+    return;
+  }
 
-  const userRecord = {
-    id: user.id,
-    email: user.email ?? null,
-    display_name: displayName,
-  };
+  await upsertUserRow({ id: user.id, email: user.email ?? null });
 
-  try {
-    const { error } = await supabase.from('users').upsert(userRecord, { onConflict: 'id' });
-    if (error) console.warn('Unable to save user row', error);
-  } catch (err) {
-    console.warn('Error saving user row', err);
+  const trimmedName = displayName?.trim();
+  if (trimmedName) {
+    await upsertUserProfileName({ userId: user.id, displayName: trimmedName });
   }
 }
