@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Button from '../components/ui/Button.jsx';
 import { SettingsSection } from '../components/settings/SettingsSection.jsx';
 import { useAuth } from '../hooks/useAuth.js';
@@ -17,6 +18,53 @@ function formatCurrency(amount, currency = 'USD') {
   }
 }
 
+const EMPTY_ADDRESS_FORM = {
+  houseNumber: '',
+  street: '',
+  city: '',
+  state: '',
+};
+
+function normaliseAddressInput(parts = EMPTY_ADDRESS_FORM) {
+  return {
+    houseNumber:
+      typeof parts.houseNumber === 'string' ? parts.houseNumber.trim() : EMPTY_ADDRESS_FORM.houseNumber,
+    street: typeof parts.street === 'string' ? parts.street.trim() : EMPTY_ADDRESS_FORM.street,
+    city: typeof parts.city === 'string' ? parts.city.trim() : EMPTY_ADDRESS_FORM.city,
+    state:
+      typeof parts.state === 'string'
+        ? parts.state.trim().toUpperCase()
+        : EMPTY_ADDRESS_FORM.state,
+  };
+}
+
+function formatAddressPreview(parts) {
+  const { houseNumber, street, city, state } = normaliseAddressInput(parts);
+  const lineOne = [houseNumber, street].filter(Boolean).join(' ').trim();
+  const lineTwo = [city, state].filter(Boolean).join(', ').replace(/^,\s*/, '').trim();
+  return [lineOne, lineTwo].filter(Boolean).join('\n');
+}
+
+function serialiseAddress(parts) {
+  const normalised = normaliseAddressInput(parts);
+  const formatted = formatAddressPreview(normalised);
+  const hasValue = Object.values(normalised).some((value) => value.length > 0);
+
+  if (!hasValue) {
+    return {
+      normalised,
+      formatted: '',
+      serialised: null,
+    };
+  }
+
+  return {
+    normalised,
+    formatted,
+    serialised: JSON.stringify({ ...normalised, formatted }),
+  };
+}
+
 export default function Settings() {
   const { user, nessie, isSyncingNessie, refreshNessie } = useAuth();
   const userId = user?.id ?? null;
@@ -29,7 +77,10 @@ export default function Settings() {
 
   const [displayName, setDisplayName] = useState('');
   const [monthlyBudget, setMonthlyBudget] = useState('');
-  const [streetAddress, setStreetAddress] = useState('');
+  const [addressHouseNumber, setAddressHouseNumber] = useState('');
+  const [addressStreet, setAddressStreet] = useState('');
+  const [addressCity, setAddressCity] = useState('');
+  const [addressState, setAddressState] = useState('');
   const [currentCountryCode, setCurrentCountryCode] = useState('');
   const [homeCountryCode, setHomeCountryCode] = useState('');
   const [profileStatus, setProfileStatus] = useState(null);
@@ -38,6 +89,7 @@ export default function Settings() {
   const [countries, setCountries] = useState([]);
   const [countriesLoading, setCountriesLoading] = useState(false);
   const [countriesError, setCountriesError] = useState(null);
+  const [profileToast, setProfileToast] = useState(null);
 
   const countryOptions = useMemo(() => {
     const map = new Map();
@@ -63,6 +115,20 @@ export default function Settings() {
 
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [countries, profile?.currentCountry, profile?.homeCountry]);
+
+  useEffect(() => {
+    if (!profileToast) {
+      return undefined;
+    }
+
+    const timeout = setTimeout(() => {
+      setProfileToast(null);
+    }, profileToast.duration ?? 4800);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [profileToast]);
 
   const identityFallback = useMemo(() => {
     if (!user) {
@@ -93,7 +159,11 @@ export default function Settings() {
         ? String(profile.monthlyBudget)
         : ''
     );
-    setStreetAddress(profile?.streetAddress ?? '');
+    const address = profile?.streetAddress ?? null;
+    setAddressHouseNumber(address?.houseNumber ?? '');
+    setAddressStreet(address?.street ?? '');
+    setAddressCity(address?.city ?? '');
+    setAddressState(address?.state ? address.state.toUpperCase() : '');
     setCurrentCountryCode(profile?.currentCountry?.code ?? '');
     setHomeCountryCode(profile?.homeCountry?.code ?? '');
   }, [profile, profileLoading, identityFallback]);
@@ -154,62 +224,85 @@ export default function Settings() {
 
   const headlineCurrency = nessie?.accounts?.[0]?.currencyCode ?? 'USD';
 
+  const addressPreview = useMemo(
+    () =>
+      formatAddressPreview({
+        houseNumber: addressHouseNumber,
+        street: addressStreet,
+        city: addressCity,
+        state: addressState,
+      }),
+    [addressHouseNumber, addressStreet, addressCity, addressState]
+  );
+
   async function handleSaveProfile(event) {
-  event.preventDefault();
-  if (!userId) return;
+    event.preventDefault();
+    if (!userId) return;
 
-  const trimmedName = displayName.trim();
-  const normalisedBudget = monthlyBudget.trim();
-  const normalisedCurrentCountry =
-    typeof currentCountryCode === "string" && currentCountryCode.trim().length > 0
-      ? currentCountryCode.trim().toUpperCase()
-      : null;
-  const normalisedHomeCountry =
-    typeof homeCountryCode === "string" && homeCountryCode.trim().length > 0
-      ? homeCountryCode.trim().toUpperCase()
-      : null;
-  const parsedBudget = normalisedBudget === "" ? null : Number(normalisedBudget);
+    const trimmedName = displayName.trim();
+    const normalisedBudget = monthlyBudget.trim();
+    const normalisedCurrentCountry =
+      typeof currentCountryCode === 'string' && currentCountryCode.trim().length > 0
+        ? currentCountryCode.trim().toUpperCase()
+        : null;
+    const normalisedHomeCountry =
+      typeof homeCountryCode === 'string' && homeCountryCode.trim().length > 0
+        ? homeCountryCode.trim().toUpperCase()
+        : null;
+    const parsedBudget = normalisedBudget === '' ? null : Number(normalisedBudget);
+    const addressResult = serialiseAddress({
+      houseNumber: addressHouseNumber,
+      street: addressStreet,
+      city: addressCity,
+      state: addressState,
+    });
 
-  if (parsedBudget != null && Number.isNaN(parsedBudget)) {
-    setProfileStatus({ type: "error", message: "Monthly budget must be a valid number." });
-    return;
-  }
-
-  setSavingProfile(true);
-  setProfileStatus(null);
-
-  try {
-    const updates = {
-      user_id: userId,
-      name: trimmedName || null,
-      monthly_budget: parsedBudget,
-      current_country_code: normalisedCurrentCountry,
-      home_country_code: normalisedHomeCountry
-    };
-
-    const { error } = await supabase
-      .from("user_profile")
-      .upsert(updates, { onConflict: "user_id" });
-
-    if (error) throw error;
-
-    // Also update Supabase auth metadata
-    if (trimmedName) {
-      const { error: metadataError } = await supabase.auth.updateUser({
-        data: { displayName: trimmedName }
-      });
-      if (metadataError) throw metadataError;
+    if (parsedBudget != null && Number.isNaN(parsedBudget)) {
+      setProfileStatus({ type: 'error', message: 'Monthly budget must be a valid number.' });
+      return;
     }
 
-    await refreshProfile();
-    setProfileStatus({ type: "success", message: "Profile settings updated successfully." });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to update profile settings.";
-    setProfileStatus({ type: "error", message });
-  } finally {
-    setSavingProfile(false);
+    setSavingProfile(true);
+    setProfileStatus(null);
+
+    try {
+      const updates = {
+        user_id: userId,
+        name: trimmedName || null,
+        monthly_budget: parsedBudget,
+        current_country_code: normalisedCurrentCountry,
+        home_country_code: normalisedHomeCountry,
+        street_address: addressResult.serialised,
+      };
+
+      const { error } = await supabase.from('user_profile').upsert(updates, { onConflict: 'user_id' });
+
+      if (error) throw error;
+
+      if (trimmedName) {
+        const { error: metadataError } = await supabase.auth.updateUser({
+          data: { displayName: trimmedName },
+        });
+        if (metadataError) throw metadataError;
+      }
+
+      await refreshProfile();
+      setProfileStatus(null);
+      setProfileToast({
+        title: 'Profile saved',
+        description:
+          addressResult.formatted
+            ? `Mailing address saved as ${addressResult.formatted.replace(/\n/g, ', ')}.`
+            : 'Your profile preferences were saved successfully.',
+        duration: 5200,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update profile settings.';
+      setProfileStatus({ type: 'error', message });
+    } finally {
+      setSavingProfile(false);
+    }
   }
-}
 
 
   async function handleRefreshAccounts() {
@@ -229,6 +322,28 @@ export default function Settings() {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-12">
+      {profileToast ? (
+        <div className="pointer-events-none fixed inset-x-0 top-6 z-40 flex justify-center px-4 sm:top-8 sm:justify-end sm:px-6">
+          <div className="pointer-events-auto flex max-w-sm items-start gap-3 rounded-3xl border border-emerald-200/80 bg-white/95 px-5 py-4 text-left shadow-xl shadow-emerald-200/60 ring-1 ring-emerald-300/60 backdrop-blur">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+              <CheckCircleIcon className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div className="flex-1 space-y-1">
+              <p className="text-sm font-semibold text-navy">{profileToast.title}</p>
+              <p className="text-xs leading-5 text-slate/70">{profileToast.description}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setProfileToast(null)}
+              className="mt-1 rounded-full p-1 text-slate/60 transition hover:bg-slate/10 hover:text-slate/80 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:ring-offset-2 focus:ring-offset-white"
+              aria-label="Dismiss notification"
+            >
+              <XMarkIcon className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <header className="mb-10 space-y-2">
         <p className="text-sm font-semibold uppercase tracking-[0.25em] text-red/80">Account</p>
         <h1 className="text-4xl font-bold tracking-tight text-navy">Settings</h1>
@@ -238,14 +353,8 @@ export default function Settings() {
       </header>
 
       <div className="space-y-6">
-        {profileStatus ? (
-          <div
-            className={
-              profileStatus.type === 'error'
-                ? 'rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-sm text-red'
-                : 'rounded-2xl border border-emerald-400/40 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-700'
-            }
-          >
+        {profileStatus?.type === 'error' ? (
+          <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-sm text-red">
             {profileStatus.message}
           </div>
         ) : null}
@@ -305,23 +414,90 @@ export default function Settings() {
                 </p>
               </div>
 
-              <div className="grid gap-2">
-                <label htmlFor="street-address" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
+              <fieldset className="grid gap-3">
+                <legend className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
                   Mailing address
-                </label>
-                <textarea
-                  id="street-address"
-                  value={streetAddress}
-                  onChange={(event) => setStreetAddress(event.target.value)}
-                  placeholder="e.g. 123 Market Street, Apartment 4B"
-                  className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
-                  rows={3}
-                  disabled={savingProfile}
-                />
+                </legend>
+                <div className="grid gap-4 sm:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
+                  <div className="grid gap-1.5">
+                    <label htmlFor="address-house-number" className="text-xs font-medium text-slate/70">
+                      House number
+                    </label>
+                    <input
+                      id="address-house-number"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="address-line1"
+                      value={addressHouseNumber}
+                      onChange={(event) => setAddressHouseNumber(event.target.value)}
+                      placeholder="e.g. 123"
+                      className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                      disabled={savingProfile}
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <label htmlFor="address-street" className="text-xs font-medium text-slate/70">
+                      Street
+                    </label>
+                    <input
+                      id="address-street"
+                      type="text"
+                      autoComplete="address-line1"
+                      value={addressStreet}
+                      onChange={(event) => setAddressStreet(event.target.value)}
+                      placeholder="Market Street"
+                      className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                      disabled={savingProfile}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
+                  <div className="grid gap-1.5">
+                    <label htmlFor="address-city" className="text-xs font-medium text-slate/70">
+                      City
+                    </label>
+                    <input
+                      id="address-city"
+                      type="text"
+                      autoComplete="address-level2"
+                      value={addressCity}
+                      onChange={(event) => setAddressCity(event.target.value)}
+                      placeholder="San Francisco"
+                      className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                      disabled={savingProfile}
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <label htmlFor="address-state" className="text-xs font-medium text-slate/70">
+                      State / region
+                    </label>
+                    <input
+                      id="address-state"
+                      type="text"
+                      autoComplete="address-level1"
+                      value={addressState}
+                      onChange={(event) => setAddressState(event.target.value.toUpperCase())}
+                      placeholder="CA"
+                      className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                      disabled={savingProfile}
+                      maxLength={32}
+                    />
+                  </div>
+                </div>
+                <div className="rounded-3xl border border-slate/15 bg-white/80 px-4 py-3 shadow-inner shadow-white/40">
+                  {addressPreview ? (
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate/60">Preview</p>
+                      <p className="whitespace-pre-wrap text-xs font-mono text-slate/70">{addressPreview}</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate/60">We'll format your address automatically as you type.</p>
+                  )}
+                </div>
                 <p className="text-xs text-slate/60">
                   This stays private and helps us tailor exchange rates and insights for your home base.
                 </p>
-              </div>
+              </fieldset>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
