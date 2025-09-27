@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import CategoryTile from '../components/insights/CategoryTile.jsx';
-import ComparisonChart from '../components/insights/ComparisonChart.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
 import { useTransactions } from '../hooks/useTransactions.js';
 import { usePPP } from '../hooks/usePPP.js';
@@ -137,7 +136,7 @@ export function Insights() {
         <CardHeader>
           <CardTitle>Smart-Spend insights</CardTitle>
           <p className="text-sm text-charcoal/70">
-            Compare your spending categories with global PPP adjustments to see how far your dollars stretch.
+            Compare your spending with PPP adjustments. You can search up to <strong>5 cities</strong>.
           </p>
           {summary && <p className="mt-2 text-sm font-semibold text-teal">{summary}</p>}
           <p className="mt-1 text-xs text-charcoal/60">Smart-Spend = see exactly where your money goes globally.</p>

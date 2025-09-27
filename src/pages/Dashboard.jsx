@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
 import WorldMap from '../components/score/WorldMap.jsx';
 import CityCard from '../components/score/CityCard.jsx';
@@ -27,6 +28,7 @@ const COUNTRY_COORDS = {
   canada: [45.4215, -75.6972],
 };
 
+// --- Helpers ---
 function formatUSD(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(n) ?? 0);
 }
@@ -90,6 +92,7 @@ function buildNotifications({ bestCity, runnerUp, weeklyChange, budgetDelta }) {
   return notes;
 }
 
+// --- Main Component ---
 export function Dashboard() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
@@ -225,7 +228,7 @@ export function Dashboard() {
                       {new Date(txn.timestamp ?? txn.date ?? Date.now()).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="mt-2 text-right sm:mt-0">
                     <p className="font-semibold text-coral">{formatUSD(txn.amount)}</p>
                     <p className="text-xs text-charcoal/60">{txn.category ?? 'General'}</p>
                   </div>
@@ -236,7 +239,8 @@ export function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Trends + Notifications */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="bg-white/90">
           <CardHeader>
             <CardTitle>Trends & insights</CardTitle>
