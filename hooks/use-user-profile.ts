@@ -15,6 +15,15 @@ export interface UserProfileCountry {
   name: string | null
 }
 
+export interface UserProfileAddress {
+  raw: string
+  formatted: string
+  houseNumber: string
+  street: string
+  city: string
+  state: string
+}
+
 export interface UserProfileData {
   name: string | null
   monthlyBudget: number | null
@@ -22,6 +31,7 @@ export interface UserProfileData {
   homeCity: UserProfileCity | null
   currentCountry: UserProfileCountry | null
   homeCountry: UserProfileCountry | null
+  streetAddress: UserProfileAddress
 }
 
 interface SupabaseProfileRow {
@@ -47,6 +57,7 @@ interface SupabaseProfileRow {
     code?: string | null
     country?: string | null
   } | null
+  street_address?: string | null
 }
 
 function normaliseNumber(value: unknown): number | null {
@@ -84,6 +95,122 @@ function normaliseCountry(country: SupabaseProfileRow["current_country"]): UserP
   }
 }
 
+const EMPTY_ADDRESS: UserProfileAddress = {
+  raw: "",
+  formatted: "",
+  houseNumber: "",
+  street: "",
+  city: "",
+  state: "",
+}
+
+function buildAddressString(parts: Partial<UserProfileAddress>) {
+  const lineOne = [parts.houseNumber, parts.street]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .filter((value) => value.length > 0)
+    .join(" ")
+    .trim()
+
+  const lineTwo = [parts.city, parts.state]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .filter((value) => value.length > 0)
+    .join(", ")
+    .trim()
+
+  return [lineOne, lineTwo].filter((line) => line.length > 0).join("\n")
+}
+
+function normaliseStreetAddress(value: SupabaseProfileRow["street_address"]): UserProfileAddress {
+  if (!value) return { ...EMPTY_ADDRESS }
+
+  let rawValue = value
+  if (typeof rawValue !== "string") {
+    rawValue = String(rawValue)
+  }
+
+  const cleaned = rawValue.replace(/\r/g, "").trim()
+  if (!cleaned) return { ...EMPTY_ADDRESS }
+
+  try {
+    const parsed = JSON.parse(cleaned) as Record<string, unknown>
+    if (parsed && typeof parsed === "object") {
+      const parts = {
+        houseNumber: typeof parsed.houseNumber === "string" ? parsed.houseNumber.trim() : "",
+        street: typeof parsed.street === "string" ? parsed.street.trim() : "",
+        city: typeof parsed.city === "string" ? parsed.city.trim() : "",
+        state:
+          typeof parsed.state === "string"
+            ? parsed.state.trim().toUpperCase()
+            : "",
+      }
+
+      const formatted =
+        typeof parsed.formatted === "string" && parsed.formatted.trim().length > 0
+          ? parsed.formatted.trim()
+          : buildAddressString(parts)
+      return {
+        raw: cleaned,
+        formatted,
+        ...parts,
+      }
+    }
+  } catch (error) {
+    // Ignore JSON parsing errors and fall back to heuristic parsing
+  }
+
+  const lines = cleaned
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+
+  let lineOne = lines[0] ?? ""
+  let remainder = lines.slice(1).join(", ")
+
+  if (!remainder && lineOne.includes(",")) {
+    const [first, ...rest] = lineOne
+      .split(",")
+      .map((segment) => segment.trim())
+      .filter((segment) => segment.length > 0)
+    lineOne = first ?? ""
+    remainder = rest.join(", ")
+  }
+
+  const parts = { ...EMPTY_ADDRESS }
+
+  const numberMatch = lineOne.match(/^(?<number>[\dA-Za-z-]+)\s+(?<street>.*)$/)
+  if (numberMatch?.groups) {
+    parts.houseNumber = numberMatch.groups.number?.trim() ?? ""
+    parts.street = numberMatch.groups.street?.trim() ?? ""
+  } else {
+    parts.street = lineOne.trim()
+  }
+
+  const locality = remainder || lines[1] || ""
+  const localityParts = locality
+    .split(",")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0)
+
+  if (localityParts.length === 1) {
+    if (localityParts[0].length <= 3) {
+      parts.state = localityParts[0].toUpperCase()
+    } else {
+      parts.city = localityParts[0]
+    }
+  } else if (localityParts.length > 1) {
+    parts.city = localityParts[0]
+    parts.state = localityParts[1]?.toUpperCase() ?? ""
+  }
+
+  const formatted = buildAddressString(parts)
+
+  return {
+    raw: cleaned,
+    formatted,
+    ...parts,
+  }
+}
+
 function mapProfile(row: SupabaseProfileRow | null): UserProfileData | null {
   if (!row) return null
 
@@ -94,6 +221,7 @@ function mapProfile(row: SupabaseProfileRow | null): UserProfileData | null {
     homeCity: normaliseCity(row.home_city),
     currentCountry: normaliseCountry(row.current_country),
     homeCountry: normaliseCountry(row.home_country),
+    streetAddress: normaliseStreetAddress(row.street_address),
   }
 }
 
@@ -113,6 +241,7 @@ export function useUserProfile(userId?: string | null) {
         `
         name,
         monthly_budget,
+        street_address,
         current_city:ppp_city!user_profile_current_city_code_fkey(code, name, flag, ppp),
         home_city:ppp_city!user_profile_home_city_code_fkey(code, name, flag, ppp),
         current_country:country_ref!user_profile_current_country_fkey(code, country),
