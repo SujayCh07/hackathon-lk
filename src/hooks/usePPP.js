@@ -25,11 +25,11 @@ export function usePPP() {
     return amountUSD / entry.ppp;
   };
 
-  const calculateRunway = (balanceUSD, city) => {
+  const calculateRunway = (monthlyBudgetUSD, city) => {
     const entry = pppData[city];
     if (!entry) return 0;
     const adjustedMonthlyCost = entry.monthlyCost * entry.ppp;
-    return balanceUSD / adjustedMonthlyCost;
+    return monthlyBudgetUSD / adjustedMonthlyCost;
   };
 
   const rankedBySavings = useMemo(() => {
