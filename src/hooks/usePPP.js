@@ -1,28 +1,76 @@
 import { useEffect, useMemo, useState } from 'react';
-import index from '../data/mockPPPIndex.json';
+import supabase, { getPurchasingPowerRatio, getAdjustedPrice, calculateLivingTime } from '../Econ.js';
 
 export function usePPP() {
   const [pppData, setPPPData] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setPPPData(index);
-    }, 150);
+    const fetchPPPData = async () => {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('ppp_country')
+          .select('country, ppp_index');
 
-    return () => clearTimeout(timeout);
+        if (error) {
+          console.error('Error fetching PPP data:', error);
+          setError(error);
+          return;
+        }
+
+        // Transform data to match the original structure
+        const transformedData = {};
+        data.forEach(row => {
+          if (row.country && row.ppp_index != null) {
+            transformedData[row.country] = {
+              ppp: row.ppp_index,
+              // You may need to add other properties like monthlyCost if they exist in your database
+              // or calculate them based on available data
+            };
+          }
+        });
+
+        setPPPData(transformedData);
+        setError(null);
+      } catch (err) {
+        console.error('Error in fetchPPPData:', err);
+        setError(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPPPData();
   }, []);
 
   const cities = useMemo(() => {
-    return Object.entries(pppData).map(([city, values]) => ({
-      city,
+    return Object.entries(pppData).map(([country, values]) => ({
+      city: country, // Using country as city for consistency with original structure
+      country,
       ...values
     }));
   }, [pppData]);
 
-  const adjustPrice = (amountUSD, city) => {
-    const entry = pppData[city];
-    if (!entry) return amountUSD;
-    return amountUSD / entry.ppp;
+  const adjustPrice = async (amountUSD, fromCountry, toCountry) => {
+    try {
+      const result = await getAdjustedPrice(fromCountry, toCountry, amountUSD);
+      return typeof result === 'number' ? result : amountUSD;
+    } catch (error) {
+      console.error('Error adjusting price:', error);
+      return amountUSD;
+    }
+  };
+
+  const calculateRunway = async (monthlyBudgetUSD, fromCountry, toCountry, monthlyCostInTargetCountry) => {
+    try {
+      const result = await calculateLivingTime(fromCountry, toCountry, monthlyBudgetUSD, monthlyCostInTargetCountry);
+      return typeof result === 'number' ? result : 0;
+    } catch (error) {
+      console.error('Error calculating runway:', error);
+      return 0;
+    }
   };
 
   const calculateRunway = (monthlyBudgetUSD, city) => {
@@ -33,7 +81,7 @@ export function usePPP() {
   };
 
   const rankedBySavings = useMemo(() => {
-    const atlantaPPP = pppData.Atlanta?.ppp ?? 1;
+    const atlantaPPP = pppData.Atlanta?.ppp ?? pppData.USA?.ppp ?? 1;
     return cities
       .map((entry) => {
         const savings = ((atlantaPPP - entry.ppp) / atlantaPPP) * 100;
@@ -50,7 +98,9 @@ export function usePPP() {
     cities,
     adjustPrice,
     calculateRunway,
+    getPPPRatio,
     rankedBySavings,
-    isLoading: Object.keys(pppData).length === 0
+    isLoading,
+    error
   };
 }
