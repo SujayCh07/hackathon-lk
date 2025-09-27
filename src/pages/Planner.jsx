@@ -18,7 +18,7 @@ function useDebounce(value, delay = 300) {
   return debounced;
 }
 
-export function Planner() {
+function Planner() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const { profile, loading: profileLoading } = useUserProfile(userId);
@@ -37,7 +37,7 @@ export function Planner() {
 
   const debouncedBudget = useDebounce(budget, 300);
 
-  // Load user's saved budget
+  // Load user’s saved budget
   useEffect(() => {
     const saved = profile?.monthlyBudget;
     if (!profileLoading && typeof saved === 'number' && Number.isFinite(saved)) {
@@ -45,7 +45,7 @@ export function Planner() {
     }
   }, [profile, profileLoading]);
 
-  // Calculate runway when budget or cities change
+  // Calculate runway data using Numbeo monthly cost
   useEffect(() => {
     if (!debouncedBudget || cities.length === 0) return;
 
@@ -57,9 +57,17 @@ export function Planner() {
       try {
         const results = await Promise.all(
           cities.map(async (city) => {
-            const runway = await calculateRunway(debouncedBudget, 'United States', city.country, city.monthlyCost);
+            // Use city.monthlyCost directly from Numbeo
+            const runway = await calculateRunway(
+              debouncedBudget,
+              null,
+              null,
+              city.monthlyCost
+            );
+
             return {
               city: city.city,
+              country: city.country,
               runway: Number.isFinite(runway) ? runway : 0,
               monthlyCost: city.monthlyCost,
               currency: city.currency,
@@ -85,14 +93,13 @@ export function Planner() {
     };
   }, [debouncedBudget, cities, calculateRunway]);
 
-  // Filtering and sorting
+  // Curious cities
   const curiousCities = useMemo(() => {
     if (!personalization?.curiousCities) return [];
     return personalization.curiousCities.map((city) => city.toLowerCase());
   }, [personalization?.curiousCities]);
 
   const focus = personalization?.budgetFocus ?? 'Balanced';
-
   const focusBreakdown = useMemo(() => {
     const base = { Rent: 0.45, Food: 0.25, Transport: 0.15, Leisure: 0.15 };
     switch (focus) {
@@ -107,6 +114,7 @@ export function Planner() {
     }
   }, [focus]);
 
+  // Filtering & sorting
   const filteredAndSortedData = useMemo(() => {
     let data = runwayData.map((entry) => ({
       ...entry,
@@ -114,19 +122,19 @@ export function Planner() {
       breakdown: focusBreakdown,
     }));
 
-    // Filter by search term (case insensitive)
+    // Search
     if (searchTerm.trim() !== '') {
       const lowerTerm = searchTerm.toLowerCase();
       data = data.filter((entry) => entry.city.toLowerCase().includes(lowerTerm));
     }
 
-    // Filter by max price (if a valid number)
+    // Max price filter
     const maxPriceNum = parseFloat(maxPriceFilter);
     if (!isNaN(maxPriceNum)) {
       data = data.filter((entry) => entry.monthlyCost <= maxPriceNum);
     }
 
-    // Sort
+    // Sorting
     switch (sortOption) {
       case 'affordable':
         data = data.slice().sort((a, b) => a.monthlyCost - b.monthlyCost);
@@ -154,7 +162,7 @@ export function Planner() {
     return data;
   }, [runwayData, searchTerm, maxPriceFilter, sortOption, curiousCities, focusBreakdown, budget]);
 
-  // Find the best-value city (max runway)
+  // Highlight best city
   const highlightCity = useMemo(() => {
     return filteredAndSortedData.reduce(
       (best, current) => (current.runway > best.runway ? current : best),
@@ -162,10 +170,8 @@ export function Planner() {
     );
   }, [filteredAndSortedData]);
 
-  // Format price helper - never show 0, use decimals as needed
   function formatPrice(value) {
     if (!value || value <= 0) return 'N/A';
-    // Show decimals only if needed, max 2 decimals
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -199,6 +205,7 @@ export function Planner() {
         <CardContent>
           <BudgetSlider value={budget} onChange={setBudget} />
 
+          {/* Stay duration */}
           <div className="mt-6 rounded-3xl border border-teal/30 bg-turquoise/10 p-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -259,11 +266,10 @@ export function Planner() {
         </CardContent>
       </Card>
 
-      {/* Highlight city info */}
+      {/* Highlight city */}
       {highlightCity.city !== 'No data' && (
         <div className="rounded-3xl border border-teal/30 bg-turquoise/10 px-6 py-5 text-sm text-teal">
-          With a{' '}
-          <strong>{formatPrice(budget)}</strong> monthly budget,{' '}
+          With a <strong>{formatPrice(budget)}</strong> monthly budget,{' '}
           <strong>{highlightCity.city}</strong> gives you the most value — your budget lasts{' '}
           <strong>{Number.isFinite(highlightCity.runway) ? highlightCity.runway.toFixed(1) : 'N/A'} months</strong> there.
           Plan a {stayDuration}-month stay for around{' '}
@@ -282,7 +288,6 @@ export function Planner() {
           <RunwayCard
             key={entry.city}
             {...entry}
-            monthlyCost={entry.monthlyCost}
             stayDurationMonths={stayDuration}
             isHighlighted={entry.city === highlightCity.city}
             badgeLabel={entry.isCurious ? 'On your wishlist' : entry.city === highlightCity.city ? 'Best pick' : null}

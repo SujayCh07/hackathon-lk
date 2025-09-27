@@ -21,6 +21,7 @@ function formatCurrency(amount, currency) {
 
 export function RunwayCard({
   city,
+  country,
   runway,
   monthlyCost,
   currency = 'USD',
@@ -45,20 +46,24 @@ export function RunwayCard({
           {badgeLabel ?? 'Best pick'}
         </span>
       )}
+
       <div className="flex items-start justify-between">
         <div>
           <h4 className="font-poppins text-lg font-semibold text-teal">{city}</h4>
-          <p className="mt-1 text-xs text-charcoal/60">PPP-adjusted budget fit</p>
+          <p className="mt-1 text-xs text-charcoal/60">Estimated cost of living in {country}</p>
         </div>
         <span className="rounded-full bg-turquoise/20 px-3 py-1 text-xs font-semibold text-teal">
           {formatRunway(runway)}
         </span>
       </div>
+
       <p className="mt-3 text-sm text-charcoal/70">
-        {formatCurrency(monthlyCost, currency)} /mo · {formatCurrency(stayCost, currency)} for {stayDurationMonths} month
-        {stayDurationMonths === 1 ? '' : 's'}
+        {formatCurrency(monthlyCost, currency)} /mo · {formatCurrency(stayCost, currency)} for{' '}
+        {stayDurationMonths} month{stayDurationMonths === 1 ? '' : 's'}
       </p>
+
       <Progress value={percent} className="mt-4" />
+
       <div className="mt-3 flex items-start gap-2 text-xs text-charcoal/70">
         <InformationCircleIcon className="mt-0.5 h-4 w-4 text-teal" aria-hidden="true" />
         <div>
@@ -66,12 +71,16 @@ export function RunwayCard({
             <ul className="space-y-1">
               {segments.map(([label, value]) => (
                 <li key={label}>
-                  <span className="font-semibold text-charcoal">{label}:</span> {Math.round(value * 100)}% of spend
+                  <span className="font-semibold text-charcoal">{label}:</span>{' '}
+                  {Math.round(value * 100)}% of spend
                 </li>
               ))}
             </ul>
           ) : (
-            <p>We estimate your rent, food, and leisure mix using PPP data.</p>
+            <p>
+              We estimate your rent, food, and leisure mix using Numbeo’s local price data +
+              PPP adjustments.
+            </p>
           )}
         </div>
       </div>
