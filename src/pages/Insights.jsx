@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import CategoryTile from '../components/insights/CategoryTile.jsx';
 import ComparisonChart from '../components/insights/ComparisonChart.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
@@ -8,6 +8,37 @@ import { usePPP } from '../hooks/usePPP.js';
 export function Insights() {
   const { totals } = useTransactions();
   const { rankedBySavings, adjustPrice } = usePPP();
+  const [categories, setCategories] = useState([]);
+
+  // Static values for the base city (e.g. Atlanta)
+  const atlantaSpends = useMemo(() => ({
+    Groceries: totals['Groceries'] ?? 350,
+    Rent: totals['Rent'] ?? 1400,
+    Transport: totals['Transport'] ?? 120
+  }), [totals]);
+
+  // Load adjusted category prices for comparison
+  useEffect(() => {
+    const loadAdjustedCategories = async () => {
+      const adjusted = await Promise.all(
+        Object.entries(atlantaSpends).map(async ([category, amount]) => {
+          const lisbonAmount = await adjustPrice(amount, 'USA', 'Germany'); // Adjusted country names
+          const delta = typeof lisbonAmount === 'number'
+            ? ((amount - lisbonAmount) / amount) * 100
+            : 0;
+
+          return {
+            title: category,
+            description: `Atlanta ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)} vs. Berlin ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(lisbonAmount)}`,
+            delta: parseFloat(delta.toFixed(1))
+          };
+        })
+      );
+      setCategories(adjusted);
+    };
+
+    loadAdjustedCategories();
+  }, [adjustPrice, atlantaSpends]);
 
   const chartData = useMemo(() => {
     return rankedBySavings.slice(0, 5).map((city) => ({
@@ -15,23 +46,6 @@ export function Insights() {
       value: Number(((1 - city.ppp) * 100).toFixed(1))
     }));
   }, [rankedBySavings]);
-
-  const categories = useMemo(() => {
-    const atlantaSpends = {
-      Groceries: totals['Groceries'] ?? 350,
-      Rent: totals['Rent'] ?? 1400,
-      Transport: totals['Transport'] ?? 120
-    };
-    return Object.entries(atlantaSpends).map(([category, amount]) => {
-      const lisbonAmount = adjustPrice(amount, 'Portugal', 'Germany');
-      const delta = ((amount - lisbonAmount) / amount) * 100;
-      return {
-        title: category,
-        description: `Atlanta ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)} vs. Lisbon ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(lisbonAmount)}`,
-        delta
-      };
-    });
-  }, [adjustPrice, totals]);
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-12">

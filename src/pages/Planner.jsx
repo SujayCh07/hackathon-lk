@@ -15,37 +15,40 @@ export function Planner() {
   const { balanceUSD } = useAccount();
   const { cities, calculateRunway } = usePPP();
   const [budget, setBudget] = useState(2500);
+  const [runwayData, setRunwayData] = useState([]);
 
   const savedBudget =
     typeof profile?.monthlyBudget === 'number' && Number.isFinite(profile.monthlyBudget)
       ? profile.monthlyBudget
       : null;
 
+  // Sync saved budget once profile is loaded
   useEffect(() => {
-    if (profileLoading) {
-      return;
-    }
-
-    if (savedBudget != null) {
+    if (!profileLoading && savedBudget != null) {
       setBudget(savedBudget);
     }
   }, [profileLoading, savedBudget]);
 
-  const runwayData = useMemo(() => {
-    return cities.map((city) => {
-      /*const calculateRunway: (monthlyBudgetUSD: any, fromCountry: any, toCountry: any, monthlyCostInTargetCountry: any) => Promise<number>
-  */
-      const runwayMonths = calculateRunway(budget, "Portugal", city.country, city.monthlyCost);
-      console.log(city.country);
-      console.log(budget);
-      console.log(city.monthlyCost);
-      return {
-        city: city.city,
-        runway: runwayMonths,
-        monthlyCost: city.monthlyCost,
-        currency: city.currency
-      };
-    });
+  // 🧠 Fetch and compute runway data based on budget
+  useEffect(() => {
+    const computeRunways = async () => {
+      const results = await Promise.all(
+        cities.map(async (city) => {
+          const runway = await calculateRunway(budget, 'Portugal', city.country, city.monthlyCost);
+          return {
+            city: city.city,
+            runway: typeof runway === 'number' ? runway : 0,
+            monthlyCost: city.monthlyCost,
+            currency: city.currency
+          };
+        })
+      );
+      setRunwayData(results);
+    };
+
+    if (cities.length > 0 && budget) {
+      computeRunways();
+    }
   }, [budget, calculateRunway, cities]);
 
   const highlightCity = useMemo(() => {
@@ -102,13 +105,15 @@ export function Planner() {
           </div>
         </CardContent>
       </Card>
+
       {runwayData.length > 0 && (
         <div className="rounded-3xl border border-teal/30 bg-turquoise/10 px-6 py-5 text-sm text-teal">
-          With a {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(budget)} monthly budget, {highlightCity.city}
+          With a {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(budget)} monthly budget,
           {' '}
-          stretches your spending power the furthest at {highlightCity.runway.toFixed(1)} months of local living costs.
+          {highlightCity.city} stretches your spending power the furthest at {highlightCity.runway.toFixed(1)} months of local living costs.
         </div>
       )}
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {runwayData.map((entry) => (
           <RunwayCard key={entry.city} {...entry} />

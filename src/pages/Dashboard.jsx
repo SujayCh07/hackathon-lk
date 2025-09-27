@@ -9,17 +9,28 @@ import CityCard from '../components/score/CityCard.jsx';
 export function Dashboard() {
   const { balanceUSD } = useAccount();
   const { recent } = useTransactions();
-  const { rankedBySavings } = usePPP();
+  const { rankedBySavings, isLoading, error } = usePPP();
 
   const markers = useMemo(() => {
-    return rankedBySavings.slice(0, 5).map((item) => ({
-      city: item.city,
-      coords: cityCoords[item.city] ?? [0, 0],
-      ppp: item.ppp
-    }));
+    return rankedBySavings
+      .slice(0, 5)
+      .filter((item) => cityCoords[item.city]) // ensure coordinates exist
+      .map((item) => ({
+        city: item.city,
+        coords: cityCoords[item.city],
+        ppp: item.ppp
+      }));
   }, [rankedBySavings]);
 
   const topCities = rankedBySavings.slice(0, 3);
+
+  if (isLoading) {
+    return <p className="p-6 text-center text-charcoal/80">Loading purchasing power data...</p>;
+  }
+
+  if (error) {
+    return <p className="p-6 text-center text-red-600">Error loading data: {error.message}</p>;
+  }
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-12">
@@ -46,10 +57,17 @@ export function Dashboard() {
                 <li key={txn.id} className="flex items-center justify-between rounded-2xl bg-offwhite/80 px-4 py-3">
                   <div>
                     <p className="font-semibold text-charcoal">{txn.merchant}</p>
-                    <p className="text-xs text-charcoal/60">{new Date(txn.date).toLocaleDateString()}</p>
+                    <p className="text-xs text-charcoal/60">
+                      {new Date(txn.date).toLocaleDateString()}
+                    </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-coral">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(txn.amount)}</p>
+                    <p className="font-semibold text-coral">
+                      {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: 'USD'
+                      }).format(txn.amount)}
+                    </p>
                     <p className="text-xs text-charcoal/60">{txn.category}</p>
                   </div>
                 </li>
@@ -58,11 +76,12 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="bg-white/90">
           <CardHeader>
-            <CardTitle>PPP Score map</CardTitle>
-            <p className="text-xs text-charcoal/60">Leaflet world map placeholder showing PPP hotspots.</p>
+            <CardTitle>PPP Score Map</CardTitle>
+            <p className="text-xs text-charcoal/60">Countries ranked by savings potential.</p>
           </CardHeader>
           <CardContent>
             <WorldMap markers={markers} />
@@ -78,13 +97,18 @@ export function Dashboard() {
   );
 }
 
+// 🧭 Align these with country names returned by your `ppp_country` table.
 const cityCoords = {
-  Atlanta: [33.749, -84.388],
-  'Mexico City': [19.4326, -99.1332],
-  Lisbon: [38.7223, -9.1393],
-  Bangkok: [13.7563, 100.5018],
-  Paris: [48.8566, 2.3522],
-  'New York': [40.7128, -74.006]
+  USA: [37.0902, -95.7129],
+  Mexico: [23.6345, -102.5528],
+  Portugal: [39.3999, -8.2245],
+  Thailand: [15.8700, 100.9925],
+  France: [46.6034, 1.8883],
+  Germany: [51.1657, 10.4515],
+  India: [20.5937, 78.9629],
+  Vietnam: [14.0583, 108.2772],
+  Colombia: [4.5709, -74.2973],
+  Indonesia: [-0.7893, 113.9213]
 };
 
 export default Dashboard;
