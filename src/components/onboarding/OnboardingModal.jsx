@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../ui/Button.jsx';
-
-const TRAVEL_GOALS = ['Digital nomad life', 'Short-term relocation', 'Long sabbatical', 'Budget world tour'];
-const TRAVEL_STYLES = ['Comfort seeker', 'Local immersion', 'Luxury explorer', 'Remote worker'];
-const BUDGET_FOCUS = ['Rent', 'Food', 'Leisure', 'Balanced'];
+import {
+  BUDGET_FOCUS,
+  CATEGORY_TAGS,
+  CONTINENT_OPTIONS,
+  TRAVEL_GOALS,
+  TRAVEL_INTERESTS,
+  TRAVEL_STYLES,
+} from '../../constants/personalization.js';
 
 function normaliseCities(value) {
   if (!value) return [];
@@ -31,6 +35,15 @@ export function OnboardingModal({
     return '';
   });
   const [cityInput, setCityInput] = useState((defaultValues.curiousCities ?? []).join(', '));
+  const [monthlyBudgetGoal, setMonthlyBudgetGoal] = useState(() => {
+    if (typeof defaultValues.monthlyBudgetGoal === 'number' && Number.isFinite(defaultValues.monthlyBudgetGoal)) {
+      return String(defaultValues.monthlyBudgetGoal);
+    }
+    return '';
+  });
+  const [selectedInterests, setSelectedInterests] = useState(defaultValues.travelInterests ?? []);
+  const [selectedContinents, setSelectedContinents] = useState(defaultValues.preferredContinents ?? []);
+  const [favoriteCategories, setFavoriteCategories] = useState(defaultValues.favoriteCategories ?? []);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -44,6 +57,14 @@ export function OnboardingModal({
         : ''
     );
     setCityInput((defaultValues.curiousCities ?? []).join(', '));
+    setMonthlyBudgetGoal(
+      typeof defaultValues.monthlyBudgetGoal === 'number' && Number.isFinite(defaultValues.monthlyBudgetGoal)
+        ? String(defaultValues.monthlyBudgetGoal)
+        : ''
+    );
+    setSelectedInterests(defaultValues.travelInterests ?? []);
+    setSelectedContinents(defaultValues.preferredContinents ?? []);
+    setFavoriteCategories(defaultValues.favoriteCategories ?? []);
   }, [defaultValues, isOpen]);
 
   const parsedBudget = useMemo(() => {
@@ -59,14 +80,33 @@ export function OnboardingModal({
       return;
     }
     setError(null);
+    const budgetGoalNumber = (() => {
+      const numeric = Number(monthlyBudgetGoal);
+      if (!Number.isFinite(numeric) || numeric <= 0) return null;
+      return numeric;
+    })();
+
     const payload = {
       travelGoal,
       travelStyle,
       budgetFocus,
       monthlyBudget: parsedBudget,
+      monthlyBudgetGoal: budgetGoalNumber,
       curiousCities: normaliseCities(cityInput),
+      travelInterests: selectedInterests,
+      preferredContinents: selectedContinents,
+      favoriteCategories,
     };
     onComplete?.(payload);
+  };
+
+  const toggleValue = (setter) => (value) => {
+    setter((prev) => {
+      if (prev.includes(value)) {
+        return prev.filter((entry) => entry !== value);
+      }
+      return [...prev, value];
+    });
   };
 
   return (
@@ -108,6 +148,20 @@ export function OnboardingModal({
                   placeholder="e.g. 2500"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-charcoal">What’s your savings goal per month?</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  value={monthlyBudgetGoal}
+                  onChange={(event) => setMonthlyBudgetGoal(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-navy/20 bg-white px-4 py-3 text-sm text-charcoal shadow-sm focus:outline-none focus:ring-2 focus:ring-coral"
+                  placeholder="e.g. 1800"
+                />
+                <p className="mt-1 text-xs text-charcoal/60">We’ll compare this with your current balance to nudge you when you drift.</p>
               </div>
 
               <fieldset>
@@ -185,6 +239,70 @@ export function OnboardingModal({
                   placeholder="Berlin, Mexico City, Lisbon"
                 />
               </div>
+
+              <fieldset>
+                <legend className="text-sm font-semibold text-charcoal">Pick the vibes you’re chasing</legend>
+                <p className="text-xs text-charcoal/60">We tailor nudges and city recs to these interests.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {TRAVEL_INTERESTS.map((interest) => {
+                    const isActive = selectedInterests.includes(interest);
+                    return (
+                      <button
+                        key={interest}
+                        type="button"
+                        onClick={() => toggleValue(setSelectedInterests)(interest)}
+                        className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                          isActive ? 'bg-teal text-white shadow-md' : 'bg-white text-charcoal border border-navy/15'
+                        }`}
+                      >
+                        {interest}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend className="text-sm font-semibold text-charcoal">Focus continents</legend>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {CONTINENT_OPTIONS.map((continent) => {
+                    const isActive = selectedContinents.includes(continent);
+                    return (
+                      <button
+                        key={continent}
+                        type="button"
+                        onClick={() => toggleValue(setSelectedContinents)(continent)}
+                        className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                          isActive ? 'bg-coral text-white shadow-md' : 'bg-white text-charcoal border border-navy/15'
+                        }`}
+                      >
+                        {continent}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend className="text-sm font-semibold text-charcoal">What spending categories excite you?</legend>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {CATEGORY_TAGS.map((category) => {
+                    const isActive = favoriteCategories.includes(category);
+                    return (
+                      <button
+                        key={category}
+                        type="button"
+                        onClick={() => toggleValue(setFavoriteCategories)(category)}
+                        className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                          isActive ? 'bg-navy text-white shadow-md' : 'bg-white text-charcoal border border-navy/15'
+                        }`}
+                      >
+                        {category}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
 
               {error && <p className="text-sm text-coral">{error}</p>}
 

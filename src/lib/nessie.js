@@ -3,6 +3,58 @@ import { supabase } from './supabase.js';
 const NESSIE_BASE_URL = import.meta.env.VITE_NESSIE_BASE_URL ?? 'https://api.nessieisreal.com';
 const NESSIE_API_KEY = import.meta.env.VITE_NESSIE_API_KEY;
 
+const CATEGORY_KEYWORDS = [
+  { name: 'Groceries', keywords: ['grocery', 'market', 'whole foods', 'trader joe', 'aldi', 'supermarket', 'fresh', 'produce'] },
+  { name: 'Dining', keywords: ['cafe', 'restaurant', 'bistro', 'diner', 'bar', 'pizza', 'coffee', 'kitchen', 'brew', 'grill'] },
+  { name: 'Transport', keywords: ['uber', 'lyft', 'taxi', 'metro', 'subway', 'train', 'transit', 'bus', 'fuel', 'gas'] },
+  { name: 'Rent', keywords: ['rent', 'landlord', 'apartment', 'property', 'lease', 'residential'] },
+  { name: 'Entertainment', keywords: ['cinema', 'movie', 'theatre', 'concert', 'ticket', 'music', 'festival', 'stadium'] },
+  { name: 'Utilities', keywords: ['electric', 'water', 'utility', 'internet', 'comcast', 'verizon', 'energy', 'power'] },
+  { name: 'Health', keywords: ['pharmacy', 'clinic', 'hospital', 'wellness', 'fitness', 'gym', 'health'] },
+  { name: 'Travel', keywords: ['airbnb', 'hotel', 'airline', 'flight', 'airways', 'hostel', 'travel'] },
+];
+
+function normaliseText(value) {
+  if (!value) return '';
+  return String(value).toLowerCase();
+}
+
+function classifyTransaction(transaction) {
+  const source = [
+    transaction.merchant,
+    transaction.payee,
+    transaction.purchase_description,
+    transaction.description,
+    Array.isArray(transaction.category) ? transaction.category.join(' ') : transaction.category,
+    transaction.type,
+  ]
+    .map(normaliseText)
+    .filter(Boolean)
+    .join(' ');
+
+  let bestMatch = null;
+  let bestScore = 0;
+
+  CATEGORY_KEYWORDS.forEach(({ name, keywords }) => {
+    const score = keywords.reduce((count, keyword) => {
+      return source.includes(keyword) ? count + 1 : count;
+    }, 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = name;
+    }
+  });
+
+  const category = bestMatch ?? (Array.isArray(transaction.category) ? transaction.category[0] : transaction.category) ?? 'General';
+  const tags = Array.isArray(transaction.category) ? transaction.category : [];
+
+  return {
+    category,
+    confidence: bestScore > 0 ? Math.min(1, bestScore / 3) : 0.3,
+    tags,
+  };
+}
+
 function buildUrl(path, query = {}) {
   if (!path.startsWith('/')) {
     throw new Error('Nessie API paths must start with a leading slash');
@@ -238,7 +290,7 @@ export async function loadTransactionsFromSupabase(userId, { limit } = {}) {
 
   let query = supabase
     .from('transactions')
-    .select('id, nessie_tx_id, amount, category, merchant, timestamp, user_id')
+    .select('id, nessie_tx_id, amount, category, normalized_category, category_confidence, category_tags, merchant, timestamp, user_id')
     .eq('user_id', userId)
     .order('timestamp', { ascending: false });
 
@@ -301,23 +353,30 @@ export async function syncTransactionsFromNessie({ userId, customerId }) {
   if (!userId || !customerId) return [];
 
   const remoteTransactions = await fetchCustomerTransactions(customerId);
-  const rows = remoteTransactions.map((transaction) => ({
-    user_id: userId,
-    nessie_tx_id: transaction._id ?? transaction.id ?? null,
-    amount: Number(transaction.amount ?? transaction.purchase_amount ?? 0),
-    category: Array.isArray(transaction.category)
-      ? transaction.category[0]
-      : transaction.category ?? transaction.type ?? 'General',
-    merchant:
-      transaction.merchant ??
-      transaction.payee ??
-      transaction.purchase_description ??
-      transaction.description ??
-      'Merchant',
-    timestamp: normaliseTimestamp(
-      transaction.transaction_date ?? transaction.date ?? transaction.purchase_date ?? transaction.post_date
-    )
-  }));
+  const rows = remoteTransactions.map((transaction) => {
+    const classification = classifyTransaction(transaction);
+    return {
+      user_id: userId,
+      nessie_tx_id: transaction._id ?? transaction.id ?? null,
+      amount: Number(transaction.amount ?? transaction.purchase_amount ?? 0),
+      category:
+        Array.isArray(transaction.category)
+          ? transaction.category[0]
+          : transaction.category ?? transaction.type ?? classification.category ?? 'General',
+      normalized_category: classification.category ?? null,
+      category_confidence: classification.confidence ?? null,
+      category_tags: classification.tags ?? [],
+      merchant:
+        transaction.merchant ??
+        transaction.payee ??
+        transaction.purchase_description ??
+        transaction.description ??
+        'Merchant',
+      timestamp: normaliseTimestamp(
+        transaction.transaction_date ?? transaction.date ?? transaction.purchase_date ?? transaction.post_date
+      ),
+    };
+  });
 
   if (rows.length > 0) {
     const { error } = await supabase
@@ -361,7 +420,10 @@ export function mapTransactionRow(row) {
     id: row.id ?? row.nessie_tx_id ?? null,
     nessieTxId: row.nessie_tx_id ?? null,
     amount: Number(row.amount ?? 0),
-    category: row.category ?? 'General',
+    category: row.normalized_category ?? row.category ?? 'General',
+    normalizedCategory: row.normalized_category ?? null,
+    categoryConfidence: Number.isFinite(row.category_confidence) ? Number(row.category_confidence) : null,
+    categoryTags: Array.isArray(row.category_tags) ? row.category_tags : [],
     merchant: row.merchant ?? 'Merchant',
     timestamp: normaliseTimestamp(row.timestamp),
     userId: row.user_id ?? null

@@ -8,6 +8,12 @@ import { useAccount } from '../hooks/useAccount.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useTransactions } from '../hooks/useTransactions.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
+import usePersonalization from '../hooks/usePersonalization.js';
+import {
+  CATEGORY_TAGS,
+  CONTINENT_OPTIONS,
+  TRAVEL_INTERESTS,
+} from '../constants/personalization.js';
 import { supabase } from '../lib/supabase.js';
 
 /* ---------- small helpers ---------- */
@@ -59,6 +65,13 @@ export default function Settings() {
   } = useUserProfile(userId);
 
   const {
+    data: personalization,
+    loading: personalizationLoading,
+    error: personalizationError,
+    save: savePersonalization,
+  } = usePersonalization(userId);
+
+  const {
     accounts,
     balanceUSD,
     isRefreshing: accountsRefreshing,
@@ -76,17 +89,23 @@ export default function Settings() {
   // form state
   const [displayName, setDisplayName] = useState('');
   const [monthlyBudget, setMonthlyBudget] = useState('');
+  const [monthlyBudgetGoal, setMonthlyBudgetGoal] = useState('');
   const [addressHouseNumber, setAddressHouseNumber] = useState('');
   const [addressStreet, setAddressStreet] = useState('');
   const [addressCity, setAddressCity] = useState('');
   const [addressState, setAddressState] = useState('');
   const [currentCountryCode, setCurrentCountryCode] = useState('');
   const [homeCountryCode, setHomeCountryCode] = useState('');
+  const [travelInterests, setTravelInterests] = useState([]);
+  const [preferredContinents, setPreferredContinents] = useState([]);
+  const [favoriteCategories, setFavoriteCategories] = useState([]);
 
   // ui state
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileStatus, setProfileStatus] = useState(null);
   const [accountsStatus, setAccountsStatus] = useState(null);
+  const [personalizationStatus, setPersonalizationStatus] = useState(null);
+  const [savingPersonalization, setSavingPersonalization] = useState(false);
   const [countries, setCountries] = useState([]);
   const [countriesLoading, setCountriesLoading] = useState(false);
   const [countriesError, setCountriesError] = useState(null);
@@ -127,6 +146,11 @@ export default function Settings() {
     setMonthlyBudget(
       profile?.monthlyBudget != null && !Number.isNaN(profile.monthlyBudget) ? String(profile.monthlyBudget) : ''
     );
+    setMonthlyBudgetGoal(
+      profile?.monthlyBudgetGoal != null && !Number.isNaN(profile.monthlyBudgetGoal)
+        ? String(profile.monthlyBudgetGoal)
+        : ''
+    );
     const addr = profile?.streetAddress ?? null; // could be stringified JSON from earlier saves
     if (addr && typeof addr === 'object') {
       setAddressHouseNumber(addr.houseNumber ?? '');
@@ -138,7 +162,28 @@ export default function Settings() {
     }
     setCurrentCountryCode(profile?.currentCountry?.code ?? '');
     setHomeCountryCode(profile?.homeCountry?.code ?? '');
+    setTravelInterests(profile?.travelInterests ?? []);
+    setPreferredContinents(profile?.preferredContinents ?? []);
+    setFavoriteCategories(profile?.favoriteCategories ?? []);
   }, [profile, profileLoading, identityFallback]);
+
+  useEffect(() => {
+    if (personalizationLoading) return;
+    if (!personalization) return;
+
+    if (personalization.monthlyBudgetGoal != null) {
+      setMonthlyBudgetGoal(String(personalization.monthlyBudgetGoal));
+    }
+    if (personalization.travelInterests) {
+      setTravelInterests(personalization.travelInterests);
+    }
+    if (personalization.preferredContinents) {
+      setPreferredContinents(personalization.preferredContinents);
+    }
+    if (personalization.favoriteCategories) {
+      setFavoriteCategories(personalization.favoriteCategories);
+    }
+  }, [personalization, personalizationLoading]);
 
   // countries list
   useEffect(() => {
@@ -203,6 +248,18 @@ export default function Settings() {
         state: addressState,
       }),
     [addressHouseNumber, addressStreet, addressCity, addressState]
+  );
+
+  const toggleChip = useCallback(
+    (setter) => (value) => {
+      setter((prev) => {
+        if (prev.includes(value)) {
+          return prev.filter((entry) => entry !== value);
+        }
+        return [...prev, value];
+      });
+    },
+    []
   );
 
   /* ---------- actions ---------- */
@@ -270,6 +327,64 @@ export default function Settings() {
     }
   }
 
+  async function handleSavePersonalization(event) {
+    event.preventDefault();
+    if (!userId) return;
+
+    const goalStr = monthlyBudgetGoal.trim();
+    const parsedGoal = goalStr === '' ? null : Number(goalStr);
+    if (parsedGoal != null && Number.isNaN(parsedGoal)) {
+      setPersonalizationStatus({
+        type: 'error',
+        message: 'Monthly savings goal must be a number.',
+      });
+      showToast({
+        type: 'error',
+        title: 'Check your savings goal',
+        description: 'Please enter a valid number for your monthly savings target.',
+        duration: 4200,
+      });
+      return;
+    }
+
+    const parsedBudget = (() => {
+      const trimmed = monthlyBudget.trim();
+      if (trimmed === '') return null;
+      const numeric = Number(trimmed);
+      return Number.isFinite(numeric) ? numeric : null;
+    })();
+
+    setSavingPersonalization(true);
+    setPersonalizationStatus(null);
+
+    try {
+      await savePersonalization({
+        monthlyBudget: parsedBudget,
+        monthlyBudgetGoal: parsedGoal,
+        travelInterests,
+        preferredContinents,
+        favoriteCategories,
+      });
+
+      setPersonalizationStatus({
+        type: 'success',
+        message: 'Your travel interests and targets are saved.',
+      });
+      showToast({
+        type: 'success',
+        title: 'Personalization saved',
+        description: 'We’ll tailor recommendations using your updated interests.',
+        duration: 3600,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not update personalization right now.';
+      setPersonalizationStatus({ type: 'error', message: msg });
+      showToast({ type: 'error', title: 'Update failed', description: msg, duration: 4800 });
+    } finally {
+      setSavingPersonalization(false);
+    }
+  }
+
   async function handleRefreshAccounts() {
     setAccountsStatus(null);
     try {
@@ -324,6 +439,16 @@ export default function Settings() {
           {profileError && (
             <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-sm text-red">
               {profileError.message || 'We were unable to load your profile information.'}
+            </div>
+          )}
+          {personalizationStatus?.type === 'error' && (
+            <div className="rounded-2xl border border-coral/40 bg-coral/5 px-4 py-3 text-sm text-coral">
+              {personalizationStatus.message}
+            </div>
+          )}
+          {personalizationError && (
+            <div className="rounded-2xl border border-coral/40 bg-coral/5 px-4 py-3 text-sm text-coral">
+              {personalizationError.message || 'We were unable to load your personalization preferences.'}
             </div>
           )}
 
@@ -542,21 +667,145 @@ export default function Settings() {
                 )}
               </div>
 
-              {accountsStatus && (
-                <div
-                  className={
-                    accountsStatus.type === 'error'
-                      ? 'rounded-2xl border border-red/40 bg-red/5 px-3 py-2 text-xs text-red'
-                      : 'rounded-2xl border border-emerald-400/40 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-700'
-                  }
-                >
-                  {accountsStatus.message}
-                </div>
-              )}
-            </SettingsSection>
-          </div>
+            {accountsStatus && (
+              <div
+                className={
+                  accountsStatus.type === 'error'
+                    ? 'rounded-2xl border border-red/40 bg-red/5 px-3 py-2 text-xs text-red'
+                    : 'rounded-2xl border border-emerald-400/40 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-700'
+                }
+              >
+                {accountsStatus.message}
+              </div>
+            )}
+          </SettingsSection>
         </div>
-      </main>
+
+        <SettingsSection
+          title="Travel personalization"
+          description="Fine-tune the interests that power GeoBudget, nudges, and destination picks."
+          actions={
+            <Button
+              type="submit"
+              form="personalization-form"
+              className="px-5 py-2 text-sm"
+              disabled={savingPersonalization || personalizationLoading}
+            >
+              {savingPersonalization ? 'Saving…' : 'Save personalization'}
+            </Button>
+          }
+        >
+          <form id="personalization-form" onSubmit={handleSavePersonalization} className="grid gap-6">
+            <div className="grid gap-2">
+              <label
+                htmlFor="monthly-budget-goal"
+                className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60"
+              >
+                Monthly savings goal (USD)
+              </label>
+              <input
+                id="monthly-budget-goal"
+                type="number"
+                min="0"
+                step="50"
+                value={monthlyBudgetGoal}
+                onChange={(event) => setMonthlyBudgetGoal(event.target.value)}
+                placeholder="e.g. 1800"
+                className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/20"
+                disabled={savingPersonalization}
+              />
+              <p className="text-xs text-slate/60">
+                We surface alerts when your balance drifts below this target.
+              </p>
+            </div>
+
+            <fieldset className="grid gap-2">
+              <legend className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
+                Travel interests
+              </legend>
+              <p className="text-xs text-slate/60">Tap to toggle the vibes you care about most.</p>
+              <div className="flex flex-wrap gap-2">
+                {TRAVEL_INTERESTS.map((interest) => {
+                  const isActive = travelInterests.includes(interest);
+                  return (
+                    <button
+                      key={interest}
+                      type="button"
+                      onClick={() => toggleChip(setTravelInterests)(interest)}
+                      className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                        isActive
+                          ? 'bg-teal text-white shadow-md shadow-teal/20'
+                          : 'border border-slate/20 bg-white/80 text-slate hover:border-teal/40 hover:text-teal'
+                      }`}
+                      disabled={savingPersonalization}
+                    >
+                      {interest}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <fieldset className="grid gap-2">
+              <legend className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
+                Preferred continents
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {CONTINENT_OPTIONS.map((continent) => {
+                  const isActive = preferredContinents.includes(continent);
+                  return (
+                    <button
+                      key={continent}
+                      type="button"
+                      onClick={() => toggleChip(setPreferredContinents)(continent)}
+                      className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                        isActive
+                          ? 'bg-coral text-white shadow-md shadow-coral/20'
+                          : 'border border-slate/20 bg-white/80 text-slate hover:border-coral/40 hover:text-coral'
+                      }`}
+                      disabled={savingPersonalization}
+                    >
+                      {continent}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <fieldset className="grid gap-2">
+              <legend className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
+                Favourite categories
+              </legend>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORY_TAGS.map((category) => {
+                  const isActive = favoriteCategories.includes(category);
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => toggleChip(setFavoriteCategories)(category)}
+                      className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                        isActive
+                          ? 'bg-navy text-white shadow-md shadow-navy/20'
+                          : 'border border-slate/20 bg-white/80 text-slate hover:border-navy/40 hover:text-navy'
+                      }`}
+                      disabled={savingPersonalization}
+                    >
+                      {category}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            {personalizationStatus?.type === 'success' && (
+              <p className="text-xs text-teal">{personalizationStatus.message}</p>
+            )}
+          </form>
+        </SettingsSection>
+
+      </div>
+    </main>
     </>
   );
 }

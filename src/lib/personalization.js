@@ -17,10 +17,36 @@ function readLocalFallback(userId) {
 function writeLocalFallback(userId, payload) {
   if (!userId || typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(`${LOCAL_STORAGE_KEY}:${userId}` , JSON.stringify(payload));
+    window.localStorage.setItem(`${LOCAL_STORAGE_KEY}:${userId}`, JSON.stringify(payload));
   } catch (error) {
     console.warn('Failed to persist personalization to localStorage', error);
   }
+}
+
+function normaliseTextArray(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter((entry) => entry.length > 0);
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+          .filter((entry) => entry.length > 0);
+      }
+    } catch (error) {
+      // fall through to comma split
+    }
+    return value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  }
+  return [];
 }
 
 export async function loadPersonalization(userId) {
@@ -35,7 +61,11 @@ export async function loadPersonalization(userId) {
          travel_style,
          budget_focus,
          monthly_budget,
+         monthly_budget_goal,
          curious_cities,
+         travel_interests,
+         preferred_continents,
+         favorite_categories,
          onboarding_complete,
          created_at,
          updated_at`
@@ -75,7 +105,11 @@ export async function loadPersonalization(userId) {
       travelStyle: data.travel_style ?? null,
       budgetFocus: data.budget_focus ?? null,
       monthlyBudget: typeof data.monthly_budget === 'number' ? data.monthly_budget : null,
+      monthlyBudgetGoal: typeof data.monthly_budget_goal === 'number' ? data.monthly_budget_goal : null,
       curiousCities: parsedCities,
+      travelInterests: normaliseTextArray(data.travel_interests),
+      preferredContinents: normaliseTextArray(data.preferred_continents),
+      favoriteCategories: normaliseTextArray(data.favorite_categories),
       onboardingComplete: Boolean(data.onboarding_complete),
       createdAt: data.created_at ?? null,
       updatedAt: data.updated_at ?? null,
@@ -101,8 +135,21 @@ export async function savePersonalization(userId, payload) {
       typeof payload.monthlyBudget === 'number' && Number.isFinite(payload.monthlyBudget)
         ? payload.monthlyBudget
         : null,
+    monthly_budget_goal:
+      typeof payload.monthlyBudgetGoal === 'number' && Number.isFinite(payload.monthlyBudgetGoal)
+        ? payload.monthlyBudgetGoal
+        : null,
     curious_cities: Array.isArray(payload.curiousCities)
       ? payload.curiousCities.filter(Boolean)
+      : [],
+    travel_interests: Array.isArray(payload.travelInterests)
+      ? payload.travelInterests.filter(Boolean)
+      : [],
+    preferred_continents: Array.isArray(payload.preferredContinents)
+      ? payload.preferredContinents.filter(Boolean)
+      : [],
+    favorite_categories: Array.isArray(payload.favoriteCategories)
+      ? payload.favoriteCategories.filter(Boolean)
       : [],
     onboarding_complete: payload.onboardingComplete ?? false,
   };
@@ -130,6 +177,7 @@ export async function savePersonalization(userId, payload) {
       travelStyle: data?.travel_style ?? serialised.travel_style,
       budgetFocus: data?.budget_focus ?? serialised.budget_focus,
       monthlyBudget: data?.monthly_budget ?? serialised.monthly_budget,
+      monthlyBudgetGoal: data?.monthly_budget_goal ?? serialised.monthly_budget_goal,
       curiousCities: (() => {
         const source = data?.curious_cities ?? serialised.curious_cities;
         if (Array.isArray(source)) return source;
@@ -146,10 +194,34 @@ export async function savePersonalization(userId, payload) {
         }
         return [];
       })(),
+      travelInterests: normaliseTextArray(data?.travel_interests ?? serialised.travel_interests),
+      preferredContinents: normaliseTextArray(data?.preferred_continents ?? serialised.preferred_continents),
+      favoriteCategories: normaliseTextArray(data?.favorite_categories ?? serialised.favorite_categories),
       onboardingComplete: Boolean(data?.onboarding_complete ?? serialised.onboarding_complete),
       createdAt: data?.created_at ?? null,
       updatedAt: data?.updated_at ?? null,
     };
+
+    try {
+      const profilePayload = {
+        user_id: userId,
+        monthly_budget: serialised.monthly_budget,
+        monthly_budget_goal: serialised.monthly_budget_goal,
+        travel_interests: serialised.travel_interests,
+        preferred_continents: serialised.preferred_continents,
+        favorite_categories: serialised.favorite_categories,
+      };
+
+      const { error: profileError } = await supabase
+        .from('user_profile')
+        .upsert(profilePayload, { onConflict: 'user_id' });
+
+      if (profileError) {
+        throw profileError;
+      }
+    } catch (profileUpdateError) {
+      console.warn('Failed to sync personalization into user_profile', profileUpdateError);
+    }
 
     writeLocalFallback(userId, normalised);
     return normalised;
