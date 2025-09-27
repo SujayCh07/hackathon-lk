@@ -4,7 +4,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../components/ui/Button.jsx';
 import { SettingsSection } from '../components/settings/SettingsSection.jsx';
 import { Toast } from '../components/ui/Toast.jsx';
+import { useAccount } from '../hooks/useAccount.js';
 import { useAuth } from '../hooks/useAuth.js';
+import { useTransactions } from '../hooks/useTransactions.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import { supabase } from '../lib/supabase.js';
 
@@ -46,7 +48,7 @@ function serialiseAddress(parts) {
 /* ---------- page ---------- */
 
 export default function Settings() {
-  const { user, nessie, isSyncingNessie, refreshNessie } = useAuth();
+  const { user } = useAuth();
   const userId = user?.id ?? null;
 
   const {
@@ -55,6 +57,21 @@ export default function Settings() {
     error: profileError,
     refresh: refreshProfile,
   } = useUserProfile(userId);
+
+  const {
+    accounts,
+    balanceUSD,
+    isRefreshing: accountsRefreshing,
+    error: accountsError,
+    refresh: refreshAccounts,
+  } = useAccount();
+
+  const monthlyBudgetNumber = typeof profile?.monthlyBudget === 'number' ? profile.monthlyBudget : null;
+
+  const {
+    isRefreshing: transactionsRefreshing,
+    refresh: refreshTransactions,
+  } = useTransactions({ limit: 5, monthlyBudget: monthlyBudgetNumber, balanceUSD });
 
   // form state
   const [displayName, setDisplayName] = useState('');
@@ -83,6 +100,17 @@ export default function Settings() {
     const id = setTimeout(() => setToast(null), toast.duration);
     return () => clearTimeout(id);
   }, [toast]);
+
+  const isSyncingNessie = accountsRefreshing || transactionsRefreshing;
+
+  useEffect(() => {
+    if (accountsError) {
+      setAccountsStatus({
+        type: 'error',
+        message: 'Unable to reach Nessie right now. Showing cached balances.'
+      });
+    }
+  }, [accountsError]);
 
   const identityFallback = useMemo(() => {
     if (!user) return '';
@@ -161,10 +189,10 @@ export default function Settings() {
   }, [countries, profile?.currentCountry, profile?.homeCountry]);
 
   const totalBalance = useMemo(() => {
-    if (!Array.isArray(nessie?.accounts)) return 0;
-    return nessie.accounts.reduce((sum, a) => sum + (typeof a.balance === 'number' ? a.balance : 0), 0);
-  }, [nessie]);
-  const headlineCurrency = nessie?.accounts?.[0]?.currencyCode ?? 'USD';
+    if (!Array.isArray(accounts)) return 0;
+    return accounts.reduce((sum, account) => sum + (typeof account?.balance === 'number' ? account.balance : 0), 0);
+  }, [accounts]);
+  const headlineCurrency = accounts?.[0]?.currencyCode ?? 'USD';
 
   const addressPreview = useMemo(
     () =>
@@ -243,10 +271,9 @@ export default function Settings() {
   }
 
   async function handleRefreshAccounts() {
-    if (typeof refreshNessie !== 'function') return;
     setAccountsStatus(null);
     try {
-      await refreshNessie();
+      await Promise.all([refreshAccounts(), refreshTransactions()]);
       setAccountsStatus({ type: 'success', message: 'Account balances refreshed.' });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unable to refresh accounts right now.';
@@ -495,8 +522,8 @@ export default function Settings() {
               </div>
 
               <div className="space-y-3">
-                {Array.isArray(nessie?.accounts) && nessie.accounts.length > 0 ? (
-                  nessie.accounts.map((a) => (
+                {Array.isArray(accounts) && accounts.length > 0 ? (
+                  accounts.map((a) => (
                     <div
                       key={a.id}
                       className="flex items-center justify-between rounded-2xl border border-slate/15 bg-white/70 px-4 py-3 shadow-sm shadow-white/60"

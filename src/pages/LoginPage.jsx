@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase.js";
-import { ensureNessieCustomer } from "../lib/nessie.js";  // 🔥 Added Nessie
+import { ensureNessieCustomer, persistNessieCustomerId } from "../lib/nessie.js";  // 🔥 Nessie helpers
 import Button from "../components/ui/Button.jsx";
 import Bali from "../assets/cities/bali.jpg"; // background image
 
@@ -32,7 +32,12 @@ export function LoginPage() {
 
     // 🔥 Ensure Nessie customer exists
     try {
-      await ensureNessieCustomer(user);
+      const { customerId } = await ensureNessieCustomer(user, { persist: false });
+      await persistNessieCustomerId({
+        userId: user.id,
+        customerId,
+        metadata: user.user_metadata ?? {},
+      });
     } catch (err) {
       console.error("Failed to sync Nessie customer:", err);
     }

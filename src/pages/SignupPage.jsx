@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase.js";
 import { upsertUserProfileName, upsertUserRow } from "../lib/userIdentity.js";
-import { ensureNessieCustomer } from "../lib/nessie.js";  // 🔥 Added Nessie
+import { ensureNessieCustomer, persistNessieCustomerId } from "../lib/nessie.js"; // 🔥 Nessie helpers
 import Button from "../components/ui/Button.jsx";
 import Barcelona from "../assets/cities/barcelona.jpg"; // background image
 
@@ -57,7 +57,12 @@ export function SignupPage() {
 
       // 🔥 Create Nessie customer and attach ID
       try {
-        await ensureNessieCustomer(data.user);
+        const { customerId } = await ensureNessieCustomer(data.user, { persist: false });
+        await persistNessieCustomerId({
+          userId: data.user.id,
+          customerId,
+          metadata: data.user.user_metadata ?? {},
+        });
       } catch (err) {
         console.error("Failed to set up Nessie profile:", err);
         setFormError("We couldn’t set up your banking profile. Try again.");
