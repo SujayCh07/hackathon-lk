@@ -1,11 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { ensureNessieCustomer, fetchNessieOverview } from '../lib/nessie.js';
-import {
-  fetchUserProfileName,
-  upsertUserProfileName,
-  upsertUserRow
-} from '../lib/userIdentity.js';
 import mockAccount from '../data/mockAccount.json';
 import mockTransactions from '../data/mockTransactions.json';
 
@@ -177,32 +172,43 @@ async function ensureUserIdentity(authUser) {
     return authUser;
   }
 
-  await upsertUserRow({ id: authUser.id, email: authUser.email ?? null });
+  const displayName = authUser.user_metadata?.displayName?.trim();
+  const userRecord = {
+    id: authUser.id,
+    email: authUser.email ?? null
+  };
 
-  const metadataName = authUser.user_metadata?.displayName?.trim();
-  const profileName = metadataName || (await fetchUserProfileName(authUser.id));
-  const derivedName = profileName || authUser.email?.split('@')[0] || null;
-
-  if (derivedName) {
-    await upsertUserProfileName({ userId: authUser.id, displayName: derivedName });
+  if (displayName) {
+    userRecord.display_name = displayName;
   }
 
-  if (!metadataName && derivedName) {
+  try {
+    const { error: userError } = await supabase.from('users').upsert(userRecord, {
+      onConflict: 'id'
+    });
+    if (userError) {
+      console.warn('Failed to upsert user row', userError);
+    }
+  } catch (error) {
+    console.warn('Failed to upsert user row', error);
+  }
+
+  if (displayName) {
     try {
-      const { data, error } = await supabase.auth.updateUser({
-        data: {
-          ...(authUser.user_metadata ?? {}),
-          displayName: derivedName
+      const { error: profileError } = await supabase.from('user_profile').upsert(
+        {
+          user_id: authUser.id,
+          name: displayName
+        },
+        {
+          onConflict: 'user_id'
         }
-      });
-      if (error) {
-        throw error;
-      }
-      if (data?.user) {
-        return data.user;
+      );
+      if (profileError) {
+        console.warn('Failed to sync user profile name', profileError);
       }
     } catch (error) {
-      console.warn('Failed to update display name metadata', error);
+      console.warn('Failed to sync user profile name', error);
     }
   }
 
