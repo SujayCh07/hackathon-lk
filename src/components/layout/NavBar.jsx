@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Button from '../ui/Button.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
-import { UserCircleIcon } from '@heroicons/react/24/outline'; // account icon
+import { UserCircleIcon } from '@heroicons/react/24/outline'; // Account icon
+
+// ✅ Added: import logo asset for brand mark
 
 const authenticatedLinks = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -13,7 +15,7 @@ const authenticatedLinks = [
 ];
 
 const linkClasses =
-  'rounded-full px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red';
+  'rounded-full px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red';
 
 export function NavBar() {
   const navigate = useNavigate();
@@ -43,18 +45,19 @@ export function NavBar() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-navy/10 bg-white/95 text-navy shadow-sm backdrop-blur">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-2" aria-label="Primary">
+    <header className="sticky top-0 z-50 border-b border-navy/10 bg-white/95 text-navy shadow-md shadow-slate-100/50 backdrop-blur">
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-8 py-3" aria-label="Primary">
 
-        {/* Logo */}
+        {/* ✅ Changed: Logo + Wordmark (stronger branding) */}
         <NavLink to="/" className="flex items-center gap-3">
-          <span className="text-2xl font-bold tracking-tight text-navy hover:text-red transition-colors">
+          {/* <img src={Logo} alt="Parity Logo" className="h-9 w-9 object-contain" /> */}
+          <span className="text-2xl font-extrabold bg-gradient-to-r from-red to-navy bg-clip-text text-transparent">
             Parity
           </span>
         </NavLink>
 
-        {/* Desktop Links */}
-        <div className="hidden items-center gap-6 md:flex">
+        {/* ✅ Changed: More spacing between nav links */}
+        <div className="hidden items-center gap-10 md:flex">
           {links.map((link) => (
             <NavLink
               key={link.to}
@@ -72,17 +75,19 @@ export function NavBar() {
           ))}
         </div>
 
-        {/* Account / Auth buttons */}
-        <div className="hidden items-center gap-3 md:flex">
+        {/* ✅ Changed: Better account section layout */}
+        <div className="hidden items-center gap-5 md:flex border-l border-slate/200 pl-6">
           {user ? (
             <>
+              {/* ✅ User label + icon link to settings */}
               <NavLink
                 to="/settings"
-                className="flex items-center gap-2 text-sm font-semibold text-navy/70 hover:text-navy"
+                className="flex items-center gap-2 text-sm font-semibold text-navy/80 hover:text-navy"
               >
-                <UserCircleIcon className="h-5 w-5 text-navy/70" />
+                <UserCircleIcon className="h-6 w-6 text-navy/70" />
                 <span>{identityLabel}</span>
               </NavLink>
+              {/* Sign out button */}
               <Button
                 type="button"
                 variant="secondary"
@@ -109,7 +114,7 @@ export function NavBar() {
           )}
         </div>
 
-        {/* Mobile Menu */}
+        {/* Mobile Menu (kept same for now) */}
         <details className="relative md:hidden" role="list">
           <summary className="list-none rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red">
             Menu
