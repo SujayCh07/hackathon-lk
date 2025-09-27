@@ -58,7 +58,7 @@ export function SignupPage() {
       return;
     }
 
-    setMessage('Check your inbox for a confirmation email before signing in.');
+    setMessage('Account created!');
     setIsSubmitting(false);
   }
 
