@@ -1,51 +1,45 @@
 import clsx from 'clsx';
+import { LightBulbIcon } from '@heroicons/react/24/outline';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card.jsx';
 
-export function NotificationsWidget({
-  items = [],
-  icon: Icon,
-  title = 'Latest nudges',
-  subtitle = 'We turn PPP swings into actionable moves.',
-  emptyStateMessage = "Once we have enough data we’ll start dropping personalised travel plays here.",
-  className,
-}) {
+export function NotificationsWidget({ items = [], className }) {
   const messages = items.filter(Boolean);
   return (
     <Card
       className={clsx(
-        'relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0b1f3f]/95 via-[#123d70]/85 to-[#f5f8ff]/95 shadow-lg shadow-[#052962]/20 ring-1 ring-white/20 before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] before:bg-[radial-gradient(circle_at_top,_rgba(227,24,55,0.12),transparent_60%)] after:pointer-events-none after:absolute after:-right-10 after:-top-10 after:h-24 after:w-24 after:rounded-full after:bg-[#e31837]/10 after:blur-2xl hover:shadow-2xl hover:shadow-[#052962]/30 hover:ring-[#e31837]/20 sm:after:h-32 sm:after:w-32',
-        'transform-gpu transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01]',
+        'relative h-full rounded-2xl border border-white/30 bg-gradient-to-br from-[#052962]/15 via-[#e0ecff]/60 to-white/95 text-slate/80 shadow-lg shadow-navy/15 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-navy/25',
         className
       )}
     >
-      <CardHeader className="mb-6 flex items-start gap-4">
-        {Icon && (
-          <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-white/20 text-[#052962] ring-1 ring-white/40">
-            <Icon aria-hidden="true" className="h-6 w-6" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(9,80,166,0.25),transparent_65%)]"
+      />
+      <CardHeader className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#052962]/10 text-[#052962]">
+            <LightBulbIcon className="h-6 w-6" aria-hidden="true" />
           </span>
-        )}
-        <div>
-          <CardTitle className="text-xl font-semibold text-white drop-shadow-sm">{title}</CardTitle>
-          {subtitle && <p className="text-sm text-white/80">{subtitle}</p>}
+          <div>
+            <CardTitle className="text-lg font-semibold text-[#052962]">Latest nudges</CardTitle>
+            <p className="text-sm text-slate/70">We turn PPP swings into actionable moves.</p>
+          </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4 text-sm text-white/85">
+      <CardContent className="space-y-4">
         <ul className="space-y-3">
           {messages.map((message, index) => (
             <li
               key={`${message}-${index}`}
-              className="flex items-start gap-3 rounded-2xl bg-white/15 px-4 py-3 text-left text-sm text-white ring-1 ring-white/30 backdrop-blur-sm"
+              className="flex items-start gap-3 rounded-2xl border border-[#0f3b75]/10 bg-white/50 px-4 py-3 text-sm text-slate/80 shadow-sm"
             >
-              <span
-                className="mt-1 inline-flex h-2 w-2 flex-shrink-0 rounded-full bg-[#e31837] shadow shadow-[#e31837]/40"
-                aria-hidden="true"
-              />
-              <p className="leading-relaxed">{message}</p>
+              <span className="mt-1 inline-flex h-2.5 w-2.5 flex-shrink-0 rounded-full bg-[#e31837]" aria-hidden="true" />
+              <p>{message}</p>
             </li>
           ))}
           {messages.length === 0 && (
-            <li className="rounded-2xl border border-dashed border-white/40 bg-white/10 px-6 py-8 text-center text-sm text-white/80">
-              {emptyStateMessage}
+            <li className="rounded-2xl border border-dashed border-[#0f3b75]/30 bg-white/40 px-4 py-6 text-center text-sm text-slate/70">
+              No nudges yet. We’ll surface smart moves once your spending trends in.
             </li>
           )}
         </ul>
