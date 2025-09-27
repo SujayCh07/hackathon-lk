@@ -3,8 +3,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import Button from "../ui/Button.jsx";
 import { Link } from "react-router-dom";
 import { useParallax } from "../../hooks/useParallax.js";
-import logo from "../../assets/logo.png";
 
+// City images
 import Paris from "../../assets/cities/paris.jpg";
 import Lisbon from "../../assets/cities/lisbon.jpg";
 import MexicoCity from "../../assets/cities/mexicocity.jpg";
@@ -25,16 +25,12 @@ const slides = [
   { city: "Dubai", country: "United Arab Emirates", image: Dubai },
 ];
 
-/**
- * Smoother, slower slide:
- * - minor horizontal pan + crossfade (less jank than full 100% slides)
- * - long ease curve, GPU-friendly
- */
+// ✅ Slow, smooth slide transitions
 const imageVariants = {
   enter: (direction) => ({
-    x: direction > 0 ? "8%" : "-8%",
+    x: direction > 0 ? "100%" : "-100%",
     opacity: 0,
-    scale: 1.04,
+    scale: 1.05,
   }),
   center: {
     x: 0,
@@ -42,30 +38,27 @@ const imageVariants = {
     scale: 1,
   },
   exit: (direction) => ({
-    x: direction > 0 ? "-8%" : "8%",
+    x: direction > 0 ? "-100%" : "100%",
     opacity: 0,
     scale: 1.02,
   }),
 };
 
 const captionVariants = {
-  enter: { y: 18, opacity: 0 },
+  enter: { y: 20, opacity: 0 },
   center: { y: 0, opacity: 1 },
-  exit: { y: -18, opacity: 0 },
+  exit: { y: -20, opacity: 0 },
 };
 
-export function HeroCarousel({ showLogo = false }) {
+export function HeroCarousel() {
   const [[index, direction], setSlideState] = useState([0, 0]);
   const { style: parallaxStyle } = useParallax(0.15);
 
-  // Preload images to avoid decode jank
+  // Preload images
   useEffect(() => {
-    slides.forEach((s) => {
-      const i = new Image();
-      i.src = s.image;
-      i.decoding = "async";
-      // @ts-ignore
-      i.fetchpriority = "low";
+    slides.forEach((slide) => {
+      const preload = new Image();
+      preload.src = slide.image;
     });
   }, []);
 
@@ -78,11 +71,10 @@ export function HeroCarousel({ showLogo = false }) {
     });
   }, []);
 
-  // Slower auto-advance (9s)
   useEffect(() => {
     const timer = setInterval(() => {
       setSlideState(([prevIndex]) => [(prevIndex + 1) % slides.length, 1]);
-    }, 9000);
+    }, 7000); // ⏱ Longer delay between slides (7s)
     return () => clearInterval(timer);
   }, []);
 
@@ -96,85 +88,64 @@ export function HeroCarousel({ showLogo = false }) {
       aria-label="Featured destinations"
     >
       {/* Background slider */}
-      <div className="absolute inset-0">
+      <motion.div className="absolute inset-0" style={parallaxStyle}>
         <AnimatePresence initial={false} custom={direction}>
-          <motion.img
+          <motion.div
             key={activeSlide.city}
-            src={activeSlide.image}
-            alt={`${activeSlide.city} skyline`}
             custom={direction}
             variants={imageVariants}
             initial="enter"
             animate="center"
             exit="exit"
             transition={{
-              x: { duration: 3.2, ease: [0.22, 1, 0.36, 1] },
-              opacity: { duration: 1.8, ease: "easeInOut" },
-              scale: { duration: 3.2, ease: [0.22, 1, 0.36, 1] },
+              x: { duration: 2.5, ease: [0.22, 1, 0.36, 1] }, // ⏱ smoother slide
+              opacity: { duration: 1.5, ease: "easeInOut" },
+              scale: { duration: 2.5, ease: [0.22, 1, 0.36, 1] },
             }}
-            className="absolute inset-0 h-full w-full object-cover will-change-transform"
-            style={parallaxStyle}
-            decoding="async"
-            loading="eager"
-            sizes="100vw"
-          />
-        </AnimatePresence>
-
-        {/* Capital One–ish overlays (readability) */}
-        <div className="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-charcoal/25 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-navy/45 via-transparent to-red/30" />
-      </div>
-
-      {/* Central content — no clunky box; soft radial glow behind text */}
-      <div className="relative z-10 flex h-full w-full flex-col items-center justify-center px-4 py-20 text-center sm:px-6">
-        <div className="relative w-full max-w-4xl mx-auto">
-          {/* subtle behind-text glow only */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -inset-x-16 -inset-y-10 -z-10 rounded-[2rem]
-                       bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.55),rgba(0,0,0,0.25)_45%,transparent_70%)]
-                       blur-sm"
-          />
-          <motion.div
-            key={`${activeSlide.city}-content`}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: "easeOut" }}
-            className="flex w-full flex-col items-center gap-6"
+            className="absolute inset-0"
           >
-            {showLogo && (
-              <div className="flex items-center justify-center">
-                <img
-                  src={logo}
-                  alt="Parity logo"
-                  className="h-12 w-auto drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]"
-                />
-              </div>
-            )}
-            <span className="rounded-full bg-white/15 px-5 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-offwhite/90">
-              Global PPP intelligence
-            </span>
-            <h1 className="font-poppins text-4xl font-bold leading-tight text-white drop-shadow-lg sm:text-5xl lg:text-6xl">
-              Same dollars, smarter world.
-            </h1>
-            <p className="max-w-2xl text-base text-offwhite/90 sm:text-lg">
-              See where your money goes the farthest with PPP-adjusted insights across the globe.
-            </p>
-            <Button
-              as={Link}
-              to="/dashboard"
-              variant="primary"
-              className="text-base shadow-lg transition-all duration-300 hover:translate-y-[-2px]
-                         hover:bg-gradient-to-r hover:from-red hover:to-navy focus-visible:ring-4
-                         focus-visible:ring-turquoise focus-visible:ring-offset-2 focus-visible:ring-offset-charcoal"
-            >
-              Connect my Capital One Account
-            </Button>
+            <img
+              src={activeSlide.image}
+              alt={`${activeSlide.city} skyline`}
+              className="h-full w-full object-cover"
+              loading="eager"
+            />
           </motion.div>
-        </div>
+        </AnimatePresence>
+        <div className="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-charcoal/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-navy/50 via-transparent to-red/30" />
+      </motion.div>
+
+      {/* Main text box */}
+      <div className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-6 px-4 py-20 text-center sm:px-6">
+        <motion.div
+          key={`${activeSlide.city}-content`}
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
+          className="flex w-full max-w-4xl flex-col items-center gap-6 rounded-3xl border border-white/10 bg-black/40 p-8 text-offwhite shadow-2xl backdrop-blur-md sm:p-12"
+        >
+          <span className="rounded-full bg-white/15 px-5 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-offwhite/90">
+            Global PPP intelligence
+          </span>
+          <h1 className="font-poppins text-4xl font-bold leading-tight text-white drop-shadow-lg sm:text-5xl lg:text-6xl">
+            Same dollars, smarter world.
+          </h1>
+          <p className="max-w-2xl text-base text-offwhite/90 sm:text-lg">
+            See where your money goes the farthest with PPP-adjusted insights across the globe.
+          </p>
+          <Button
+            as={Link}
+            to="/dashboard"
+            variant="primary"
+            className="text-base shadow-lg transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-r hover:from-red hover:to-navy focus-visible:ring-4 focus-visible:ring-turquoise focus-visible:ring-offset-2 focus-visible:ring-offset-charcoal"
+          >
+            Connect my Capital One Account
+          </Button>
+        </motion.div>
       </div>
 
-      {/* City caption (no background box) */}
+      {/* City caption - no background box, just text w/ shadow */}
       <AnimatePresence initial={false} custom={direction}>
         <motion.div
           key={`${activeSlide.city}-caption`}
@@ -183,29 +154,28 @@ export function HeroCarousel({ showLogo = false }) {
           initial="enter"
           animate="center"
           exit="exit"
-          transition={{ duration: 0.9, ease: "easeOut" }}
-          className="absolute bottom-[20%] left-8 sm:left-12"
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="absolute bottom-[18%] left-8 sm:left-12"
         >
-          <p className="font-poppins text-4xl sm:text-5xl font-extrabold uppercase tracking-[0.25em] text-white drop-shadow-[0_4px_10px_rgba(0,0,0,0.85)]">
+          <p className="font-poppins text-4xl sm:text-5xl font-extrabold uppercase tracking-[0.25em] text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]">
             {activeSlide.city}
           </p>
-          <p className="text-sm sm:text-base font-medium uppercase tracking-[0.35em] text-white/85 drop-shadow-[0_2px_6px_rgba(0,0,0,0.75)]">
+          <p className="text-sm sm:text-base font-medium uppercase tracking-[0.35em] text-white/80 drop-shadow-[0_2px_6px_rgba(0,0,0,0.7)]">
             {activeSlide.country}
           </p>
         </motion.div>
       </AnimatePresence>
 
-      {/* Dots — moved up */}
-      <nav className="absolute bottom-[12%] flex gap-3" aria-label="Carousel slide controls">
+      {/* Dots */}
+      <nav className="absolute bottom-6 flex gap-3" aria-label="Carousel slide controls">
         {slides.map((slide, idx) => (
           <button
             key={slide.city}
             type="button"
             onClick={() => goToSlide(idx)}
-            className={`h-2 w-10 rounded-full transition-all focus-visible:outline focus-visible:outline-2 
-                        focus-visible:outline-offset-2 focus-visible:outline-offwhite ${
-                          idx === index ? "bg-offwhite" : "bg-white/40"
-                        }`}
+            className={`h-2 w-10 rounded-full transition-all ${
+              idx === index ? "bg-offwhite" : "bg-white/40"
+            }`}
             aria-label={`Show ${slide.city}`}
           />
         ))}

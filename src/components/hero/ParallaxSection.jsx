@@ -1,130 +1,227 @@
 import { motion } from "framer-motion";
-import { useParallax } from "../../hooks/useParallax.js";
-import { Card } from "../ui/Card.jsx";
+import { Link } from "react-router-dom";
+import {
+  ArrowRightIcon,
+  GlobeAltIcon,
+  CurrencyDollarIcon,
+  ChartBarIcon,
+} from "@heroicons/react/24/outline";
 
-const CurrencyIcon = (props) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    strokeWidth={1.5}
-    stroke="currentColor"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
-    <circle cx="12" cy="12" r="8.25" />
-    <path d="M9 9.75h6" />
-    <path d="M9 14.25h5" />
-    <path d="M12 7.5v9" />
-  </svg>
-);
+// Use any high-quality images you already have in /assets/cities (or swap to product shots)
+import London from "../../assets/cities/london.jpg";
+import Lisbon from "../../assets/cities/lisbon.jpg";
+import Bangkok from "../../assets/cities/bangkok.jpg";
 
-const GlobeIcon = (props) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    strokeWidth={1.5}
-    stroke="currentColor"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
-    <circle cx="12" cy="12" r="8.25" />
-    <path d="M3.75 12h16.5" />
-    <path d="M12 3.75c3 3.75 3 12.75 0 16.5" />
-    <path d="M12 3.75c-3 3.75-3 12.75 0 16.5" />
-  </svg>
-);
-
-const InsightsIcon = (props) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    strokeWidth={1.5}
-    stroke="currentColor"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...props}
-  >
-    <path d="M4.5 19.5h15" />
-    <path d="M7.5 19.5v-6.75" />
-    <path d="M12 19.5V7.5" />
-    <path d="M16.5 19.5V11.25" />
-  </svg>
-);
-
-const items = [
+const rows = [
   {
-    title: "Parity Score",
-    description:
-      "See the true strength of your Capital One balance anywhere in the world. Instantly compare local purchasing power with global parity benchmarks.",
-    accent: "Value",
-    icon: CurrencyIcon,
+    eyebrow: "PPP SCORE",
+    title: "See the real worth of your balance—anywhere.",
+    body:
+      "Parity converts your Capital One balance into local purchasing power with PPP benchmarks. No guesswork—just what your money can actually buy.",
+    points: [
+      "Country-by-country value equivalents (e.g., $1 in NYC ≈ $1.45 in Mexico City).",
+      "One tap to compare cities side-by-side.",
+      "Built for clarity—no FX jargon.",
+    ],
+    icon: CurrencyDollarIcon,
+    cta: { label: "Explore PPP Score", to: "/score" },
+    image: London,
   },
   {
-    title: "GeoBudget",
-    description:
-      "Plan your travel runway in real time. Combine PPP multipliers with live FX rates to forecast how long your money will last in any destination.",
-    accent: "Runway",
-    icon: GlobeIcon,
+    eyebrow: "GEOBUDGET",
+    title: "Plan your runway with PPP + live FX.",
+    body:
+      "Forecast months of travel by destination. Combine PPP multipliers and live FX so your budget matches reality, not vibes.",
+    points: [
+      "Auto-budget by city, category, or date range.",
+      "What-if sliders: adjust spend and instantly see runway.",
+      "Export itineraries to share with travel partners.",
+    ],
+    icon: GlobeAltIcon,
+    cta: { label: "Open GeoBudget", to: "/geobudget" },
+    image: Lisbon,
   },
   {
-    title: "Smart-Spend",
-    description:
-      "Track and optimize how your Capital One transactions stretch across categories. Discover which expenses go further overseas versus at home.",
-    accent: "Insights",
-    icon: InsightsIcon,
+    eyebrow: "SMART-SPEND",
+    title: "Know which categories stretch further abroad.",
+    body:
+      "Link Capital One transactions and see where dining, transit, and lodging go further—locally vs. overseas—so you spend with confidence.",
+    points: [
+      "Category heatmap with PPP adjustments.",
+      "Merchant-level insights and gentle alerts.",
+      "Tips to optimize rewards + reduce fees.",
+    ],
+    icon: ChartBarIcon,
+    cta: { label: "View Smart-Spend", to: "/smart-spend" },
+    image: Bangkok,
   },
 ];
 
-export function ParallaxSection() {
-  const { style } = useParallax(0.18);
+const fade = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: "easeOut" } },
+};
 
+export default function ParallaxSection() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-offwhite via-offwhite/60 to-mist/80 py-20 sm:py-28">
+    <section
+      className="relative overflow-hidden bg-gradient-to-b from-offwhite via-offwhite/70 to-white py-20 sm:py-28"
+      aria-label="Parity features"
+    >
+      {/* Subtle brand wash + “swoosh” accent */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(1200px_600px_at_10%_-10%,rgba(0,40,120,0.10),transparent_60%)]" />
+      <SwooshDecoration />
+
+      {/* Section header */}
       <motion.div
-        style={style}
-        className="pointer-events-none absolute inset-x-0 top-0 h-full bg-[radial-gradient(circle_at_top_left,_rgba(0,40,120,0.18),_transparent_55%)]"
-        aria-hidden="true"
-      />
-
-      {/* Section intro */}
-      <div className="mx-auto mb-12 max-w-5xl px-6 text-center sm:mb-16">
-        <h2 className="text-3xl font-bold tracking-tight text-navy sm:text-4xl">
-          Smarter travel, powered by Capital One
-        </h2>
-        <p className="mt-4 text-lg text-slate/70">
-          Purchasing Power Parity reframes your balance as a global compass.
-          With real-time FX hooks and local value insights, Parity helps you
-          travel confidently — and spend intelligently.
+        variants={fade}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, amount: 0.4 }}
+        className="mx-auto mb-12 max-w-5xl px-6 text-center sm:mb-16"
+      >
+        <p className="text-[0.8rem] font-semibold uppercase tracking-[0.35em] text-navy/70">
+          Digital tools built for ease
         </p>
-      </div>
+        <h2 className="mt-3 text-3xl font-bold tracking-tight text-navy sm:text-4xl">
+          Save time, plan smarter, and spend with confidence
+        </h2>
+        <p className="mx-auto mt-4 max-w-3xl text-lg text-slate/75">
+          Parity reframes your Capital One balance as a global compass—so your
+          travel plans start with real purchasing power, not guesswork.
+        </p>
+      </motion.div>
 
-      {/* Cards */}
-      <div className="relative mx-auto grid max-w-6xl gap-10 px-6 md:grid-cols-3">
-        {items.map((item) => (
-          <Card
-            key={item.title}
-            className="flex flex-col items-start bg-white/90 p-6 shadow-lg backdrop-blur hover:shadow-xl transition-shadow"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-r from-navy to-red text-white shadow-md">
-              <item.icon className="h-6 w-6" />
-            </div>
-            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-navy/60">
-              {item.accent}
-            </p>
-            <h3 className="font-poppins mt-2 text-2xl font-semibold text-slate">
-              {item.title}
-            </h3>
-            <p className="mt-3 text-base text-slate/70">{item.description}</p>
-          </Card>
+      {/* Alternating media/text rows (Capital One style) */}
+      <div className="mx-auto flex max-w-6xl flex-col gap-20 px-6">
+        {rows.map((row, idx) => (
+          <FeatureRow key={row.title} row={row} reverse={idx % 2 === 1} />
         ))}
       </div>
+
+      {/* Sticky CTA banner */}
+      <motion.div
+        variants={fade}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, amount: 0.3 }}
+        className="mx-auto mt-20 max-w-5xl px-6"
+      >
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-navy to-red p-1 shadow-xl">
+          <div className="rounded-[1rem] bg-white/10 p-6 text-center backdrop-blur-sm sm:p-8">
+            <h3 className="text-2xl font-semibold text-white">
+              Turn your balance into a global travel compass.
+            </h3>
+            <p className="mt-2 text-white/85">
+              Connect your Capital One account to get PPP-adjusted insights in
+              minutes.
+            </p>
+            <div className="mt-6">
+              <Link
+                to="/dashboard"
+                className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 font-medium text-navy shadow hover:shadow-md"
+              >
+                Connect my Capital One Account
+                <ArrowRightIcon className="h-5 w-5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </motion.div>
     </section>
   );
 }
 
-export default ParallaxSection;
+/** A single alternating feature row */
+function FeatureRow({ row, reverse = false }) {
+  const Icon = row.icon;
+  return (
+    <div
+      className={`grid grid-cols-1 items-center gap-8 md:grid-cols-12 ${
+        reverse ? "md:[&>*:first-child]:order-2" : ""
+      }`}
+    >
+      {/* Media */}
+      <motion.div
+        variants={fade}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, amount: 0.4 }}
+        className="md:col-span-6"
+      >
+        <div className="overflow-hidden rounded-2xl shadow-lg">
+          <img
+            src={row.image}
+            alt=""
+            className="h-[320px] w-full object-cover transition-transform duration-700 ease-out hover:scale-105 sm:h-[380px]"
+            loading="lazy"
+          />
+        </div>
+      </motion.div>
+
+      {/* Copy */}
+      <motion.div
+        variants={fade}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, amount: 0.4 }}
+        className="md:col-span-6"
+      >
+        <p className="text-[0.75rem] font-semibold uppercase tracking-[0.35em] text-navy/70">
+          {row.eyebrow}
+        </p>
+        <h3 className="mt-2 text-2xl font-semibold text-slate sm:text-3xl">
+          {row.title}
+        </h3>
+        <p className="mt-3 text-slate/75">{row.body}</p>
+
+        <ul className="mt-5 space-y-2">
+          {row.points.map((p) => (
+            <li key={p} className="flex items-start gap-3 text-slate/80">
+              <span className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-navy to-red text-white">
+                <Icon className="h-4 w-4" />
+              </span>
+              <span>{p}</span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-6">
+          <Link
+            to={row.cta.to}
+            className="inline-flex items-center gap-2 text-navy hover:text-red"
+            aria-label={row.cta.label}
+          >
+            {row.cta.label}
+            <ArrowRightIcon className="h-5 w-5" />
+          </Link>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+/** subtle “swoosh” accent behind header, Capital One vibe */
+function SwooshDecoration() {
+  return (
+    <svg
+      className="pointer-events-none absolute -top-10 right-[-120px] h-[280px] w-[560px] opacity-30"
+      viewBox="0 0 560 280"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M20 230C190 120 360 90 540 60"
+        stroke="url(#g)"
+        strokeWidth="30"
+        strokeLinecap="round"
+      />
+      <defs>
+        <linearGradient id="g" x1="20" y1="230" x2="540" y2="60" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#0A2A6B" />
+          <stop offset="1" stopColor="#D21F3C" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
