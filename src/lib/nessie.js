@@ -44,7 +44,7 @@ async function request(path, { method = 'GET', body, headers = {}, query } = {})
 export async function ensureNessieCustomer(user) {
   const existingId = user?.user_metadata?.nessieCustomerId;
   if (existingId) {
-    return { customerId: existingId, user };
+    return { customerId: existingId };
   }
 
   const profile = {
