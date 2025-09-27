@@ -23,7 +23,7 @@ export function Insights() {
       Transport: totals['Transport'] ?? 120
     };
     return Object.entries(atlantaSpends).map(([category, amount]) => {
-      const lisbonAmount = adjustPrice(amount, 'Lisbon');
+      const lisbonAmount = adjustPrice(amount, 'Portugal', 'Germany');
       const delta = ((amount - lisbonAmount) / amount) * 100;
       return {
         title: category,

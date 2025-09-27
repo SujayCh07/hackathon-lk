@@ -36,6 +36,9 @@ export function Planner() {
       /*const calculateRunway: (monthlyBudgetUSD: any, fromCountry: any, toCountry: any, monthlyCostInTargetCountry: any) => Promise<number>
   */
       const runwayMonths = calculateRunway(budget, "Portugal", city.country, city.monthlyCost);
+      console.log(city.country);
+      console.log(budget);
+      console.log(city.monthlyCost);
       return {
         city: city.city,
         runway: runwayMonths,
