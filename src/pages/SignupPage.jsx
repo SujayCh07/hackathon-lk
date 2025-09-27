@@ -17,7 +17,7 @@ export function SignupPage() {
   const [message, setMessage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const redirectTo = searchParams.get("redirectTo") ?? "/personalize";
+  const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
 
   async function handleSubmit(event) {
     event.preventDefault();

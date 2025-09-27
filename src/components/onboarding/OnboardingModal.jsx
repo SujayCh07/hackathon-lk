@@ -1,11 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../ui/Button.jsx';
-import {
-  TRAVEL_INTEREST_OPTIONS,
-  CONTINENT_OPTIONS,
-  CATEGORY_FOCUS_OPTIONS,
-} from '../../lib/personalizationOptions.js';
 
 const TRAVEL_GOALS = ['Digital nomad life', 'Short-term relocation', 'Long sabbatical', 'Budget world tour'];
 const TRAVEL_STYLES = ['Comfort seeker', 'Local immersion', 'Luxury explorer', 'Remote worker'];
@@ -17,14 +12,6 @@ function normaliseCities(value) {
     .split(',')
     .map((city) => city.trim())
     .filter(Boolean);
-}
-
-function toggleSelection(list, value) {
-  if (!value) return list;
-  if (list.includes(value)) {
-    return list.filter((entry) => entry !== value);
-  }
-  return [...list, value];
 }
 
 export function OnboardingModal({
@@ -44,9 +31,6 @@ export function OnboardingModal({
     return '';
   });
   const [cityInput, setCityInput] = useState((defaultValues.curiousCities ?? []).join(', '));
-  const [travelInterests, setTravelInterests] = useState(defaultValues.travelInterests ?? []);
-  const [preferredContinents, setPreferredContinents] = useState(defaultValues.preferredContinents ?? []);
-  const [favoriteCategories, setFavoriteCategories] = useState(defaultValues.favoriteCategories ?? []);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -60,9 +44,6 @@ export function OnboardingModal({
         : ''
     );
     setCityInput((defaultValues.curiousCities ?? []).join(', '));
-    setTravelInterests(defaultValues.travelInterests ?? []);
-    setPreferredContinents(defaultValues.preferredContinents ?? []);
-    setFavoriteCategories(defaultValues.favoriteCategories ?? []);
   }, [defaultValues, isOpen]);
 
   const parsedBudget = useMemo(() => {
@@ -83,11 +64,7 @@ export function OnboardingModal({
       travelStyle,
       budgetFocus,
       monthlyBudget: parsedBudget,
-      monthlyBudgetGoal: parsedBudget,
       curiousCities: normaliseCities(cityInput),
-      travelInterests,
-      preferredContinents,
-      favoriteCategories,
     };
     onComplete?.(payload);
   };
@@ -194,76 +171,6 @@ export function OnboardingModal({
                       {option}
                     </button>
                   ))}
-                </div>
-              </fieldset>
-
-              <fieldset>
-                <legend className="text-sm font-semibold text-charcoal">What excites you most when you travel?</legend>
-                <p className="text-xs text-charcoal/60">Pick a few — we’ll tailor GeoBudget and nudges around them.</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {TRAVEL_INTEREST_OPTIONS.map((option) => {
-                    const isActive = travelInterests.includes(option);
-                    return (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => setTravelInterests((prev) => toggleSelection(prev, option))}
-                        className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                          isActive
-                            ? 'border-teal bg-teal/15 text-teal'
-                            : 'border-navy/15 bg-white text-charcoal/80 hover:border-teal/50'
-                        }`}
-                      >
-                        {option}
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-
-              <fieldset>
-                <legend className="text-sm font-semibold text-charcoal">Preferred continents</legend>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {CONTINENT_OPTIONS.map((option) => {
-                    const isActive = preferredContinents.includes(option);
-                    return (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => setPreferredContinents((prev) => toggleSelection(prev, option))}
-                        className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                          isActive
-                            ? 'border-coral bg-coral/15 text-coral'
-                            : 'border-navy/15 bg-white text-charcoal/80 hover:border-coral/50'
-                        }`}
-                      >
-                        {option}
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-
-              <fieldset>
-                <legend className="text-sm font-semibold text-charcoal">Spending categories to optimise</legend>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {CATEGORY_FOCUS_OPTIONS.map((option) => {
-                    const isActive = favoriteCategories.includes(option);
-                    return (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => setFavoriteCategories((prev) => toggleSelection(prev, option))}
-                        className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                          isActive
-                            ? 'border-navy bg-navy/15 text-navy'
-                            : 'border-navy/15 bg-white text-charcoal/80 hover:border-navy/40'
-                        }`}
-                      >
-                        {option}
-                      </button>
-                    );
-                  })}
                 </div>
               </fieldset>
 

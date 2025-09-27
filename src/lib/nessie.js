@@ -3,18 +3,6 @@ import { supabase } from './supabase.js';
 const NESSIE_BASE_URL = import.meta.env.VITE_NESSIE_BASE_URL ?? 'https://api.nessieisreal.com';
 const NESSIE_API_KEY = import.meta.env.VITE_NESSIE_API_KEY;
 
-const CATEGORY_KEYWORDS = [
-  { category: 'Groceries', keywords: ['grocery', 'market', 'whole foods', 'trader joe', 'aldi', 'costco'] },
-  { category: 'Rent', keywords: ['rent', 'landlord', 'apartment', 'property management', 'realty'] },
-  { category: 'Transport', keywords: ['uber', 'lyft', 'ride', 'metro', 'subway', 'train', 'bus', 'transit', 'rail'] },
-  { category: 'Dining', keywords: ['restaurant', 'cafe', 'coffee', 'bar', 'pizza', 'kitchen', 'bistro', 'grill'] },
-  { category: 'Entertainment', keywords: ['theatre', 'cinema', 'music', 'concert', 'ticket', 'stadium', 'event'] },
-  { category: 'Travel', keywords: ['airline', 'hotel', 'hostel', 'airbnb', 'booking', 'expedia', 'travel'] },
-  { category: 'Utilities', keywords: ['utility', 'electric', 'gas', 'water', 'internet', 'comcast', 'verizon'] },
-  { category: 'Healthcare', keywords: ['clinic', 'pharmacy', 'health', 'wellness', 'hospital'] },
-  { category: 'Fitness', keywords: ['gym', 'fitness', 'studio', 'yoga', 'pilates'] },
-];
-
 function buildUrl(path, query = {}) {
   if (!path.startsWith('/')) {
     throw new Error('Nessie API paths must start with a leading slash');
@@ -250,7 +238,7 @@ export async function loadTransactionsFromSupabase(userId, { limit } = {}) {
 
   let query = supabase
     .from('transactions')
-    .select('id, nessie_tx_id, amount, category, category_confidence, merchant, description, origin, timestamp, user_id')
+    .select('id, nessie_tx_id, amount, category, merchant, timestamp, user_id')
     .eq('user_id', userId)
     .order('timestamp', { ascending: false });
 
@@ -306,41 +294,30 @@ export async function syncAccountsFromNessie({ userId, customerId }) {
     await supabase.from('accounts').delete().eq('user_id', userId);
   }
 
-  const latestAccounts = await loadAccountsFromSupabase(userId);
-  await recordAccountSnapshots(userId, latestAccounts);
-  return latestAccounts;
+  return loadAccountsFromSupabase(userId);
 }
 
 export async function syncTransactionsFromNessie({ userId, customerId }) {
   if (!userId || !customerId) return [];
 
   const remoteTransactions = await fetchCustomerTransactions(customerId);
-  const rows = remoteTransactions.map((transaction) => {
-    const { category, confidence } = autoCategoriseTransaction(transaction);
-
-    return {
+  const rows = remoteTransactions.map((transaction) => ({
     user_id: userId,
     nessie_tx_id: transaction._id ?? transaction.id ?? null,
     amount: Number(transaction.amount ?? transaction.purchase_amount ?? 0),
-    category,
-    category_confidence: confidence,
+    category: Array.isArray(transaction.category)
+      ? transaction.category[0]
+      : transaction.category ?? transaction.type ?? 'General',
     merchant:
       transaction.merchant ??
       transaction.payee ??
       transaction.purchase_description ??
       transaction.description ??
       'Merchant',
-    description:
-      transaction.description ??
-      transaction.purchase_description ??
-      transaction.medium ??
-      null,
     timestamp: normaliseTimestamp(
       transaction.transaction_date ?? transaction.date ?? transaction.purchase_date ?? transaction.post_date
-    ),
-    origin: 'nessie',
-  };
-  });
+    )
+  }));
 
   if (rows.length > 0) {
     const { error } = await supabase
@@ -364,83 +341,6 @@ function normaliseTimestamp(value) {
   return date.toISOString();
 }
 
-function toTitleCase(value) {
-  if (typeof value !== 'string') return '';
-  return value
-    .toLowerCase()
-    .split(' ')
-    .filter(Boolean)
-    .map((segment) => segment[0].toUpperCase() + segment.slice(1))
-    .join(' ');
-}
-
-function inferCategoryFromKeywords(text) {
-  if (!text) return null;
-  const lower = text.toLowerCase();
-  for (const rule of CATEGORY_KEYWORDS) {
-    if (rule.keywords.some((keyword) => lower.includes(keyword))) {
-      return { category: rule.category, confidence: 0.9 };
-    }
-  }
-  return null;
-}
-
-function autoCategoriseTransaction(transaction) {
-  const descriptionParts = [
-    transaction.merchant,
-    transaction.payee,
-    transaction.purchase_description,
-    transaction.description,
-    transaction.medium,
-  ]
-    .map((part) => (typeof part === 'string' ? part : ''))
-    .filter(Boolean);
-
-  const compositeDescription = descriptionParts.join(' ');
-
-  const providedCategory = (() => {
-    const raw = Array.isArray(transaction.category)
-      ? transaction.category[0]
-      : transaction.category ?? transaction.type ?? null;
-    if (!raw) return null;
-    return toTitleCase(String(raw).replace(/[_-]/g, ' '));
-  })();
-
-  const keywordMatch = inferCategoryFromKeywords(compositeDescription);
-
-  if (keywordMatch) {
-    return keywordMatch;
-  }
-
-  if (providedCategory) {
-    return { category: providedCategory, confidence: 0.35 };
-  }
-
-  return { category: 'General', confidence: 0.1 };
-}
-
-async function recordAccountSnapshots(userId, accounts = []) {
-  if (!userId || !Array.isArray(accounts) || accounts.length === 0) return;
-
-  const rows = accounts
-    .map((account) => ({
-      user_id: userId,
-      account_id: account.id ?? account.account_id ?? null,
-      nessie_account_id: account.nessie_account_id ?? account.nessieAccountId ?? null,
-      balance: Number(account.balance ?? account.balanceUSD ?? 0),
-      currency_code: account.currency_code ?? account.currencyCode ?? 'USD',
-      captured_at: new Date().toISOString(),
-    }))
-    .filter((row) => Number.isFinite(row.balance));
-
-  if (rows.length === 0) return;
-
-  const { error } = await supabase.from('account_balance_snapshots').insert(rows);
-  if (error) {
-    console.warn('Failed to persist account balance snapshot', error);
-  }
-}
-
 export function mapAccountRow(row) {
   if (!row) return null;
   return {
@@ -462,11 +362,8 @@ export function mapTransactionRow(row) {
     nessieTxId: row.nessie_tx_id ?? null,
     amount: Number(row.amount ?? 0),
     category: row.category ?? 'General',
-    categoryConfidence: typeof row.category_confidence === 'number' ? row.category_confidence : null,
     merchant: row.merchant ?? 'Merchant',
-    description: row.description ?? null,
     timestamp: normaliseTimestamp(row.timestamp),
-    origin: row.origin ?? null,
     userId: row.user_id ?? null
   };
 }
