@@ -15,11 +15,18 @@ const linkClasses =
 export function NavBar() {
   return (
     <header className="sticky top-0 z-50 border-b border-navy/10 bg-white/95 text-navy shadow-sm backdrop-blur">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4" aria-label="Primary">
-        <NavLink to="/" className="flex items-center gap-3 text-lg font-semibold tracking-tight">
-          <img src={logo} alt="Parity logo" className="h-12 w-auto" />
-          <span className="sr-only">Parity</span>
+      {/* reduced padding in nav to make bar thinner */}
+      <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-2" aria-label="Primary">
+
+        {/* Logo shifted left and enlarged */}
+        <NavLink to="/" className="flex items-center gap-3">
+          {/* <img src={logo} alt="Parity logo" className="h-14 w-auto -ml-2" /> */}
+          <span className="text-2xl font-bold tracking-tight text-navy hover:text-red transition-colors">
+            Parity
+          </span>
         </NavLink>
+
+        {/* Links */}
         <div className="hidden items-center gap-6 md:flex">
           {links.map((link) => (
             <NavLink
@@ -37,6 +44,8 @@ export function NavBar() {
             </NavLink>
           ))}
         </div>
+
+        {/* CTA button */}
         <Button
           as={NavLink}
           to="/dashboard"
@@ -44,6 +53,8 @@ export function NavBar() {
         >
           Enter App
         </Button>
+
+        {/* Mobile menu */}
         <details className="relative md:hidden" role="list">
           <summary className="list-none rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red">
             Menu

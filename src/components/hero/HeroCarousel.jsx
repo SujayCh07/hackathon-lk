@@ -25,25 +25,32 @@ const slides = [
   { city: "Dubai", country: "United Arab Emirates", image: Dubai },
 ];
 
-// Smooth transitions
+// Slide-only animation (no fading)
 const imageVariants = {
   enter: (direction) => ({
     x: direction > 0 ? "100%" : "-100%",
-    opacity: 0,
-    scale: 1.05,
+    position: "absolute",
   }),
-  center: { x: 0, opacity: 1, scale: 1 },
+  center: {
+    x: 0,
+    position: "absolute",
+  },
   exit: (direction) => ({
     x: direction > 0 ? "-100%" : "100%",
-    opacity: 0,
-    scale: 1.02,
+    position: "absolute",
   }),
 };
 
 const captionVariants = {
-  enter: { y: 20, opacity: 0 },
-  center: { y: 0, opacity: 1 },
-  exit: { y: -20, opacity: 0 },
+  enter: (direction) => ({
+    x: direction > 0 ? 40 : -40,
+    opacity: 0,
+  }),
+  center: { x: 0, opacity: 1 },
+  exit: (direction) => ({
+    x: direction > 0 ? -40 : 40,
+    opacity: 0,
+  }),
 };
 
 export function HeroCarousel() {
@@ -67,10 +74,11 @@ export function HeroCarousel() {
     });
   }, []);
 
+  // Auto advance
   useEffect(() => {
     const timer = setInterval(() => {
       setSlideState(([prevIndex]) => [(prevIndex + 1) % slides.length, 1]);
-    }, 7000);
+    }, 6000); // slightly faster to sync with captions
     return () => clearInterval(timer);
   }, []);
 
@@ -84,29 +92,23 @@ export function HeroCarousel() {
       aria-label="Featured destinations"
     >
       {/* Background slider */}
-      <motion.div className="absolute inset-0" style={parallaxStyle}>
-        <AnimatePresence initial={false} custom={direction}>
-          <motion.div
+      <motion.div className="absolute inset-0 overflow-hidden" style={parallaxStyle}>
+        <AnimatePresence initial={false} custom={direction} mode="wait">
+          <motion.img
             key={activeSlide.city}
+            src={activeSlide.image}
+            alt={`${activeSlide.city} skyline`}
             custom={direction}
             variants={imageVariants}
             initial="enter"
             animate="center"
             exit="exit"
             transition={{
-              x: { duration: 2.5, ease: [0.22, 1, 0.36, 1] },
-              opacity: { duration: 1.5, ease: "easeInOut" },
-              scale: { duration: 2.5, ease: [0.22, 1, 0.36, 1] },
+              duration: 1.0,
+              ease: "easeInOut",
             }}
-            className="absolute inset-0"
-          >
-            <img
-              src={activeSlide.image}
-              alt={`${activeSlide.city} skyline`}
-              className="h-full w-full object-cover"
-              loading="eager"
-            />
-          </motion.div>
+            className="absolute inset-0 h-full w-full object-cover"
+          />
         </AnimatePresence>
 
         {/* Overlays for readability */}
@@ -114,15 +116,9 @@ export function HeroCarousel() {
         <div className="absolute inset-0 bg-gradient-to-r from-navy/40 via-transparent to-red/25" />
       </motion.div>
 
-      {/* Central content box */}
+      {/* Central content (static) */}
       <div className="relative z-10 flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6">
-        <motion.div
-          key={`${activeSlide.city}-content`}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: "easeOut" }}
-          className="flex w-full max-w-2xl flex-col items-center gap-5 rounded-xl bg-charcoal/55 px-6 py-8 text-center shadow-[0_20px_50px_rgba(6,16,40,0.4)] backdrop-blur-sm"
-        >
+        <div className="flex w-full max-w-2xl flex-col items-center gap-5 rounded-xl bg-charcoal/55 px-6 py-8 text-center shadow-[0_20px_50px_rgba(6,16,40,0.4)] backdrop-blur-sm">
           <span className="rounded-full bg-white/20 px-5 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-offwhite/90">
             Global Parity Intelligence
           </span>
@@ -136,15 +132,15 @@ export function HeroCarousel() {
             as={Link}
             to="/dashboard"
             variant="primary"
-            className="text-base shadow-lg transition-all duration-500 ease-in-out transform hover:scale-105 hover:translate-y-[-4px] hover:bg-gradient-to-r hover:from-red hover:to-navy"
+            className="text-base shadow-lg transition-all duration-500 ease-in-out transform hover:scale-105 hover:translate-y-[-3px] hover:bg-gradient-to-r hover:from-red hover:to-navy"
           >
-            Connect my Capital One™ Account
+            Connect my&nbsp;<span className="text-red-600">Capital One™</span>&nbsp;Account
           </Button>
-        </motion.div>
+        </div>
       </div>
 
-      {/* City caption */}
-      <AnimatePresence initial={false} custom={direction}>
+      {/* City + Country captions (sliding in sync) */}
+      <AnimatePresence initial={false} custom={direction} mode="wait">
         <motion.div
           key={`${activeSlide.city}-caption`}
           custom={direction}
@@ -152,7 +148,7 @@ export function HeroCarousel() {
           initial="enter"
           animate="center"
           exit="exit"
-          transition={{ duration: 0.8, ease: "easeOut" }}
+          transition={{ duration: 1.0, ease: "easeInOut" }}
           className="absolute bottom-[18%] left-8 sm:left-12"
         >
           <p className="font-poppins text-4xl sm:text-5xl font-extrabold uppercase tracking-[0.25em] text-white drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)]">
