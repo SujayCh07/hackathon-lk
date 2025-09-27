@@ -1,9 +1,25 @@
-import { useEffect, useMemo, useState } from 'react';
+// Calculate realistic monthly living costs in USD equivalent
+  const estimateMonthlyLivingCost = (pppIndex) => {
+    // Base comfortable living cost in USD (what $2000 buys in the US)
+    const baseComfortableLivingUSD = 2000; 
+    
+    // In countries with high PPP index (cheap countries), 
+    // the same lifestyle costs much less in USD terms
+    const equivalentUSDCost = baseComfortableLivingUSD / pppIndex;
+    
+    // Sanity check: don't let it go below $100 or above $8000
+    const clampedCost = Math.max(100, Math.min(8000, equivalentUSDCost));
+    
+    console.log(`Monthly cost estimate: PPP ${pppIndex} → ${clampedCost.toFixed(0)}/month USD equivalent`);
+    
+    return Math.round(clampedCost);
+  };import { useEffect, useMemo, useState, useCallback } from 'react';
 import supabase, { 
   getPurchasingPowerRatio, 
   getAdjustedPrice, 
   calculateLivingTime,
-  getAllCountriesWithPPP 
+  calculateBudgetRunway,
+  getAllCountries 
 } from '../Econ.js';
 
 export function usePPP() {
@@ -14,10 +30,12 @@ export function usePPP() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log('usePPP: Starting data fetch...');
         setIsLoading(true);
         
         // Get PPP data
-        const countriesWithPPP = await getAllCountriesWithPPP();
+        const countriesWithPPP = await getAllCountries();
+        console.log('usePPP: Received countries:', countriesWithPPP.length);
         
         if (countriesWithPPP.length === 0) {
           throw new Error('No PPP data available');
@@ -28,14 +46,16 @@ export function usePPP() {
           city: country.originalName, // Using original name for display
           country: country.originalName,
           normalizedName: country.normalizedName,
-          ppp: country.ppp_index,
+          ppp: country.pppIndex,
           // Add default monthly cost - you should update this based on your actual data
-          monthlyCost: estimateMonthlyLivingCost(country.ppp_index),
+          monthlyCost: estimateMonthlyLivingCost(country.pppIndex),
           currency: 'USD' // Default currency
         }));
 
+        console.log('usePPP: Transformed countries:', transformedCountries.slice(0, 3));
         setCountries(transformedCountries);
         setError(null);
+        console.log('usePPP: Data fetch completed successfully');
       } catch (err) {
         console.error('Error in usePPP:', err);
         setError(err);
@@ -51,19 +71,22 @@ export function usePPP() {
   // Estimate monthly living cost based on PPP index
   // This is a rough estimation - you should replace with actual data if available
   const estimateMonthlyLivingCost = (pppIndex) => {
-    const baseCost = 2000; // Base monthly cost in USD
-    return Math.round(baseCost * pppIndex);
+    // Base cost in USD for a comfortable lifestyle
+    const baseCostUSD = 2000; 
+    // In cheaper countries (high PPP ratio), the USD equivalent is lower
+    // In expensive countries (low PPP ratio), the USD equivalent is higher
+    return Math.round(baseCostUSD / pppIndex * 1); // Simplified estimation
   };
 
   const cities = useMemo(() => countries, [countries]);
 
-  const adjustPrice = async (amountUSD, fromCountry, toCountry) => {
+  const adjustPrice = useCallback(async (amountUSD, fromCountry, toCountry) => {
     try {
-      console.log(`Adjusting price: $${amountUSD} from ${fromCountry} to ${toCountry}`);
+      console.log(`Adjusting price: ${amountUSD} from ${fromCountry} to ${toCountry}`);
       const result = await getAdjustedPrice(amountUSD, fromCountry, toCountry);
       
       if (typeof result === 'number') {
-        console.log(`Adjusted price: $${result.toFixed(2)}`);
+        console.log(`Adjusted price: ${result.toFixed(2)}`);
         return result;
       } else {
         console.warn(`Price adjustment failed: ${result}`);
@@ -73,17 +96,17 @@ export function usePPP() {
       console.error('Error adjusting price:', error);
       return amountUSD;
     }
-  };
+  }, []); // No dependencies since it's a pure function
 
   const calculateRunway = async (monthlyBudgetUSD, fromCountry, toCountry, monthlyCostInTargetCountry) => {
     try {
-      console.log(`Calculating runway: $${monthlyBudgetUSD}/month from ${fromCountry} to ${toCountry}`);
-      console.log(`Monthly cost in target: $${monthlyCostInTargetCountry}`);
+      console.log(`Calculating runway: ${monthlyBudgetUSD}/month budget for ${toCountry}`);
       
-      const result = await calculateLivingTime(fromCountry, toCountry, monthlyBudgetUSD, monthlyCostInTargetCountry);
+      // Use the new simplified runway calculation
+      const result = await calculateBudgetRunway(monthlyBudgetUSD, toCountry);
       
       if (typeof result === 'number') {
-        console.log(`Runway calculated: ${result.toFixed(2)} months`);
+        console.log(`Runway calculated: ${result.toFixed(2)} months worth of expenses`);
         return result;
       } else {
         console.warn(`Runway calculation failed: ${result}`);
@@ -95,7 +118,7 @@ export function usePPP() {
     }
   };
 
-  const getPPPRatio = async (fromCountry, toCountry) => {
+  const getPPPRatio = useCallback(async (fromCountry, toCountry) => {
     try {
       const result = await getPurchasingPowerRatio(fromCountry, toCountry);
       return typeof result === 'number' ? result : null;
@@ -103,23 +126,29 @@ export function usePPP() {
       console.error('Error getting PPP ratio:', error);
       return null;
     }
-  };
+  }, []);
 
   const rankedBySavings = useMemo(() => {
-    if (countries.length === 0) return [];
+    if (countries.length === 0) {
+      console.log('rankedBySavings: No countries available');
+      return [];
+    }
 
-    // Find USA/Atlanta as baseline (fallback to first country if not found)
-    const baselinePPP = countries.find(c => 
-      c.normalizedName === 'usa' || 
-      c.city.toLowerCase().includes('usa') ||
-      c.city.toLowerCase().includes('atlanta')
-    )?.ppp ?? countries[0]?.ppp ?? 1;
+    // Find USA as baseline (try different variations)
+    const baselineCountry = countries.find(c => 
+      c.normalizedName === 'united states' || 
+      c.city.toLowerCase().includes('united states') ||
+      c.city.toLowerCase().includes('usa')
+    );
+    
+    const baselinePPP = baselineCountry?.ppp ?? 1.0;
+    console.log('rankedBySavings: Using baseline PPP:', baselinePPP, 'from country:', baselineCountry?.city);
 
-    return countries
+    const ranked = countries
       .map((country) => {
         // Calculate savings percentage compared to baseline
-        // Higher PPP means more expensive, so negative savings
         // Lower PPP means cheaper, so positive savings
+        // Higher PPP means more expensive, so negative savings
         const savings = ((baselinePPP - country.ppp) / baselinePPP) * 100;
         
         return {
@@ -128,6 +157,14 @@ export function usePPP() {
         };
       })
       .sort((a, b) => b.savings - a.savings); // Sort by highest savings first
+      
+    console.log('rankedBySavings: Top 3 countries by savings:', ranked.slice(0, 3).map(c => ({
+      city: c.city,
+      ppp: c.ppp,
+      savings: c.savings
+    })));
+
+    return ranked;
   }, [countries]);
 
   return {

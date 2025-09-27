@@ -7,6 +7,26 @@ function safeToFixed(value, digits = 1) {
   return isNaN(num) ? '0.0' : num.toFixed(digits);
 }
 
+// Format runway into months or years + months
+function formatRunway(runway) {
+  const num = parseFloat(runway);
+  if (isNaN(num) || num < 0) return '0.0 months';
+
+  if (num <= 12) {
+    return `${num.toFixed(1)} months`;
+  }
+
+  const totalMonths = Math.round(num * 10) / 10; // preserve decimal for months
+  const years = Math.floor(totalMonths / 12);
+  const months = Math.round((totalMonths % 12) * 10) / 10;
+
+  let result = '';
+  if (years > 0) result += `${years} year${years > 1 ? 's' : ''}`;
+  if (months > 0) result += ` ${months.toFixed(1)} month${months !== 1 ? 's' : ''}`;
+
+  return result.trim();
+}
+
 export function RunwayCard({ city, runway, monthlyCost, currency = 'USD' }) {
   const percent = Math.min(100, (runway / 12) * 100);
 
@@ -20,7 +40,7 @@ export function RunwayCard({ city, runway, monthlyCost, currency = 'USD' }) {
       <div className="flex items-center justify-between">
         <h4 className="font-poppins text-lg font-semibold text-teal">{city}</h4>
         <span className="rounded-full bg-turquoise/20 px-3 py-1 text-xs font-semibold text-teal">
-          {safeToFixed(runway)} months
+          {formatRunway(runway)}
         </span>
       </div>
       <p className="mt-3 text-sm text-charcoal/70">
