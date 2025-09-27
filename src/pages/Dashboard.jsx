@@ -1,7 +1,7 @@
 import { useMemo, useEffect, useState } from 'react';
+import { CreditCardIcon, ChartBarIcon, GlobeAmericasIcon, WalletIcon } from '@heroicons/react/24/outline';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
 import WorldMap from '../components/score/WorldMap.jsx';
-import CityCard from '../components/score/CityCard.jsx';
 import SpendingTrendChart from '../components/dashboard/SpendingTrendChart.jsx';
 import SavingsRunwayPanel from '../components/dashboard/SavingsRunwayPanel.jsx';
 import NotificationsWidget from '../components/dashboard/NotificationsWidget.jsx';
@@ -189,8 +189,6 @@ export function Dashboard() {
       .slice(0, 5);
   }, [topDestinations, coordsCache]);
 
-  const pppTop = topDestinations.slice(0, 3);
-
   const notifications = useMemo(
     () =>
       buildNotifications({
@@ -212,8 +210,18 @@ export function Dashboard() {
     await completeOnboarding(payload);
   };
 
+  const baseCardClasses =
+    'relative h-full rounded-2xl border border-white/30 bg-gradient-to-br from-[#052962]/15 via-[#e0ecff]/60 to-white/95 text-slate/80 shadow-lg shadow-navy/15 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-navy/25';
+  const heroCardClasses =
+    'relative h-full rounded-2xl border border-[#0f3b75]/50 bg-gradient-to-br from-[#052962] via-[#0f3b75] to-[#63a4ff]/65 text-white shadow-xl shadow-navy/40 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-navy/50';
+
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 -z-20 bg-gradient-to-b from-[#f4f8ff] via-white to-[#eef3ff]" aria-hidden="true" />
+      <div
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(9,80,166,0.12),transparent_55%)]"
+        aria-hidden="true"
+      />
       <OnboardingModal
         isOpen={showOnboarding}
         defaultValues={personalization}
@@ -222,115 +230,129 @@ export function Dashboard() {
         displayName={displayName}
       />
 
-      {/* Hero cards */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <Card className="col-span-1 bg-white/90">
-          <CardHeader>
-            <CardTitle>{heroLabel}</CardTitle>
-            <p className="text-xs uppercase tracking-[0.3em] text-teal/60">Dynamic budget profile</p>
+      <div className="grid auto-rows-[minmax(0,1fr)] grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card className={heroCardClasses}>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_bottom_left,rgba(227,24,55,0.18),transparent_75%)]"
+          />
+          <CardHeader className="flex items-start justify-between gap-4 text-white">
+            <div className="flex items-center gap-3">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-white">
+                <WalletIcon className="h-7 w-7" aria-hidden="true" />
+              </span>
+              <div>
+                <CardTitle className="text-lg font-semibold text-white">{heroLabel}</CardTitle>
+                <p className="text-xs uppercase tracking-[0.3em] text-white/70">Dynamic budget profile</p>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-poppins font-semibold text-teal">{formatUSD(balanceUSD)}</p>
-            <p className="mt-2 text-sm text-charcoal/70">{heroSubtitle}</p>
-            <p className="mt-3 text-xs text-charcoal/50">
+          <CardContent className="space-y-4 text-white/90">
+            <p className="text-4xl font-bold text-white">{formatUSD(balanceUSD)}</p>
+            <p className="text-sm leading-relaxed text-white/85">{heroSubtitle}</p>
+            <p className="text-xs uppercase tracking-[0.25em] text-white/60">
               Dashboard = balances, travel power, and PPP-led opportunities.
             </p>
           </CardContent>
         </Card>
 
-        <Card className="col-span-1 md:col-span-2 bg-white/90">
-          <CardHeader>
-            <CardTitle>Recent transactions</CardTitle>
-            <p className="text-xs uppercase tracking-[0.3em] text-teal/60">Last 30 days</p>
+        <Card className={baseCardClasses}>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(9,80,166,0.18),transparent_70%)]"
+          />
+          <CardHeader className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#052962]/10 text-[#052962]">
+                <CreditCardIcon className="h-6 w-6" aria-hidden="true" />
+              </span>
+              <div>
+                <CardTitle className="text-lg font-semibold text-[#052962]">Recent transactions</CardTitle>
+                <p className="text-xs uppercase tracking-[0.2em] text-[#1e4b93]/70">Last 30 days</p>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <ul className="space-y-3">
               {recent.length === 0 && (
-                <li className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-center text-sm text-charcoal/60">
-                  We’ll populate this once your transactions sync.
+                <li className="rounded-2xl border border-dashed border-[#0f3b75]/30 bg-white/40 px-4 py-6 text-center text-sm text-slate/70">
+                  No transactions yet. Sync your card to get started.
                 </li>
               )}
               {recent.map((txn) => (
                 <li
                   key={txn.id}
-                  className="flex flex-col justify-between rounded-2xl bg-offwhite/80 px-4 py-3 sm:flex-row sm:items-center"
+                  className="flex flex-col gap-3 rounded-2xl border border-[#0f3b75]/10 bg-white/55 px-4 py-4 shadow-sm transition-all duration-200 hover:border-[#052962]/30 hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div>
-                    <p className="font-semibold text-charcoal">{txn.merchant ?? 'Unknown merchant'}</p>
-                    <p className="text-xs text-charcoal/60">
+                  <div className="space-y-1">
+                    <p className="text-base font-semibold text-[#052962]">{txn.merchant ?? 'Unknown merchant'}</p>
+                    <p className="text-xs text-[#1e4b93]/70">
                       {new Date(txn.timestamp ?? txn.date ?? Date.now()).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="mt-2 text-right sm:mt-0">
-                    <p className="font-semibold text-coral">{formatUSD(txn.amount)}</p>
-                    <p className="text-xs text-charcoal/60">{txn.category ?? 'General'}</p>
+                  <div className="text-left sm:text-right">
+                    <p className="text-lg font-semibold text-[#e31837]">{formatUSD(txn.amount)}</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-[#1e4b93]/70">{txn.category ?? 'General'}</p>
                   </div>
                 </li>
               ))}
             </ul>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Trends + Notifications */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="bg-white/90">
-          <CardHeader>
-            <CardTitle>Trends & insights</CardTitle>
-            <p className="text-sm text-charcoal/70">
-              {weeklyChange != null
-                ? `Your spending is ${weeklyChange > 0 ? 'up' : 'down'} ${Math.abs(weeklyChange).toFixed(1)}% from last week.`
-                : 'We’ll track spend trends once we have two weeks of data.'}
-            </p>
+        <Card className={baseCardClasses}>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(9,80,166,0.18),transparent_70%)]"
+          />
+          <CardHeader className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#052962]/10 text-[#052962]">
+                <ChartBarIcon className="h-6 w-6" aria-hidden="true" />
+              </span>
+              <div>
+                <CardTitle className="text-lg font-semibold text-[#052962]">Trends & insights</CardTitle>
+                <p className="text-sm text-slate/70">
+                  {weeklyChange != null
+                    ? `Your spending is ${weeklyChange > 0 ? 'up' : 'down'} ${Math.abs(weeklyChange).toFixed(1)}% from last week.`
+                    : 'We’ll track spend trends once we have two weeks of data.'}
+                </p>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <SpendingTrendChart data={trendData.map(({ label, amount }) => ({ label, amount }))} />
           </CardContent>
         </Card>
 
-        <NotificationsWidget items={notifications} />
-      </div>
+        <NotificationsWidget items={notifications} className="h-full" />
 
-      {/* Map + Top destinations */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="bg-white/90">
-          <CardHeader>
-            <CardTitle>PPP score heatmap</CardTitle>
-            <p className="text-sm text-charcoal/70">
-              Hover the globe to see how your purchasing power compares.
-            </p>
+        <Card className={`${baseCardClasses} lg:col-span-2`}>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,rgba(9,80,166,0.18),transparent_70%)]"
+          />
+          <CardHeader className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#052962]/10 text-[#052962]">
+                <GlobeAmericasIcon className="h-6 w-6" aria-hidden="true" />
+              </span>
+              <div>
+                <CardTitle className="text-lg font-semibold text-[#052962]">PPP score heatmap</CardTitle>
+                <p className="text-sm text-slate/70">Hover the globe to see how your purchasing power compares.</p>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <WorldMap markers={pppMarkers} />
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 gap-4">
-          <SavingsRunwayPanel destinations={topDestinations} stayLengthMonths={6} />
-          <Card className="bg-white/90">
-            <CardHeader>
-              <CardTitle>Top PPP picks</CardTitle>
-              <p className="text-sm text-charcoal/70">
-                GeoBudget = personalized travel & budget forecasting.
-              </p>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              {pppTop.map((dest) => (
-                <CityCard
-                  key={dest.city}
-                  city={dest.city}
-                  ppp={dest.ppp}
-                  savingsPct={dest.savings ?? dest.savingsPct}
-                />
-              ))}
-              {pppTop.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-sm text-charcoal/60">
-                  We’re fetching PPP insights — check back shortly.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <SavingsRunwayPanel
+          destinations={topDestinations}
+          stayLengthMonths={6}
+          className="lg:col-span-2"
+        />
       </div>
     </div>
   );
