@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 const authenticatedLinks = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/planner', label: 'GeoBudget' },
+  { to: '/insights', label: 'Smart-Spend' }
   { to: '/insights', label: 'Smart-Spend' },
   { to: '/share', label: 'Share' }
 ];
