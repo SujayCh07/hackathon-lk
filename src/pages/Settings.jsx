@@ -150,7 +150,7 @@ export default function Settings() {
         <p className="text-sm font-semibold uppercase tracking-[0.25em] text-red/80">Account</p>
         <h1 className="text-4xl font-bold tracking-tight text-navy">Settings</h1>
         <p className="max-w-2xl text-base text-slate/80">
-          Update your personal details, budgeting preferences, and refresh your linked Capital One data.
+          Update your personal details, budgeting preferences, and refresh your linked Capital One™ data.
         </p>
       </header>
 
@@ -226,7 +226,7 @@ export default function Settings() {
 
           <SettingsSection
             title="Capital One sync"
-            description="See the latest balances pulled from your demo Capital One account and refresh whenever you need."
+            description="See the latest balances pulled from your Capital One™ account."
             actions={
               <Button
                 type="button"
@@ -238,7 +238,7 @@ export default function Settings() {
                 {isSyncingNessie ? 'Refreshing…' : 'Refresh balances'}
               </Button>
             }
-            footer="Balances are simulated for the hackathon environment and reset frequently."
+            footer="Disclaimer: Balances are simulated for the hackathon environment and reset frequently."
             contentClassName="space-y-4"
           >
             <div className="rounded-2xl border border-white/60 bg-gradient-to-br from-white/80 to-white/30 px-4 py-3 shadow-inner">
