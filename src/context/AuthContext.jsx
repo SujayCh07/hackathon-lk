@@ -27,22 +27,19 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const initialise = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          throw error;
-        }
-
-        setSession(data.session ?? null);
-        setUser(data.session?.user ?? null);
-
-        if (data.session?.user) {
-          await syncNessie(data.session.user);
-        }
-      } catch (error) {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
         setAuthError(error);
-      } finally {
         setIsLoading(false);
+        return;
+      }
+
+      setSession(data.session ?? null);
+      setUser(data.session?.user ?? null);
+      setIsLoading(false);
+
+      if (data.session?.user) {
+        await syncNessie(data.session.user);
       }
     };
 
@@ -53,7 +50,6 @@ export function AuthProvider({ children }) {
     } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
-      setAuthError(null);
       if (nextSession?.user) {
         await syncNessie(nextSession.user);
       } else {
@@ -114,21 +110,6 @@ export function AuthProvider({ children }) {
     setNessieState(initialNessieState);
   }, []);
 
-  const refreshUser = useCallback(async () => {
-    try {
-      const { data, error } = await supabase.auth.getUser();
-      if (error) {
-        throw error;
-      }
-
-      setUser(data?.user ?? null);
-      return data?.user ?? null;
-    } catch (error) {
-      console.warn('Failed to refresh authenticated user', error);
-      throw error;
-    }
-  }, []);
-
   const value = useMemo(
     () => ({
       session,
@@ -138,20 +119,9 @@ export function AuthProvider({ children }) {
       nessie: nessieState,
       isSyncingNessie,
       refreshNessie: () => (user ? syncNessie(user) : undefined),
-      refreshUser,
       signOut
     }),
-    [
-      authError,
-      isLoading,
-      isSyncingNessie,
-      nessieState,
-      refreshUser,
-      session,
-      signOut,
-      syncNessie,
-      user
-    ]
+    [authError, isLoading, isSyncingNessie, nessieState, session, signOut, syncNessie, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
