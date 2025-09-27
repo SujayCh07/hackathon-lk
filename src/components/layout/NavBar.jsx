@@ -34,9 +34,6 @@ export function NavBar() {
     }
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  };
   const links = user ? authenticatedLinks : [];
 
   const identityLabel = useMemo(() => {
@@ -93,13 +90,6 @@ export function NavBar() {
 
         {/* ✅ Changed: Better account section layout */}
         <div className="hidden items-center gap-5 md:flex border-l border-slate/200 pl-6">
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="rounded-full border border-navy/20 bg-white px-3 py-2 text-xs font-semibold text-navy/70 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-          >
-            {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
-          </button>
           {user ? (
             <>
               {/* ✅ User label + icon link to settings */}
@@ -163,13 +153,6 @@ export function NavBar() {
              <li className="pt-3">
                 {user ? (
                   <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={toggleTheme}
-                      className="w-full rounded-full border border-navy/20 bg-white px-4 py-2 text-xs font-semibold text-navy/70 shadow-sm transition hover:bg-navy/5"
-                    >
-                      {theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                    </button>
                     <NavLink
                       to="/settings"
                       className="flex items-center gap-2 text-sm font-semibold text-navy/70 hover:text-navy"
@@ -189,13 +172,6 @@ export function NavBar() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={toggleTheme}
-                      className="w-full rounded-full border border-navy/20 bg-white px-4 py-2 text-xs font-semibold text-navy/70 shadow-sm transition hover:bg-navy/5"
-                    >
-                      {theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                    </button>
                     <Button as={NavLink} to="/login" variant="secondary" className="w-full text-sm">
                       Log in
                     </Button>
