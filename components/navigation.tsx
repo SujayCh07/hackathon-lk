@@ -90,14 +90,28 @@ export function Navigation() {
             {loading ? (
               <Skeleton className="h-10 w-32 rounded-full" />
             ) : user ? (
-              <UserAccountMenu
-                user={user}
-                identityLabel={identityLabel}
-                onSignOut={handleSignOut}
-                signingOut={signingOut || loading}
-                nessieAccounts={Array.isArray(nessie?.accounts) ? nessie.accounts : []}
-                nessieLoading={syncingNessie}
-              />
+              <>
+                <UserAccountMenu
+                  user={user}
+                  identityLabel={identityLabel}
+                  onSignOut={handleSignOut}
+                  signingOut={signingOut || loading}
+                  nessieAccounts={Array.isArray(nessie?.accounts) ? nessie.accounts : []}
+                  nessieLoading={syncingNessie}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (!signingOut) {
+                      void handleSignOut()
+                    }
+                  }}
+                  disabled={signingOut}
+                  className="text-sm font-semibold"
+                >
+                  {signingOut ? "Signing out…" : "Sign out"}
+                </Button>
+              </>
             ) : (
               <>
                 <Button asChild variant="ghost" className="text-sm">

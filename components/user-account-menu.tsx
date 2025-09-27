@@ -152,13 +152,14 @@ export function UserAccountMenu({
           <Button
             variant="ghost"
             className="group inline-flex items-center gap-3 rounded-full border border-transparent px-3 py-2 text-sm font-semibold transition-all hover:border-border hover:bg-background/60"
+            type="button"
           >
             <Avatar className="size-9 border border-primary/30 bg-primary/10 transition-transform group-data-[state=open]:scale-[1.02]">
               <AvatarFallback className="bg-transparent text-sm font-semibold uppercase text-primary">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <UserCircleIcon className="hidden size-5 text-primary sm:block" aria-hidden="true" />
+            <UserCircleIcon className="size-5 text-primary" aria-hidden="true" />
             <div className="flex min-w-0 flex-col text-left">
               <span className="max-w-[10rem] truncate text-sm font-semibold text-foreground/90">{displayName}</span>
               {user.email && (
