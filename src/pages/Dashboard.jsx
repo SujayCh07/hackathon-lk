@@ -119,7 +119,7 @@ function buildNotifications({
         category: 'Budget',
         icon: 'piggy-bank',
         actionLabel: 'Adjust savings plan',
-        actionHref: '/settings',
+        actionHref: 'https://verified.capitalone.com/auth/signin',
         impact: budgetDelta,
       });
     } else if (budgetDelta < 0) {
@@ -130,7 +130,7 @@ function buildNotifications({
         category: 'Budget',
         icon: 'warning',
         actionLabel: 'Review transactions',
-        actionHref: '/dashboard',
+        actionHref: 'https://verified.capitalone.com/auth/signin',
         impact: budgetDelta,
       });
     }
@@ -148,7 +148,7 @@ function buildNotifications({
         category: 'Personalisation',
         icon: 'star',
         actionLabel: 'Save to wishlist',
-        actionHref: '/planner',
+        actionHref: '/budget',
       });
     }
   }
@@ -162,7 +162,7 @@ function buildNotifications({
       category: 'Runway',
       icon: 'globe',
       actionLabel: 'Plan next stay',
-      actionHref: '/planner',
+      actionHref: 'https://capitalonetravel.com/?external_id=WWW_XXXXX_XXX_SEM-Brand_Google_ZZ_ZZ_T_TravelPortal_ZZ__kenshoo_clickid__86221&target_id=kwd-526220852637&oC=hNXpu38C0E&gad_source=1&gad_campaignid=16246474980&gbraid=0AAAAAD-_MFp4czKtl-CkFmNlt8dmJ0Vy5&gclid=CjwKCAjwlt7GBhAvEiwAKal0cj3dmo92ZGl912aZnKTyk9c0RdMQWdftOKsUk7wM_590zVWTeoNnDBoC8zAQAvD_BwE',
       impact: coverage,
     });
   }
