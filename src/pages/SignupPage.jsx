@@ -6,6 +6,7 @@ import Button from '../components/ui/Button.jsx';
 export function SignupPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -20,6 +21,10 @@ export function SignupPage() {
     setFormError(null);
     setMessage(null);
 
+    if (!displayName.trim()) {
+      setFormError('Please choose a display name.');
+      return;
+    }
     if (password !== confirmPassword) {
       setFormError('Passwords do not match.');
       return;
@@ -29,13 +34,22 @@ export function SignupPage() {
 
     const { data, error } = await supabase.auth.signUp({
       email,
-      password
+      password,
+      options: {
+        data: {
+          displayName: displayName.trim()
+        }
+      }
     });
 
     if (error) {
       setFormError(error.message);
       setIsSubmitting(false);
       return;
+    }
+
+    if (data.user) {
+      await persistUserIdentity(data.user, displayName.trim());
     }
 
     if (data.session) {
@@ -55,6 +69,20 @@ export function SignupPage() {
           We’ll keep your Nessie sandbox data in sync as soon as you confirm your email address.
         </p>
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+          <div>
+            <label htmlFor="signup-display-name" className="block text-sm font-semibold text-charcoal">
+              Display name
+            </label>
+            <input
+              id="signup-display-name"
+              type="text"
+              required
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              className="mt-2 w-full rounded-2xl border border-navy/20 bg-offwhite px-4 py-3 text-sm text-charcoal focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+              placeholder="How should we greet you?"
+            />
+          </div>
           <div>
             <label htmlFor="signup-email" className="block text-sm font-semibold text-charcoal">
               Email
@@ -118,3 +146,49 @@ export function SignupPage() {
 }
 
 export default SignupPage;
+
+async function persistUserIdentity(user, displayName) {
+  if (!user?.id) {
+    return;
+  }
+
+  const trimmedName = displayName?.trim();
+  const userRecord = {
+    id: user.id,
+    email: user.email ?? null
+  };
+
+  if (trimmedName) {
+    userRecord.display_name = trimmedName;
+  }
+
+  try {
+    const { error: userError } = await supabase.from('users').upsert(userRecord, {
+      onConflict: 'id'
+    });
+    if (userError) {
+      console.warn('Unable to save user row', userError);
+    }
+  } catch (error) {
+    console.warn('Unable to save user row', error);
+  }
+
+  if (trimmedName) {
+    try {
+      const { error: profileError } = await supabase.from('user_profile').upsert(
+        {
+          user_id: user.id,
+          name: trimmedName
+        },
+        {
+          onConflict: 'user_id'
+        }
+      );
+      if (profileError) {
+        console.warn('Unable to save user profile name', profileError);
+      }
+    } catch (error) {
+      console.warn('Unable to save user profile name', error);
+    }
+  }
+}

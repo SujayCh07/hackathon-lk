@@ -1,13 +1,3 @@
-import { NavLink } from 'react-router-dom';
-import Button from '../ui/Button.jsx';
-import logo from '../../assets/logo.png';
-
-const links = [
-  { to: '/', label: 'Home' },
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/planner', label: 'GeoBudget' },
-  { to: '/insights', label: 'Smart-Spend' }
-=======
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import Button from '../ui/Button.jsx';
@@ -16,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 const authenticatedLinks = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/planner', label: 'GeoBudget' },
+  { to: '/insights', label: 'Smart-Spend' }
   { to: '/insights', label: 'Smart-Spend' },
   { to: '/share', label: 'Share' }
 ];
@@ -27,6 +18,8 @@ export function NavBar() {
   const { user, signOut, isLoading } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const links = user ? authenticatedLinks : [];
+  const displayName = user?.user_metadata?.displayName?.trim();
+  const identityLabel = displayName || user?.email || 'Logged in';
 
   async function handleSignOut() {
     try {
@@ -68,19 +61,11 @@ export function NavBar() {
           ))}
         </div>
 
-        {/* CTA button */}
-        <Button
-          as={NavLink}
-          to="/dashboard"
-          className="hidden border border-red/10 bg-gradient-to-r from-red to-navy px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:from-red/90 hover:to-navy/90 md:inline-flex"
-        >
-          Enter App
-        </Button>
         {/* Auth actions */}
         <div className="hidden items-center gap-3 md:flex">
           {user ? (
             <>
-              <span className="text-sm font-semibold text-navy/70">{user.email ?? 'Logged in'}</span>
+              <span className="text-sm font-semibold text-navy/70">{identityLabel}</span>
               <Button
                 type="button"
                 variant="secondary"
@@ -130,14 +115,6 @@ export function NavBar() {
                   </NavLink>
                 </li>
               ))}
-              <li className="pt-2">
-                <Button
-                  as={NavLink}
-                  to="/dashboard"
-                  className="w-full text-sm"
-                >
-                  Enter App
-                </Button>
               <li className="pt-3">
                 {user ? (
                   <Button

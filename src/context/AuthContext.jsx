@@ -62,9 +62,11 @@ export function AuthProvider({ children }) {
     async (authUser) => {
       setIsSyncingNessie(true);
       try {
-        const { customerId, user: updatedUser } = await ensureNessieCustomer(authUser);
-        if (updatedUser) {
-          setUser(updatedUser);
+        const userWithIdentity = await ensureUserIdentity(authUser);
+        const { customerId, user: updatedUser } = await ensureNessieCustomer(userWithIdentity);
+        const effectiveUser = updatedUser ?? userWithIdentity;
+        if (effectiveUser) {
+          setUser(effectiveUser);
         }
 
         const { accounts, transactions } = await fetchNessieOverview(customerId);
@@ -163,4 +165,52 @@ function normaliseTransactions(transactions) {
       : transaction.category ?? transaction.type ?? 'General',
     raw: transaction
   }));
+}
+
+async function ensureUserIdentity(authUser) {
+  if (!authUser?.id) {
+    return authUser;
+  }
+
+  const displayName = authUser.user_metadata?.displayName?.trim();
+  const userRecord = {
+    id: authUser.id,
+    email: authUser.email ?? null
+  };
+
+  if (displayName) {
+    userRecord.display_name = displayName;
+  }
+
+  try {
+    const { error: userError } = await supabase.from('users').upsert(userRecord, {
+      onConflict: 'id'
+    });
+    if (userError) {
+      console.warn('Failed to upsert user row', userError);
+    }
+  } catch (error) {
+    console.warn('Failed to upsert user row', error);
+  }
+
+  if (displayName) {
+    try {
+      const { error: profileError } = await supabase.from('user_profile').upsert(
+        {
+          user_id: authUser.id,
+          name: displayName
+        },
+        {
+          onConflict: 'user_id'
+        }
+      );
+      if (profileError) {
+        console.warn('Failed to sync user profile name', profileError);
+      }
+    } catch (error) {
+      console.warn('Failed to sync user profile name', error);
+    }
+  }
+
+  return authUser;
 }
