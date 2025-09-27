@@ -3,6 +3,9 @@ import CategoryTile from '../components/insights/CategoryTile.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
 import { useTransactions } from '../hooks/useTransactions.js';
 import { usePPP } from '../hooks/usePPP.js';
+import { useAuth } from '../hooks/useAuth.js';
+import { useUserProfile } from '../hooks/useUserProfile.js';
+import usePersonalization from '../hooks/usePersonalization.js';
 
 // City → Country resolver using OpenStreetMap Nominatim API
 async function cityToCountry(city) {
@@ -204,6 +207,8 @@ export function Insights() {
           <p className="text-sm text-charcoal/70">
             Compare your spending with PPP adjustments. You can search up to <strong>5 cities</strong>.
           </p>
+          {summary && <p className="mt-2 text-sm font-semibold text-teal">{summary}</p>}
+          <p className="mt-1 text-xs text-charcoal/60">Smart-Spend = see exactly where your money goes globally.</p>
         </CardHeader>
         <CardContent>
           {rows.map((id) => (
