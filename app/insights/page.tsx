@@ -1,11 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart3, ShoppingCart, Home, Car, Coffee, TrendingUp, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
 
 // Mock spending categories data
 const spendingCategories = [
@@ -49,6 +51,8 @@ const cityComparisons = [
 ]
 
 export default function SmartSpendInsights() {
+  const { user, loading } = useAuth()
+  const router = useRouter()
   const [selectedCity, setSelectedCity] = useState("Bangkok, Thailand")
   const [homeCity] = useState("New York, NY")
 
@@ -61,6 +65,23 @@ export default function SmartSpendInsights() {
 
   const getSavingsPercentage = (multiplier: number) => {
     return Math.round((1 - multiplier) * 100)
+  }
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace(`/login?redirectTo=${encodeURIComponent("/insights")}`)
+    }
+  }, [loading, user, router])
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
+          {loading ? "Checking your session…" : "Redirecting you to log in…"}
+        </div>
+      </div>
+    )
   }
 
   return (

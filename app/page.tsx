@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Navigation } from "@/components/navigation"
 import { ArrowRight, Globe, TrendingUp, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/hooks/use-auth"
 
 const cities = [
   {
@@ -31,6 +33,8 @@ const cities = [
 ]
 
 export default function LandingPage() {
+  const router = useRouter()
+  const { user, loading } = useAuth()
   const [currentSlide, setCurrentSlide] = useState(0)
   const [scrollY, setScrollY] = useState(0)
 
@@ -39,6 +43,12 @@ export default function LandingPage() {
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace("/dashboard")
+    }
+  }, [loading, user, router])
 
   useEffect(() => {
     const timer = setInterval(() => {
