@@ -1,4 +1,3 @@
-// hooks/useAccount.js
 import { useMemo } from 'react';
 import { useAuth } from './useAuth.js';
 

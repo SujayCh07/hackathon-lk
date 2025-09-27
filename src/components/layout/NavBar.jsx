@@ -17,6 +17,8 @@ export function NavBar() {
   const { user, signOut, isLoading } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const links = user ? authenticatedLinks : [];
+  const displayName = user?.user_metadata?.displayName?.trim();
+  const identityLabel = displayName || user?.email || 'Logged in';
 
   async function handleSignOut() {
     try {
@@ -57,7 +59,7 @@ export function NavBar() {
           ))}
         </div>
 
-        {/* CTA Button - visible to everyone */}
+        {/* CTA Button - always visible on desktop */}
         <Button
           as={NavLink}
           to="/dashboard"
@@ -70,9 +72,7 @@ export function NavBar() {
         <div className="hidden items-center gap-3 md:flex">
           {user ? (
             <>
-              <span className="text-sm font-semibold text-navy/70">
-                {user.email ?? 'Logged in'}
-              </span>
+              <span className="text-sm font-semibold text-navy/70">{identityLabel}</span>
               <Button
                 type="button"
                 variant="secondary"
