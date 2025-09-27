@@ -25,18 +25,14 @@ const slides = [
   { city: "Dubai", country: "United Arab Emirates", image: Dubai },
 ];
 
-// ✅ Slow, smooth slide transitions
+// Smooth transitions
 const imageVariants = {
   enter: (direction) => ({
     x: direction > 0 ? "100%" : "-100%",
     opacity: 0,
     scale: 1.05,
   }),
-  center: {
-    x: 0,
-    opacity: 1,
-    scale: 1,
-  },
+  center: { x: 0, opacity: 1, scale: 1 },
   exit: (direction) => ({
     x: direction > 0 ? "-100%" : "100%",
     opacity: 0,
@@ -74,7 +70,7 @@ export function HeroCarousel() {
   useEffect(() => {
     const timer = setInterval(() => {
       setSlideState(([prevIndex]) => [(prevIndex + 1) % slides.length, 1]);
-    }, 7000); // ⏱ Longer delay between slides (7s)
+    }, 7000);
     return () => clearInterval(timer);
   }, []);
 
@@ -98,7 +94,7 @@ export function HeroCarousel() {
             animate="center"
             exit="exit"
             transition={{
-              x: { duration: 2.5, ease: [0.22, 1, 0.36, 1] }, // ⏱ smoother slide
+              x: { duration: 2.5, ease: [0.22, 1, 0.36, 1] },
               opacity: { duration: 1.5, ease: "easeInOut" },
               scale: { duration: 2.5, ease: [0.22, 1, 0.36, 1] },
             }}
@@ -112,40 +108,42 @@ export function HeroCarousel() {
             />
           </motion.div>
         </AnimatePresence>
-        <div className="absolute inset-0 bg-gradient-to-t from-charcoal/80 via-charcoal/20 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-navy/50 via-transparent to-red/30" />
+
+        {/* Overlays for readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-charcoal/75 via-charcoal/25 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-navy/40 via-transparent to-red/25" />
       </motion.div>
 
-      {/* Main text box */}
-      <div className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-6 px-4 py-20 text-center sm:px-6">
+      {/* Central content box */}
+      <div className="relative z-10 flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6">
         <motion.div
           key={`${activeSlide.city}-content`}
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
-          className="flex w-full max-w-4xl flex-col items-center gap-6 rounded-3xl border border-white/10 bg-black/40 p-8 text-offwhite shadow-2xl backdrop-blur-md sm:p-12"
+          className="flex w-full max-w-2xl flex-col items-center gap-5 rounded-xl bg-charcoal/55 px-6 py-8 text-center shadow-[0_20px_50px_rgba(6,16,40,0.4)] backdrop-blur-sm"
         >
-          <span className="rounded-full bg-white/15 px-5 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-offwhite/90">
-            Global PPP intelligence
+          <span className="rounded-full bg-white/20 px-5 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-offwhite/90">
+            Global Parity Intelligence
           </span>
           <h1 className="font-poppins text-4xl font-bold leading-tight text-white drop-shadow-lg sm:text-5xl lg:text-6xl">
-            Same dollars, smarter world.
+            Spend smarter, travel farther.
           </h1>
-          <p className="max-w-2xl text-base text-offwhite/90 sm:text-lg">
+          <p className="max-w-xl text-base text-offwhite/90 sm:text-lg">
             See where your money goes the farthest with PPP-adjusted insights across the globe.
           </p>
           <Button
             as={Link}
             to="/dashboard"
             variant="primary"
-            className="text-base shadow-lg transition-all duration-300 hover:translate-y-[-2px] hover:bg-gradient-to-r hover:from-red hover:to-navy focus-visible:ring-4 focus-visible:ring-turquoise focus-visible:ring-offset-2 focus-visible:ring-offset-charcoal"
+            className="text-base shadow-lg transition-all duration-500 ease-in-out transform hover:scale-105 hover:translate-y-[-4px] hover:bg-gradient-to-r hover:from-red hover:to-navy"
           >
-            Connect my Capital One Account
+            Connect my Capital One™ Account
           </Button>
         </motion.div>
       </div>
 
-      {/* City caption - no background box, just text w/ shadow */}
+      {/* City caption */}
       <AnimatePresence initial={false} custom={direction}>
         <motion.div
           key={`${activeSlide.city}-caption`}
