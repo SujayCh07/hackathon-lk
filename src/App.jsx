@@ -11,10 +11,6 @@ import LoginPage from './pages/LoginPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import { useAuth } from './hooks/useAuth.js';
 
-import LoginPage from './pages/LoginPage.jsx';
-import SignupPage from './pages/SignupPage.jsx';
-import { useAuth } from './hooks/useAuth.js';
-
 function App() {
   const location = useLocation();
 
