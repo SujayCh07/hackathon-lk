@@ -1,3 +1,4 @@
+/// <reference types="@supabase/functions-js/edge-runtime.d.ts" />
 
 type NessieAccount = {
   _id: string;
