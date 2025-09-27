@@ -155,69 +155,62 @@ export default function Settings() {
   const headlineCurrency = nessie?.accounts?.[0]?.currencyCode ?? 'USD';
 
   async function handleSaveProfile(event) {
-    event.preventDefault();
-    if (!userId) {
-      return;
-    }
+  event.preventDefault();
+  if (!userId) return;
 
-    const trimmedName = displayName.trim();
-    const normalisedBudget = monthlyBudget.trim();
-    const normalisedAddress = streetAddress.trim();
-    const normalisedCurrentCountry =
-      typeof currentCountryCode === 'string' && currentCountryCode.trim().length > 0
-        ? currentCountryCode.trim().toUpperCase()
-        : null;
-    const normalisedHomeCountry =
-      typeof homeCountryCode === 'string' && homeCountryCode.trim().length > 0
-        ? homeCountryCode.trim().toUpperCase()
-        : null;
-    const parsedBudget = normalisedBudget === '' ? null : Number(normalisedBudget);
+  const trimmedName = displayName.trim();
+  const normalisedBudget = monthlyBudget.trim();
+  const normalisedCurrentCountry =
+    typeof currentCountryCode === "string" && currentCountryCode.trim().length > 0
+      ? currentCountryCode.trim().toUpperCase()
+      : null;
+  const normalisedHomeCountry =
+    typeof homeCountryCode === "string" && homeCountryCode.trim().length > 0
+      ? homeCountryCode.trim().toUpperCase()
+      : null;
+  const parsedBudget = normalisedBudget === "" ? null : Number(normalisedBudget);
 
-    if (parsedBudget != null && Number.isNaN(parsedBudget)) {
-      setProfileStatus({ type: 'error', message: 'Monthly budget must be a valid number.' });
-      return;
-    }
-
-    setSavingProfile(true);
-    setProfileStatus(null);
-
-    try {
-      const updates = {
-        user_id: userId,
-        name: trimmedName || null,
-        monthly_budget: parsedBudget,
-        street_address: normalisedAddress || null,
-        current_country_code: normalisedCurrentCountry,
-        home_country_code: normalisedHomeCountry
-      };
-
-      const { error } = await supabase.from('user_profile').upsert(updates, { onConflict: 'user_id' });
-      if (error) {
-        throw error;
-      }
-
-      if (trimmedName) {
-        const { error: metadataError } = await supabase.auth.updateUser({
-          data: {
-            ...(user?.user_metadata ?? {}),
-            displayName: trimmedName
-          }
-        });
-
-        if (metadataError) {
-          throw metadataError;
-        }
-      }
-
-      await refreshProfile();
-      setProfileStatus({ type: 'success', message: 'Profile settings updated successfully.' });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update profile settings.';
-      setProfileStatus({ type: 'error', message });
-    } finally {
-      setSavingProfile(false);
-    }
+  if (parsedBudget != null && Number.isNaN(parsedBudget)) {
+    setProfileStatus({ type: "error", message: "Monthly budget must be a valid number." });
+    return;
   }
+
+  setSavingProfile(true);
+  setProfileStatus(null);
+
+  try {
+    const updates = {
+      user_id: userId,
+      name: trimmedName || null,
+      monthly_budget: parsedBudget,
+      current_country_code: normalisedCurrentCountry,
+      home_country_code: normalisedHomeCountry
+    };
+
+    const { error } = await supabase
+      .from("user_profile")
+      .upsert(updates, { onConflict: "user_id" });
+
+    if (error) throw error;
+
+    // Also update Supabase auth metadata
+    if (trimmedName) {
+      const { error: metadataError } = await supabase.auth.updateUser({
+        data: { displayName: trimmedName }
+      });
+      if (metadataError) throw metadataError;
+    }
+
+    await refreshProfile();
+    setProfileStatus({ type: "success", message: "Profile settings updated successfully." });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update profile settings.";
+    setProfileStatus({ type: "error", message });
+  } finally {
+    setSavingProfile(false);
+  }
+}
+
 
   async function handleRefreshAccounts() {
     if (typeof refreshNessie !== 'function') {
