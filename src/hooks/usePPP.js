@@ -73,14 +73,11 @@ export function usePPP() {
     }
   };
 
-  const getPPPRatio = async (fromCountry, toCountry) => {
-    try {
-      const result = await getPurchasingPowerRatio(fromCountry, toCountry);
-      return typeof result === 'number' ? result : null;
-    } catch (error) {
-      console.error('Error getting PPP ratio:', error);
-      return null;
-    }
+  const calculateRunway = (monthlyBudgetUSD, city) => {
+    const entry = pppData[city];
+    if (!entry) return 0;
+    const adjustedMonthlyCost = entry.monthlyCost * entry.ppp;
+    return monthlyBudgetUSD / adjustedMonthlyCost;
   };
 
   const rankedBySavings = useMemo(() => {
