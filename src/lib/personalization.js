@@ -157,7 +157,7 @@ export async function savePersonalization(userId, payload) {
     console.error('Failed to persist personalization', error);
     const cached = { userId, ...payload };
     writeLocalFallback(userId, cached);
-    throw error instanceof Error ? error : new Error('Unable to persist personalization');
+    return cached;
   }
 }
 
