@@ -207,7 +207,6 @@ export function Insights() {
           <p className="text-sm text-charcoal/70">
             Compare your spending with PPP adjustments. You can search up to <strong>5 cities</strong>.
           </p>
-          {summary && <p className="mt-2 text-sm font-semibold text-teal">{summary}</p>}
           <p className="mt-1 text-xs text-charcoal/60">Smart-Spend = see exactly where your money goes globally.</p>
         </CardHeader>
         <CardContent>
