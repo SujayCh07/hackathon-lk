@@ -148,33 +148,6 @@ export function NavBar() {
                   </div>
                 )}
               </li>
-
-              <li className="pt-3">
-                {user ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="w-full text-sm"
-                    onClick={handleSignOut}
-                    disabled={isSigningOut || isLoading}
-                  >
-                    {isSigningOut ? 'Signing out…' : 'Sign out'}
-                  </Button>
-                ) : (
-                  <div className="space-y-2">
-                    <Button as={NavLink} to="/login" variant="secondary" className="w-full text-sm">
-                      Log in
-                    </Button>
-                    <Button
-                      as={NavLink}
-                      to="/signup"
-                      className="w-full border border-red/10 bg-gradient-to-r from-red to-navy text-sm font-semibold text-white shadow-sm transition hover:from-red/90 hover:to-navy/90"
-                    >
-                      Sign up
-                    </Button>
-                  </div>
-                )}
-              </li>
             </ul>
           </div>
         </details>
