@@ -2,16 +2,56 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../ui/Button.jsx';
 import { Link } from 'react-router-dom';
+import Paris from '../../assets/cities/paris.svg';
+import Lisbon from '../../assets/cities/lisbon.svg';
+import MexicoCity from '../../assets/cities/mexico-city.svg';
+import Bangkok from '../../assets/cities/bangkok.svg';
+import NewYork from '../../assets/cities/new-york.svg';
+import London from '../../assets/cities/london.svg';
+import Tokyo from '../../assets/cities/tokyo.svg';
+import Dubai from '../../assets/cities/dubai.svg';
 
 const slides = [
-  { city: 'Paris', country: 'France', image: '/cities/paris.jpg' },
-  { city: 'Lisbon', country: 'Portugal', image: '/cities/lisbon.jpg' },
-  { city: 'Mexico City', country: 'Mexico', image: '/cities/mexico.jpg' },
-  { city: 'Bangkok', country: 'Thailand', image: '/cities/bangkok.jpg' },
-  { city: 'New York', country: 'United States', image: '/cities/newyork.jpg' },
-  { city: 'London', country: 'United Kingdom', image: '/cities/london.jpg' },
-  { city: 'Tokyo', country: 'Japan', image: '/cities/tokyo.jpg' },
-  { city: 'Dubai', country: 'United Arab Emirates', image: '/cities/dubai.jpg' }
+  {
+    city: 'Paris',
+    country: 'France',
+    image: Paris
+  },
+  {
+    city: 'Lisbon',
+    country: 'Portugal',
+    image: Lisbon
+  },
+  {
+    city: 'Mexico City',
+    country: 'Mexico',
+    image: MexicoCity
+  },
+  {
+    city: 'Bangkok',
+    country: 'Thailand',
+    image: Bangkok
+  },
+  {
+    city: 'New York',
+    country: 'United States',
+    image: NewYork
+  },
+  {
+    city: 'London',
+    country: 'United Kingdom',
+    image: London
+  },
+  {
+    city: 'Tokyo',
+    country: 'Japan',
+    image: Tokyo
+  },
+  {
+    city: 'Dubai',
+    country: 'United Arab Emirates',
+    image: Dubai
+  }
 ];
 
 const variants = {
@@ -26,7 +66,7 @@ export function HeroCarousel() {
   useEffect(() => {
     const timer = setInterval(() => {
       setIndex((current) => (current + 1) % slides.length);
-    }, 6000);
+    }, 5000);
     return () => clearInterval(timer);
   }, []);
 
@@ -34,12 +74,11 @@ export function HeroCarousel() {
 
   return (
     <section
-      className="relative flex h-screen w-full flex-col items-center justify-center overflow-hidden"
+      className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-charcoal text-offwhite"
       role="region"
       aria-roledescription="carousel"
       aria-label="Featured destinations"
     >
-      {/* Background Images */}
       <div className="absolute inset-0">
         <AnimatePresence mode="wait">
           <motion.img
@@ -54,66 +93,71 @@ export function HeroCarousel() {
             transition={{ duration: 1.1 }}
           />
         </AnimatePresence>
-        {/* Gradient Overlays (Capital One branding) */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#002878]/85 via-[#002878]/20 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#002878]/40 via-transparent to-[#D0312D]/40" />
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-charcoal/85 via-charcoal/20 to-transparent"
+          aria-hidden="true"
+        />
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-navy/50 via-transparent to-red/30"
+          aria-hidden="true"
+        />
       </div>
-
-      {/* Hero Content */}
-      <div className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-6 px-6 text-center">
+      <div
+        className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-6 px-6 text-center"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         <motion.div
           key={`${activeSlide.city}-eyebrow`}
           initial={{ y: 16, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6 }}
-          className="rounded-full bg-white/15 px-4 py-2 text-xs font-medium uppercase tracking-[0.4em] text-white/80"
+          className="rounded-full bg-white/15 px-4 py-2 text-xs font-medium uppercase tracking-[0.4em] text-offwhite/80"
         >
-          Global PPP Intelligence
+          Global PPP intelligence
         </motion.div>
-        <h1 className="font-poppins text-4xl font-semibold tracking-tight text-white drop-shadow-lg sm:text-6xl">
+        <h1 className="font-poppins text-4xl font-semibold tracking-tight text-offwhite drop-shadow-lg sm:text-6xl">
           Same dollars, smarter world.
         </h1>
-        <p className="max-w-3xl text-base text-white/80 sm:text-xl">
+        <p className="max-w-3xl text-base text-offwhite/80 sm:text-xl">
           See where your money goes the farthest with PPP-adjusted insights across the globe.
         </p>
         <Button
           as={Link}
           to="/dashboard"
           variant="primary"
-          className="bg-[#D0312D] hover:bg-gradient-to-r hover:from-[#D0312D] hover:to-[#002878] px-6 py-3 rounded-lg text-white text-base"
+          className="text-base"
+          aria-label="Connect my Capital One account and view dashboard"
         >
           Connect my Capital One Account
         </Button>
       </div>
-
-      {/* City + Country Label */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-charcoal/70 to-transparent" aria-hidden="true" />
       <motion.div
         key={`${activeSlide.city}-caption`}
         initial={{ y: 24, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6 }}
         className="absolute bottom-12 left-8 flex flex-col gap-1 text-left"
+        aria-live="polite"
       >
-        <p className="font-poppins text-3xl font-semibold uppercase tracking-[0.2em] text-white drop-shadow-lg">
+        <p className="font-poppins text-3xl font-semibold uppercase tracking-[0.2em] text-offwhite drop-shadow-lg">
           {activeSlide.city}
         </p>
-        <p className="text-sm font-medium uppercase tracking-[0.35em] text-white/70">
-          {activeSlide.country}
-        </p>
+        <p className="text-sm font-medium uppercase tracking-[0.35em] text-offwhite/70">{activeSlide.country}</p>
       </motion.div>
-
-      {/* Controls */}
-      <nav className="absolute bottom-6 flex gap-3" aria-label="Carousel controls">
+      <nav className="absolute bottom-8 flex gap-3" aria-label="Carousel slide controls">
         {slides.map((slide, idx) => (
           <button
             key={slide.city}
             type="button"
             onClick={() => setIndex(idx)}
-            className={`h-2 w-10 rounded-full transition-all ${
-              idx === index ? 'bg-white' : 'bg-white/40'
+            className={`h-2 w-10 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-offwhite ${
+              idx === index ? 'bg-offwhite' : 'bg-white/40'
             }`}
             aria-label={`Show ${slide.city}`}
             aria-current={idx === index ? 'true' : undefined}
+            aria-pressed={idx === index}
           />
         ))}
       </nav>

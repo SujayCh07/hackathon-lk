@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0D3B66" />
+      <stop offset="100%" stop-color="#2EC4B6" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#grad)" />
+  <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#FAF9F6" font-size="96" font-family="Poppins, sans-serif">Atlanta</text>
+</svg>
