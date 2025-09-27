@@ -10,6 +10,7 @@ import Home from './pages/Home.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import Settings from './pages/Settings.jsx';
+import PersonalizationSurvey from './pages/PersonalizationSurvey.jsx';
 import { useAuth } from './hooks/useAuth.js';
 
 function App() {
@@ -41,6 +42,14 @@ function App() {
               <PublicRoute>
                 <SignupPage />
               </PublicRoute>
+            }
+          />
+          <Route
+            path="/personalize"
+            element={
+              <ProtectedRoute>
+                <PersonalizationSurvey />
+              </ProtectedRoute>
             }
           />
           <Route
