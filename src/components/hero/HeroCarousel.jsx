@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../ui/Button.jsx';
 import { Link } from 'react-router-dom';
@@ -54,67 +54,18 @@ const slides = [
   }
 ];
 
-const imageVariants = {
-  enter: (direction) => ({
-    x: direction === 0 ? 0 : direction > 0 ? '100%' : '-100%',
-    opacity: 0
-  }),
-  center: {
-    x: 0,
-    opacity: 1
-  },
-  exit: (direction) => ({
-    x: direction === 0 ? 0 : direction > 0 ? '-100%' : '100%',
-    opacity: 0
-  })
-};
-
-const captionVariants = {
-  enter: (direction) => ({
-    x: direction === 0 ? 0 : direction > 0 ? 32 : -32,
-    opacity: 0
-  }),
-  center: {
-    x: 0,
-    opacity: 1
-  },
-  exit: (direction) => ({
-    x: direction === 0 ? 0 : direction > 0 ? -32 : 32,
-    opacity: 0
-  })
+const variants = {
+  initial: { opacity: 0, scale: 1.02 },
+  animate: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.98 }
 };
 
 export function HeroCarousel() {
-  const [[index, direction], setSlideState] = useState([0, 0]);
-
-  const goToSlide = useCallback((targetIndex) => {
-    setSlideState(([prevIndex, prevDirection]) => {
-      const total = slides.length;
-      const normalized = ((targetIndex % total) + total) % total;
-
-      if (normalized === prevIndex) {
-        return [prevIndex, prevDirection];
-      }
-
-      let nextDirection;
-      if (prevIndex === total - 1 && normalized === 0) {
-        nextDirection = 1;
-      } else if (prevIndex === 0 && normalized === total - 1) {
-        nextDirection = -1;
-      } else {
-        nextDirection = normalized > prevIndex ? 1 : -1;
-      }
-
-      return [normalized, nextDirection];
-    });
-  }, []);
+  const [index, setIndex] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setSlideState(([prevIndex]) => {
-        const next = (prevIndex + 1) % slides.length;
-        return [next, 1];
-      });
+      setIndex((current) => (current + 1) % slides.length);
     }, 5000);
     return () => clearInterval(timer);
   }, []);
@@ -129,21 +80,17 @@ export function HeroCarousel() {
       aria-label="Featured destinations"
     >
       <div className="absolute inset-0">
-        <AnimatePresence initial={false} custom={direction}>
+        <AnimatePresence mode="wait">
           <motion.img
             key={activeSlide.city}
             src={activeSlide.image}
             alt={`${activeSlide.city} skyline`}
             className="h-full w-full object-cover"
-            custom={direction}
-            variants={imageVariants}
-            initial="enter"
-            animate="center"
+            variants={variants}
+            initial="initial"
+            animate="animate"
             exit="exit"
-            transition={{
-              x: { type: 'spring', stiffness: 120, damping: 30 },
-              opacity: { duration: 0.4 }
-            }}
+            transition={{ duration: 1.1 }}
           />
         </AnimatePresence>
         <div
@@ -186,30 +133,25 @@ export function HeroCarousel() {
         </Button>
       </div>
       <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-charcoal/70 to-transparent" aria-hidden="true" />
-      <AnimatePresence initial={false} custom={direction}>
-        <motion.div
-          key={`${activeSlide.city}-caption`}
-          custom={direction}
-          variants={captionVariants}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-          className="absolute bottom-12 left-8 flex flex-col gap-1 text-left"
-          aria-live="polite"
-        >
-          <p className="font-poppins text-3xl font-semibold uppercase tracking-[0.2em] text-offwhite drop-shadow-lg">
-            {activeSlide.city}
-          </p>
-          <p className="text-sm font-medium uppercase tracking-[0.35em] text-offwhite/70">{activeSlide.country}</p>
-        </motion.div>
-      </AnimatePresence>
+      <motion.div
+        key={`${activeSlide.city}-caption`}
+        initial={{ y: 24, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.6 }}
+        className="absolute bottom-12 left-8 flex flex-col gap-1 text-left"
+        aria-live="polite"
+      >
+        <p className="font-poppins text-3xl font-semibold uppercase tracking-[0.2em] text-offwhite drop-shadow-lg">
+          {activeSlide.city}
+        </p>
+        <p className="text-sm font-medium uppercase tracking-[0.35em] text-offwhite/70">{activeSlide.country}</p>
+      </motion.div>
       <nav className="absolute bottom-8 flex gap-3" aria-label="Carousel slide controls">
         {slides.map((slide, idx) => (
           <button
             key={slide.city}
             type="button"
-            onClick={() => goToSlide(idx)}
+            onClick={() => setIndex(idx)}
             className={`h-2 w-10 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-offwhite ${
               idx === index ? 'bg-offwhite' : 'bg-white/40'
             }`}
