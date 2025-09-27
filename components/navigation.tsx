@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
 import { UserAccountMenu } from "@/components/user-account-menu"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard" },
@@ -86,13 +87,15 @@ export function Navigation() {
             <span className="font-bold text-foreground">PPP Pocket</span>
           </Link>
           <div className="flex items-center gap-2">
-            {user ? (
+            {loading ? (
+              <Skeleton className="h-10 w-32 rounded-full" />
+            ) : user ? (
               <UserAccountMenu
                 user={user}
                 identityLabel={identityLabel}
                 onSignOut={handleSignOut}
                 signingOut={signingOut || loading}
-                nessieAccounts={nessie.accounts}
+                nessieAccounts={Array.isArray(nessie?.accounts) ? nessie.accounts : []}
                 nessieLoading={syncingNessie}
               />
             ) : (
