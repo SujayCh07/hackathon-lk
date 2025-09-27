@@ -6,6 +6,7 @@ import { useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
+import { UserAccountMenu } from "@/components/user-account-menu"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard" },
@@ -17,7 +18,7 @@ const navigation = [
 export function Navigation() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, signOut, loading } = useAuth()
+  const { user, signOut, loading, nessie, syncingNessie } = useAuth()
   const [signingOut, setSigningOut] = useState(false)
 
   const identityLabel = useMemo(() => {
@@ -86,17 +87,14 @@ export function Navigation() {
           </Link>
           <div className="flex items-center gap-2">
             {user ? (
-              <>
-                <span className="hidden text-sm font-semibold text-foreground/80 sm:inline">{identityLabel}</span>
-                <Button
-                  variant="secondary"
-                  className="text-sm"
-                  onClick={handleSignOut}
-                  disabled={signingOut || loading}
-                >
-                  {signingOut ? "Signing out…" : "Sign out"}
-                </Button>
-              </>
+              <UserAccountMenu
+                user={user}
+                identityLabel={identityLabel}
+                onSignOut={handleSignOut}
+                signingOut={signingOut || loading}
+                nessieAccounts={nessie.accounts}
+                nessieLoading={syncingNessie}
+              />
             ) : (
               <>
                 <Button asChild variant="ghost" className="text-sm">
