@@ -1,11 +1,22 @@
-import { toPng } from 'html-to-image';
+import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 export default function ExportActions({ targetRef }) {
+  const createImageDataUrl = async () => {
+    if (!targetRef?.current) return null;
+    const canvas = await html2canvas(targetRef.current, {
+      useCORS: true,
+      scale: window.devicePixelRatio || 2,
+      logging: false,
+      backgroundColor: '#ffffff',
+    });
+    return canvas.toDataURL('image/png');
+  };
+
   const exportPNG = async () => {
-    if (!targetRef?.current) return;
     try {
-      const dataUrl = await toPng(targetRef.current, { cacheBust: true });
+      const dataUrl = await createImageDataUrl();
+      if (!dataUrl) return;
       const link = document.createElement('a');
       link.href = dataUrl;
       link.download = 'ppp-summary.png';
@@ -18,9 +29,9 @@ export default function ExportActions({ targetRef }) {
   };
 
   const exportPDF = async () => {
-    if (!targetRef?.current) return;
     try {
-      const dataUrl = await toPng(targetRef.current, { cacheBust: true });
+      const dataUrl = await createImageDataUrl();
+      if (!dataUrl) return;
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(dataUrl);
       const pdfWidth = pdf.internal.pageSize.getWidth();

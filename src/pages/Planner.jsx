@@ -7,6 +7,11 @@ import { usePPP } from '../hooks/usePPP.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import usePersonalization from '../hooks/usePersonalization.js';
+import {
+  CATEGORY_TAGS,
+  CONTINENT_OPTIONS,
+  TRAVEL_INTERESTS,
+} from '../constants/personalization.js';
 
 // Debounce hook
 function useDebounce(value, delay = 300) {
@@ -33,6 +38,10 @@ export function Planner() {
   const [searchTerm, setSearchTerm] = useState('');
   const [maxPriceFilter, setMaxPriceFilter] = useState('');
   const [sortOption, setSortOption] = useState('runway');
+  const [interestFilter, setInterestFilter] = useState('');
+  const [continentFilter, setContinentFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [filtersInitialised, setFiltersInitialised] = useState(false);
   const [stayDuration, setStayDuration] = useState(6);
 
   const debouncedBudget = useDebounce(budget, 300);
@@ -60,6 +69,10 @@ export function Planner() {
             const runway = await calculateRunway(debouncedBudget, 'United States', city.country, city.monthlyCost);
             return {
               city: city.city,
+              country: city.country,
+              continent: city.continent,
+              interests: Array.isArray(city.interests) ? city.interests : [],
+              categories: Array.isArray(city.categories) ? city.categories : [],
               runway: Number.isFinite(runway) ? runway : 0,
               monthlyCost: city.monthlyCost,
               currency: city.currency,
@@ -93,6 +106,24 @@ export function Planner() {
 
   const focus = personalization?.budgetFocus ?? 'Balanced';
 
+  useEffect(() => {
+    setFiltersInitialised(false);
+  }, [personalization?.travelInterests, personalization?.preferredContinents, personalization?.favoriteCategories]);
+
+  useEffect(() => {
+    if (!personalization || filtersInitialised) return;
+    if (personalization.travelInterests?.length > 0) {
+      setInterestFilter(personalization.travelInterests[0]);
+    }
+    if (personalization.preferredContinents?.length > 0) {
+      setContinentFilter(personalization.preferredContinents[0]);
+    }
+    if (personalization.favoriteCategories?.length > 0) {
+      setCategoryFilter(personalization.favoriteCategories[0]);
+    }
+    setFiltersInitialised(true);
+  }, [filtersInitialised, personalization]);
+
   const focusBreakdown = useMemo(() => {
     const base = { Rent: 0.45, Food: 0.25, Transport: 0.15, Leisure: 0.15 };
     switch (focus) {
@@ -117,13 +148,30 @@ export function Planner() {
     // Filter by search term (case insensitive)
     if (searchTerm.trim() !== '') {
       const lowerTerm = searchTerm.toLowerCase();
-      data = data.filter((entry) => entry.city.toLowerCase().includes(lowerTerm));
+      data = data.filter((entry) =>
+        entry.city.toLowerCase().includes(lowerTerm) ||
+        (entry.country?.toLowerCase?.().includes(lowerTerm) ?? false)
+      );
     }
 
     // Filter by max price (if a valid number)
     const maxPriceNum = parseFloat(maxPriceFilter);
     if (!isNaN(maxPriceNum)) {
       data = data.filter((entry) => entry.monthlyCost <= maxPriceNum);
+    }
+
+    if (interestFilter) {
+      data = data.filter((entry) => entry.interests?.some?.((interest) => interest === interestFilter));
+    }
+
+    if (continentFilter) {
+      data = data.filter((entry) =>
+        entry.continent?.toLowerCase?.() === continentFilter.toLowerCase()
+      );
+    }
+
+    if (categoryFilter) {
+      data = data.filter((entry) => entry.categories?.some?.((category) => category === categoryFilter));
     }
 
     // Sort
@@ -254,6 +302,47 @@ export function Planner() {
               <option value="closest">Closest match to my budget</option>
               <option value="az">City A-Z</option>
               <option value="za">City Z-A</option>
+            </select>
+          </div>
+
+          <div className="grid gap-4 py-2 md:grid-cols-3">
+            <select
+              value={interestFilter}
+              onChange={(event) => setInterestFilter(event.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            >
+              <option value="">All interests</option>
+              {TRAVEL_INTERESTS.map((interest) => (
+                <option key={interest} value={interest}>
+                  {interest}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={continentFilter}
+              onChange={(event) => setContinentFilter(event.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            >
+              <option value="">All continents</option>
+              {CONTINENT_OPTIONS.map((continent) => (
+                <option key={continent} value={continent}>
+                  {continent}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            >
+              <option value="">All categories</option>
+              {CATEGORY_TAGS.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
             </select>
           </div>
         </CardContent>

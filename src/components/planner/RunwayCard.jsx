@@ -21,6 +21,7 @@ function formatCurrency(amount, currency) {
 
 export function RunwayCard({
   city,
+  country,
   runway,
   monthlyCost,
   currency = 'USD',
@@ -28,11 +29,16 @@ export function RunwayCard({
   breakdown = {},
   isHighlighted = false,
   badgeLabel = null,
+  continent = null,
+  interests = [],
+  categories = [],
 }) {
   const percent = Math.min(100, (Number(runway) / stayDurationMonths) * 100);
   const stayCost = Number(monthlyCost) * stayDurationMonths;
 
   const segments = Object.entries(breakdown);
+  const displayedInterests = interests.slice(0, 3);
+  const displayedCategories = categories.slice(0, 3);
 
   return (
     <Card
@@ -74,6 +80,20 @@ export function RunwayCard({
             <p>We estimate your rent, food, and leisure mix using PPP data.</p>
           )}
         </div>
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-slate/60">
+        {country && <span className="rounded-full bg-slate/10 px-3 py-1 text-slate/70">{country}</span>}
+        {continent && <span className="rounded-full bg-slate/10 px-3 py-1 text-slate/70">{continent}</span>}
+        {displayedInterests.map((interest) => (
+          <span key={`${city}-interest-${interest}`} className="rounded-full bg-teal/10 px-3 py-1 text-teal/80">
+            {interest}
+          </span>
+        ))}
+        {displayedCategories.map((category) => (
+          <span key={`${city}-category-${category}`} className="rounded-full bg-coral/10 px-3 py-1 text-coral/80">
+            {category}
+          </span>
+        ))}
       </div>
     </Card>
   );
