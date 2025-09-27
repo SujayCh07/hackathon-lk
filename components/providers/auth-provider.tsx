@@ -11,7 +11,13 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
-import { ensureNessieCustomer, fetchNessieOverview, type NessieAccount, type NessieTransaction } from '@/lib/nessie'
+import {
+  ensureNessieCustomer,
+  fetchNessieOverview,
+  getFallbackNessieOverview,
+  type NessieAccount,
+  type NessieTransaction,
+} from '@/lib/nessie'
 import { fetchUserProfileName, upsertUserProfileName, upsertUserRow } from '@/lib/user-identity'
 
 interface NessieState {
@@ -138,7 +144,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
       } catch (error) {
         console.error('Failed to synchronise Nessie data', error)
-        setNessie(initialNessieState)
+        const fallback = getFallbackNessieOverview()
+        setNessie({
+          customerId: fallback.customerId,
+          accounts: normaliseAccounts(fallback.accounts),
+          transactions: normaliseTransactions(fallback.transactions),
+        })
       } finally {
         setSyncingNessie(false)
       }
