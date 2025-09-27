@@ -1,3 +1,4 @@
+// supabase/functions/nessie-sync/index.ts
 /// <reference types="@supabase/functions-js/edge-runtime.d.ts" />
 
 type NessieAccount = {
@@ -22,10 +23,12 @@ const j = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json" } });
 
 Deno.serve(async (req) => {
+  const debug = req.headers.get("x-debug") === "1";
+  const errors: Array<{stage:string; status?:number; body?:string}> = [];
   try {
     const { customer_id, user_id: bodyUserId } = await req.json().catch(() => ({}));
     const headerUserId = req.headers.get("x-user-id") || undefined;
-    const userId = headerUserId || bodyUserId; // TEMP for hackathon; replace with auth later
+    const userId = headerUserId || bodyUserId;
 
     if (!userId) return j({ error: "Missing user_id (use x-user-id header or JSON)" }, 400);
     if (!customer_id) return j({ error: "Missing customer_id" }, 400);
@@ -35,7 +38,7 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!NESSIE_KEY)  return j({ error: "Missing NESSIE_API_KEY" }, 500);
+    if (!NESSIE_KEY)   return j({ error: "Missing NESSIE_API_KEY" }, 500);
     if (!SUPABASE_URL) return j({ error: "Missing SUPABASE_URL" }, 500);
     if (!SERVICE_KEY)  return j({ error: "Missing SUPABASE_SERVICE_ROLE_KEY" }, 500);
 
@@ -51,12 +54,12 @@ Deno.serve(async (req) => {
         },
       });
 
-    // 1) Pull accounts
+    // ---- 1) Pull accounts
     const accRes = await fetch(`${NESSIE_BASE}/customers/${customer_id}/accounts?key=${NESSIE_KEY}`);
-    if (!accRes.ok) return j({ error: "Failed to fetch accounts from Nessie" }, 502);
+    if (!accRes.ok) return j({ error: "Failed to fetch accounts from Nessie", status: accRes.status }, 502);
     const accounts: NessieAccount[] = await accRes.json();
 
-    // 2) Insert an account snapshot for each
+    // ---- 2) Insert account snapshots
     let accountsInserted = 0;
     for (const a of accounts) {
       const masked = a.account_number ? `••••${a.account_number.slice(-4)}` : null;
@@ -72,14 +75,21 @@ Deno.serve(async (req) => {
           snapshot_ts: new Date().toISOString(),
         }]),
       });
-      if (resp.ok) accountsInserted++;
+      if (resp.ok) {
+        accountsInserted++;
+      } else if (debug) {
+        errors.push({ stage: "insert_account", status: resp.status, body: await resp.text() });
+      }
     }
 
-    // 3) Pull purchases for each account and insert as transactions
+    // ---- 3) Purchases → transactions
     let transactionsInserted = 0;
     for (const a of accounts) {
       const purRes = await fetch(`${NESSIE_BASE}/accounts/${a._id}/purchases?key=${NESSIE_KEY}`);
-      if (!purRes.ok) continue;
+      if (!purRes.ok) {
+        if (debug) errors.push({ stage: "fetch_purchases", status: purRes.status, body: await purRes.text() });
+        continue;
+      }
       const purchases: NessiePurchase[] = await purRes.json();
       if (!Array.isArray(purchases) || purchases.length === 0) continue;
 
@@ -89,17 +99,21 @@ Deno.serve(async (req) => {
         nessie_account_id: a._id,
         ts: new Date(p.purchase_date).toISOString(),
         merchant: p.description || p.merchant_id || "Merchant",
-        category: null, // not provided by Nessie; you can backfill later
+        category: null, // optional in our schema
         currency_code: "USD",
-        amount: Math.abs(Number(p.amount ?? 0)), // store spend as positive
+        amount: Math.abs(Number(p.amount ?? 0)),
       }));
 
       const resp = await sFetch("transactions", { method: "POST", body: JSON.stringify(rows) });
-      if (resp.ok) transactionsInserted += rows.length;
+      if (resp.ok) {
+        transactionsInserted += rows.length;
+      } else if (debug) {
+        errors.push({ stage: "insert_transactions", status: resp.status, body: await resp.text() });
+      }
     }
 
-    // 4) Upsert integration link
-    await sFetch("user_integrations", {
+    // ---- 4) Upsert integration link
+    const uiResp = await sFetch("user_integrations", {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates" },
       body: JSON.stringify([{
@@ -108,12 +122,18 @@ Deno.serve(async (req) => {
         last_sync: new Date().toISOString(),
       }]),
     });
+    if (!uiResp.ok && debug) {
+      errors.push({ stage: "upsert_user_integrations", status: uiResp.status, body: await uiResp.text() });
+    }
 
-    return j({
+    const payload: any = {
       insertedAccounts: accountsInserted,
       insertedTransactions: transactionsInserted,
       lastSync: new Date().toISOString(),
-    });
+    };
+    if (debug) payload._debug = { accountsCount: accounts.length, errors };
+
+    return j(payload);
   } catch (e) {
     return j({ error: String(e?.message || e) }, 500);
   }
