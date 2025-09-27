@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="dubaiSky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9" />
+      <stop offset="60%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+    <linearGradient id="dubaiGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2ec4b6" stop-opacity="0.35" />
+      <stop offset="50%" stop-color="#f4d35e" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#ee6c4d" stop-opacity="0.35" />
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#dubaiSky)" />
+  <rect width="1600" height="900" fill="url(#dubaiGlow)" opacity="0.45" />
+  <g fill="#081d36">
+    <rect x="0" y="650" width="1600" height="250" opacity="0.8" />
+  </g>
+  <g fill="#143a66">
+    <rect x="120" y="520" width="130" height="330" />
+    <rect x="280" y="510" width="140" height="340" />
+    <rect x="460" y="540" width="120" height="310" />
+    <rect x="620" y="500" width="140" height="350" />
+    <rect x="800" y="530" width="130" height="320" />
+    <rect x="980" y="500" width="150" height="350" />
+    <rect x="1180" y="520" width="140" height="330" />
+    <rect x="1360" y="540" width="130" height="310" />
+  </g>
+  <g fill="#1f4b7a">
+    <rect x="160" y="440" width="70" height="390" />
+    <rect x="320" y="420" width="80" height="410" />
+    <rect x="500" y="450" width="70" height="380" />
+    <rect x="660" y="400" width="90" height="430" />
+    <rect x="840" y="430" width="80" height="400" />
+    <rect x="1020" y="420" width="90" height="410" />
+    <rect x="1200" y="430" width="80" height="400" />
+    <rect x="1380" y="460" width="70" height="370" />
+  </g>
+  <g fill="#facc15" opacity="0.85">
+    <path d="M700 180 L740 820 L720 820 L760 200 Z" />
+    <rect x="720" y="520" width="20" height="180" />
+    <rect x="990" y="340" width="20" height="220" />
+    <rect x="1010" y="560" width="16" height="120" />
+  </g>
+  <g fill="#fde68a" opacity="0.6">
+    <rect x="200" y="580" width="12" height="70" />
+    <rect x="230" y="610" width="12" height="50" />
+    <rect x="360" y="600" width="12" height="60" />
+    <rect x="400" y="630" width="12" height="40" />
+    <rect x="560" y="600" width="12" height="60" />
+    <rect x="900" y="620" width="12" height="40" />
+    <rect x="940" y="590" width="12" height="60" />
+    <rect x="1120" y="610" width="12" height="50" />
+    <rect x="1160" y="580" width="12" height="70" />
+    <rect x="1420" y="620" width="12" height="40" />
+    <rect x="1460" y="590" width="12" height="60" />
+  </g>
+</svg>

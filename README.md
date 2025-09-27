@@ -1,30 +1,38 @@
-# Fintech web app UI
+# Parity
 
-*Automatically synced with your [v0.app](https://v0.app) deployments*
+Parity is a minimalist travel-fintech playground that showcases how far your dollars stretch around the world with purchasing power parity (PPP) insights. The app is built with Vite, React 19, TailwindCSS, and animated routing via Framer Motion.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/sujay-chavas-projects/v0-fintech-web-app-ui)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/projects/iSMsKK9YX36)
+## Getting started
 
-## Overview
+```bash
+npm install
+npm run dev
+```
 
-This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
+The development server will be available at the URL printed in your terminal (defaults to http://localhost:5173).
 
-## Deployment
+## Features
 
-Your project is live at:
+- Hero carousel with travel imagery and CTA into the dashboard.
+- Dashboard with mock Capital One balance, transactions, PPP world map, and top city savings cards.
+- GeoBudget planner with interactive budget slider and runway visualizations.
+- Smart-Spend insights comparing category spending and PPP-adjusted savings with Recharts.
+- Share page that exports Parity summaries as PNG or PDF via html2canvas and jsPDF.
+- Mock data and hooks to simplify swapping in Supabase/Nessie APIs later.
 
-**[https://vercel.com/sujay-chavas-projects/v0-fintech-web-app-ui](https://vercel.com/sujay-chavas-projects/v0-fintech-web-app-ui)**
+## Tech stack
 
-## Build your app
+- Vite + React 19 (RC)
+- TailwindCSS for styling
+- React Router v6 + Framer Motion transitions
+- Leaflet for world map visualization
+- Recharts for comparison charts
+- html2canvas + jsPDF for export actions
 
-Continue building your app on:
+## Accessibility & design notes
 
-**[https://v0.app/chat/projects/iSMsKK9YX36](https://v0.app/chat/projects/iSMsKK9YX36)**
+- Travel-inspired color palette with high contrast.
+- Semantic headings, focus states, and ARIA labelling on interactive elements.
+- Responsive layouts across breakpoints.
 
-## How It Works
-
-1. Create and modify your project using [v0.app](https://v0.app)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+Enjoy exploring how far your money can go globally with Parity!

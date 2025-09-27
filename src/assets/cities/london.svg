@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="londonSky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9" />
+      <stop offset="60%" stop-color="#0d3b66" />
+      <stop offset="100%" stop-color="#082f49" />
+    </linearGradient>
+    <linearGradient id="londonGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2ec4b6" stop-opacity="0.3" />
+      <stop offset="50%" stop-color="#f4d35e" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#ee6c4d" stop-opacity="0.25" />
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#londonSky)" />
+  <rect width="1600" height="900" fill="url(#londonGlow)" opacity="0.4" />
+  <g fill="#0a2542">
+    <rect x="0" y="650" width="1600" height="250" opacity="0.75" />
+  </g>
+  <g fill="#174472">
+    <rect x="140" y="540" width="130" height="310" />
+    <rect x="280" y="500" width="150" height="350" />
+    <rect x="470" y="510" width="120" height="340" />
+    <rect x="630" y="540" width="140" height="310" />
+    <rect x="820" y="500" width="150" height="350" />
+    <rect x="1000" y="520" width="140" height="330" />
+    <rect x="1190" y="530" width="130" height="320" />
+    <rect x="1360" y="550" width="140" height="300" />
+  </g>
+  <g fill="#23527f">
+    <rect x="170" y="440" width="80" height="410" />
+    <rect x="330" y="430" width="70" height="420" />
+    <rect x="500" y="440" width="80" height="410" />
+    <rect x="660" y="430" width="80" height="420" />
+    <rect x="840" y="440" width="80" height="410" />
+    <rect x="1020" y="450" width="80" height="400" />
+    <rect x="1200" y="440" width="80" height="410" />
+    <rect x="1390" y="460" width="90" height="390" />
+  </g>
+  <g fill="#fde68a" opacity="0.85">
+    <rect x="845" y="260" width="36" height="240" />
+    <rect x="845" y="220" width="36" height="40" />
+    <rect x="828" y="500" width="70" height="150" />
+    <rect x="360" y="520" width="16" height="100" />
+    <rect x="1038" y="520" width="16" height="90" />
+  </g>
+  <g fill="#fbbf24" opacity="0.55">
+    <rect x="200" y="600" width="12" height="60" />
+    <rect x="240" y="630" width="12" height="40" />
+    <rect x="380" y="610" width="12" height="50" />
+    <rect x="420" y="580" width="12" height="70" />
+    <rect x="560" y="620" width="12" height="40" />
+    <rect x="600" y="590" width="12" height="60" />
+    <rect x="900" y="600" width="12" height="60" />
+    <rect x="940" y="630" width="12" height="40" />
+    <rect x="1120" y="590" width="12" height="60" />
+    <rect x="1160" y="620" width="12" height="40" />
+    <rect x="1420" y="600" width="12" height="60" />
+    <rect x="1460" y="570" width="12" height="70" />
+  </g>
+</svg>

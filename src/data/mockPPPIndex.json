@@ -1,0 +1,32 @@
+{
+  "Atlanta": {
+    "ppp": 1,
+    "monthlyCost": 2800,
+    "currency": "USD"
+  },
+  "Lisbon": {
+    "ppp": 0.72,
+    "monthlyCost": 1950,
+    "currency": "EUR"
+  },
+  "Mexico City": {
+    "ppp": 0.58,
+    "monthlyCost": 1650,
+    "currency": "MXN"
+  },
+  "Bangkok": {
+    "ppp": 0.49,
+    "monthlyCost": 1400,
+    "currency": "THB"
+  },
+  "Paris": {
+    "ppp": 1.12,
+    "monthlyCost": 3200,
+    "currency": "EUR"
+  },
+  "New York": {
+    "ppp": 1.21,
+    "monthlyCost": 3800,
+    "currency": "USD"
+  }
+}

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="mexicoSky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="50%" stop-color="#0d3b66" />
+      <stop offset="100%" stop-color="#082f49" />
+    </linearGradient>
+    <radialGradient id="mexicoGlow" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#f4d35e" stop-opacity="0.45" />
+      <stop offset="50%" stop-color="#ee6c4d" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#2ec4b6" stop-opacity="0.2" />
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#mexicoSky)" />
+  <rect width="1600" height="900" fill="url(#mexicoGlow)" opacity="0.55" />
+  <g fill="#0b2742">
+    <rect x="0" y="640" width="1600" height="260" opacity="0.75" />
+  </g>
+  <g fill="#113861">
+    <rect x="100" y="520" width="140" height="320" />
+    <rect x="260" y="480" width="160" height="360" />
+    <rect x="460" y="520" width="120" height="320" />
+    <rect x="640" y="490" width="150" height="350" />
+    <rect x="820" y="530" width="130" height="310" />
+    <rect x="1000" y="510" width="150" height="330" />
+    <rect x="1200" y="500" width="160" height="340" />
+    <rect x="1400" y="540" width="140" height="300" />
+  </g>
+  <g fill="#1c4f7d">
+    <rect x="140" y="440" width="70" height="400" />
+    <rect x="320" y="420" width="80" height="420" />
+    <rect x="500" y="450" width="70" height="390" />
+    <rect x="680" y="420" width="80" height="420" />
+    <rect x="860" y="440" width="80" height="400" />
+    <rect x="1040" y="430" width="90" height="410" />
+    <rect x="1230" y="410" width="100" height="430" />
+    <rect x="1420" y="460" width="80" height="380" />
+  </g>
+  <g fill="#facc15" opacity="0.7">
+    <rect x="700" y="300" width="60" height="200" />
+    <polygon points="730,240 770,300 690,300" />
+    <rect x="712" y="500" width="36" height="80" />
+  </g>
+  <g fill="#fde68a" opacity="0.6">
+    <rect x="160" y="560" width="14" height="60" />
+    <rect x="190" y="590" width="14" height="40" />
+    <rect x="340" y="550" width="14" height="70" />
+    <rect x="370" y="590" width="14" height="50" />
+    <rect x="520" y="580" width="14" height="60" />
+    <rect x="700" y="620" width="14" height="50" />
+    <rect x="1040" y="560" width="14" height="60" />
+    <rect x="1070" y="600" width="14" height="40" />
+    <rect x="1240" y="580" width="14" height="60" />
+    <rect x="1450" y="570" width="14" height="70" />
+  </g>
+</svg>
