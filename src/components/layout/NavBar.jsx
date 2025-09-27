@@ -60,13 +60,7 @@ export function NavBar() {
         </div>
 
         {/* CTA Button - always visible on desktop */}
-        <Button
-          as={NavLink}
-          to="/dashboard"
-          className="hidden border border-red/10 bg-gradient-to-r from-red to-navy px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:from-red/90 hover:to-navy/90 md:inline-flex"
-        >
-          Enter App
-        </Button>
+
 
         {/* Auth Actions - Desktop */}
         <div className="hidden items-center gap-3 md:flex">
