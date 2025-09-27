@@ -9,7 +9,6 @@ import Share from './pages/Share.jsx';
 import Home from './pages/Home.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
-import Settings from './pages/Settings.jsx';
 import { useAuth } from './hooks/useAuth.js';
 
 function App() {
@@ -66,14 +65,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <Share />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute>
-                <Settings />
               </ProtectedRoute>
             }
           />

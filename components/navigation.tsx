@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
-import { UserCircleIcon, ChevronDownIcon } from "@heroicons/react/24/outline"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
@@ -20,7 +19,6 @@ export function Navigation() {
   const router = useRouter()
   const { user, signOut, loading } = useAuth()
   const [signingOut, setSigningOut] = useState(false)
-  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
 
   const identityLabel = useMemo(() => {
     const metadata = user?.user_metadata ?? {}
@@ -47,21 +45,11 @@ export function Navigation() {
   async function handleSignOut() {
     try {
       setSigningOut(true)
-      setAccountMenuOpen(false)
       await signOut()
       router.replace("/")
     } finally {
       setSigningOut(false)
     }
-  }
-
-  function setAccountMenuVisibility(open: boolean) {
-    if (!user) return
-    setAccountMenuOpen(open)
-  }
-
-  function toggleAccountMenu() {
-    setAccountMenuVisibility(!accountMenuOpen)
   }
 
   return (
@@ -98,62 +86,17 @@ export function Navigation() {
           </Link>
           <div className="flex items-center gap-2">
             {user ? (
-              <div
-                className="relative"
-                onMouseEnter={() => setAccountMenuVisibility(true)}
-                onMouseLeave={() => setAccountMenuVisibility(false)}
-                onBlur={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget)) {
-                    setAccountMenuVisibility(false)
-                  }
-                }}
-              >
+              <>
+                <span className="hidden text-sm font-semibold text-foreground/80 sm:inline">{identityLabel}</span>
                 <Button
-                  type="button"
                   variant="secondary"
-                  className="flex items-center gap-2 text-sm"
-                  onClick={toggleAccountMenu}
-                  onFocus={() => setAccountMenuVisibility(true)}
-                  aria-haspopup="true"
-                  aria-expanded={accountMenuOpen}
+                  className="text-sm"
+                  onClick={handleSignOut}
+                  disabled={signingOut || loading}
                 >
-                  <UserCircleIcon className="h-5 w-5 text-foreground/70" />
-                  <span className="hidden sm:inline">{identityLabel}</span>
-                  <ChevronDownIcon
-                    className={`h-4 w-4 transition-transform ${
-                      accountMenuOpen ? "rotate-180 text-foreground" : "text-foreground/50"
-                    }`}
-                  />
+                  {signingOut ? "Signing out…" : "Sign out"}
                 </Button>
-                {accountMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-56 rounded-xl border border-border/60 bg-background/95 p-3 shadow-lg">
-                    <div className="space-y-2 text-sm">
-                      <Link
-                        href="/settings"
-                        className={cn(
-                          "flex items-center justify-between rounded-lg px-3 py-2 font-semibold transition-colors",
-                          pathname === "/settings"
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-foreground/80 hover:bg-muted hover:text-foreground",
-                        )}
-                        onClick={() => setAccountMenuVisibility(false)}
-                      >
-                        <span>Settings</span>
-                        <span aria-hidden>→</span>
-                      </Link>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        className="w-full justify-between text-sm"
-                        onClick={handleSignOut}
-                        disabled={signingOut || loading}
-                      >
-                        <span>{signingOut ? "Signing out…" : "Sign out"}</span>
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              </>
             ) : (
               <>
                 <Button asChild variant="ghost" className="text-sm">
