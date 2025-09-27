@@ -40,7 +40,7 @@ export async function getPurchasingPowerRatio(originalCountry, finalCountry) {
   return final.value / original.value
 }
 
-export async function getAdjustedPrice(originalCountry, finalCountry, originalPrice) {
+export async function getAdjustedPrice(originalPrice, originalCountry, finalCountry) {
   const ratio = await getPurchasingPowerRatio(originalCountry, finalCountry)
   if (typeof ratio !== "number") {
     return "doesn't exist"

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import supabase, { getPurchasingPowerRatio, getAdjustedPrice, calculateLivingTime } from '../Econ.js';
 
 export function usePPP() {
+  console.log(adjustPrice(100, 'USA', 'Portugal'));
   const [pppData, setPPPData] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
