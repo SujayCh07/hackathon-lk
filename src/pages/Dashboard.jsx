@@ -1,13 +1,7 @@
 import { useMemo, useEffect, useState } from 'react';
-import {
-  WalletIcon,
-  CreditCardIcon,
-  ChartBarIcon,
-  LightBulbIcon,
-  GlobeAltIcon,
-} from '@heroicons/react/24/outline';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
 import WorldMap from '../components/score/WorldMap.jsx';
+import CityCard from '../components/score/CityCard.jsx';
 import SpendingTrendChart from '../components/dashboard/SpendingTrendChart.jsx';
 import SavingsRunwayPanel from '../components/dashboard/SavingsRunwayPanel.jsx';
 import NotificationsWidget from '../components/dashboard/NotificationsWidget.jsx';
@@ -20,23 +14,6 @@ import usePersonalization from '../hooks/usePersonalization.js';
 import OnboardingModal from '../components/onboarding/OnboardingModal.jsx';
 
 // --- Helpers ---
-function PiggyBankIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
-      <path
-        d="M4.75 12.25c0-3.45 2.86-6.25 6.4-6.25h2.2c3.07 0 5.6 2.49 5.6 5.56v1.14l1.5.75-1.5.75v1.24a3.91 3.91 0 01-3.91 3.91h-1.05a1.85 1.85 0 11-3.7 0H9.1a4.35 4.35 0 01-4.35-4.35z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M7.5 18v1.5M16.5 18v1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M12 6.25h3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M16.25 11.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0z" fill="currentColor" />
-    </svg>
-  );
-}
-
 function formatUSD(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(n) ?? 0);
 }
@@ -212,6 +189,8 @@ export function Dashboard() {
       .slice(0, 5);
   }, [topDestinations, coordsCache]);
 
+  const pppTop = topDestinations.slice(0, 3);
+
   const notifications = useMemo(
     () =>
       buildNotifications({
@@ -233,48 +212,8 @@ export function Dashboard() {
     await completeOnboarding(payload);
   };
 
-  const cardSurface =
-    'group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0b1f3f]/95 via-[#123d70]/85 to-[#f5f8ff]/95 p-6 shadow-lg shadow-[#052962]/20 ring-1 ring-white/20 before:pointer-events-none before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] before:bg-[radial-gradient(circle_at_top,_rgba(227,24,55,0.14),transparent_65%)] after:pointer-events-none after:absolute after:-top-10 after:right-[-12%] after:h-24 after:w-24 after:rounded-full after:bg-[#e31837]/12 after:blur-3xl transform-gpu transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:shadow-2xl hover:shadow-[#052962]/30 hover:ring-[#e31837]/20 sm:after:h-32 sm:after:w-32';
-  const headerBadgeClass =
-    'flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-white/20 text-[#052962] ring-1 ring-white/40';
-  const budgetDelta = spendingMetrics?.budgetDelta ?? null;
-  const budgetDeltaLabel =
-    budgetDelta == null
-      ? 'Sync spending to unlock pacing insights'
-      : budgetDelta > 0
-      ? `${formatUSD(Math.abs(budgetDelta))} under plan`
-      : budgetDelta < 0
-      ? `${formatUSD(Math.abs(budgetDelta))} over plan`
-      : 'Right on target';
-  const budgetDeltaColor =
-    budgetDelta == null ? 'text-white' : budgetDelta >= 0 ? 'text-emerald-200' : 'text-[#ffb5c0]';
-  const weeklySummary =
-    weeklyChange != null
-      ? `Spending is ${weeklyChange > 0 ? 'up' : 'down'} ${Math.abs(weeklyChange).toFixed(1)}% versus last week.`
-      : 'We’ll track spend trends once we have two weeks of data.';
-  const bestDestination = topDestinations[0];
-  const pppSpotlight = bestDestination
-    ? `${bestDestination.city} delivers a PPP score of ${bestDestination.ppp?.toFixed?.(0) ?? '—'} with ${
-        bestDestination.context ?? 'balanced opportunities'
-      }. ${
-        bestDestination.monthlyCost
-          ? `Approx. ${formatUSD(bestDestination.monthlyCost)}/mo in your focus category.`
-          : ''
-      }`
-    : 'PPP insights load as soon as we have enough travel data.';
-  const emptyTransactionsMessage = 'No transactions yet. Sync your card to get started.';
-
   return (
-    <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-10">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 -top-24 -z-10 h-64 bg-[radial-gradient(circle_at_top,_rgba(5,41,98,0.2),transparent_70%)] blur-3xl"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-10 bottom-0 -z-10 h-80 bg-[radial-gradient(circle_at_bottom,_rgba(19,99,190,0.18),transparent_70%)] blur-3xl"
-      />
-
+    <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
       <OnboardingModal
         isOpen={showOnboarding}
         defaultValues={personalization}
@@ -283,122 +222,115 @@ export function Dashboard() {
         displayName={displayName}
       />
 
-      <div className="grid auto-rows-fr gap-6 xl:grid-cols-2">
-        <Card className={`${cardSurface} h-full`}>
-          <CardHeader className="mb-6 flex items-start gap-4">
-            <span className={headerBadgeClass}>
-              <WalletIcon aria-hidden="true" className="h-6 w-6" />
-            </span>
-            <div>
-              <CardTitle className="text-2xl font-semibold text-white drop-shadow-sm">{heroLabel}</CardTitle>
-              <p className="text-sm text-[#d0defa]">{heroSubtitle}</p>
-            </div>
+      {/* Hero cards */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <Card className="col-span-1 bg-white/90">
+          <CardHeader>
+            <CardTitle>{heroLabel}</CardTitle>
+            <p className="text-xs uppercase tracking-[0.3em] text-teal/60">Dynamic budget profile</p>
           </CardHeader>
-          <CardContent className="space-y-6 text-sm text-[#d0defa]/90">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/70">Current balance</p>
-              <p className="mt-2 text-4xl font-bold text-white drop-shadow-lg">{formatUSD(balanceUSD)}</p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl bg-white/10 p-4 ring-1 ring-white/20">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">Monthly budget</p>
-                <p className="mt-3 text-lg font-semibold text-white">{formatUSD(baseMonthlyBudget)}</p>
-              </div>
-              <div className="rounded-xl bg-white/10 p-4 ring-1 ring-white/20">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">Pacing</p>
-                <p className={`mt-3 text-lg font-semibold ${budgetDeltaColor}`}>{budgetDeltaLabel}</p>
-              </div>
-            </div>
-            <p className="text-xs text-white/70">Dashboard = balances, travel power, and PPP-led opportunities.</p>
+          <CardContent>
+            <p className="text-3xl font-poppins font-semibold text-teal">{formatUSD(balanceUSD)}</p>
+            <p className="mt-2 text-sm text-charcoal/70">{heroSubtitle}</p>
+            <p className="mt-3 text-xs text-charcoal/50">
+              Dashboard = balances, travel power, and PPP-led opportunities.
+            </p>
           </CardContent>
         </Card>
 
-        <Card className={`${cardSurface} h-full`}>
-          <CardHeader className="mb-6 flex items-start gap-4">
-            <span className={headerBadgeClass}>
-              <CreditCardIcon aria-hidden="true" className="h-6 w-6" />
-            </span>
-            <div>
-              <CardTitle className="text-2xl font-semibold text-white drop-shadow-sm">Recent transactions</CardTitle>
-              <p className="text-sm text-[#d0defa]">Last 30 days</p>
-            </div>
+        <Card className="col-span-1 md:col-span-2 bg-white/90">
+          <CardHeader>
+            <CardTitle>Recent transactions</CardTitle>
+            <p className="text-xs uppercase tracking-[0.3em] text-teal/60">Last 30 days</p>
           </CardHeader>
-          <CardContent className="space-y-4 text-sm text-white/80">
+          <CardContent>
             <ul className="space-y-3">
               {recent.length === 0 && (
-                <li className="rounded-2xl border border-dashed border-white/35 bg-white/10 px-6 py-8 text-center text-sm text-white/80">
-                  {emptyTransactionsMessage}
+                <li className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-center text-sm text-charcoal/60">
+                  We’ll populate this once your transactions sync.
                 </li>
               )}
               {recent.map((txn) => (
                 <li
                   key={txn.id}
-                  className="flex flex-col justify-between gap-3 rounded-2xl bg-white/15 px-5 py-4 text-white shadow-inner shadow-white/10 ring-1 ring-white/25 transition duration-200 hover:bg-white/20 sm:flex-row sm:items-center"
+                  className="flex flex-col justify-between rounded-2xl bg-offwhite/80 px-4 py-3 sm:flex-row sm:items-center"
                 >
                   <div>
-                    <p className="text-base font-semibold text-white drop-shadow">{txn.merchant ?? 'Unknown merchant'}</p>
-                    <p className="text-xs text-white/70">
+                    <p className="font-semibold text-charcoal">{txn.merchant ?? 'Unknown merchant'}</p>
+                    <p className="text-xs text-charcoal/60">
                       {new Date(txn.timestamp ?? txn.date ?? Date.now()).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="text-right text-sm">
-                    <p className="font-semibold text-[#ffccd5]">{formatUSD(txn.amount)}</p>
-                    <p className="text-xs text-white/70">{txn.category ?? 'General'}</p>
+                  <div className="mt-2 text-right sm:mt-0">
+                    <p className="font-semibold text-coral">{formatUSD(txn.amount)}</p>
+                    <p className="text-xs text-charcoal/60">{txn.category ?? 'General'}</p>
                   </div>
                 </li>
               ))}
             </ul>
           </CardContent>
         </Card>
+      </div>
 
-        <Card className={`${cardSurface} h-full`}>
-          <CardHeader className="mb-6 flex items-start gap-4">
-            <span className={headerBadgeClass}>
-              <ChartBarIcon aria-hidden="true" className="h-6 w-6" />
-            </span>
-            <div>
-              <CardTitle className="text-2xl font-semibold text-white drop-shadow-sm">Trends & insights</CardTitle>
-              <p className="text-sm text-[#d0defa]">{weeklySummary}</p>
-            </div>
+      {/* Trends + Notifications */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card className="bg-white/90">
+          <CardHeader>
+            <CardTitle>Trends & insights</CardTitle>
+            <p className="text-sm text-charcoal/70">
+              {weeklyChange != null
+                ? `Your spending is ${weeklyChange > 0 ? 'up' : 'down'} ${Math.abs(weeklyChange).toFixed(1)}% from last week.`
+                : 'We’ll track spend trends once we have two weeks of data.'}
+            </p>
           </CardHeader>
-          <CardContent className="!space-y-0">
-            <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-              <SpendingTrendChart data={trendData.map(({ label, amount }) => ({ label, amount }))} />
-            </div>
+          <CardContent>
+            <SpendingTrendChart data={trendData.map(({ label, amount }) => ({ label, amount }))} />
           </CardContent>
         </Card>
 
-        <NotificationsWidget
-          items={notifications}
-          icon={LightBulbIcon}
-          subtitle="We turn PPP swings into actionable moves."
-          emptyStateMessage="Once we have enough data we’ll start dropping personalised travel plays here."
-        />
+        <NotificationsWidget items={notifications} />
+      </div>
 
-        <Card className={`${cardSurface} h-full xl:col-span-2`}>
-          <CardHeader className="mb-6 flex items-start gap-4">
-            <span className={headerBadgeClass}>
-              <GlobeAltIcon aria-hidden="true" className="h-6 w-6" />
-            </span>
-            <div>
-              <CardTitle className="text-2xl font-semibold text-white drop-shadow-sm">PPP score heatmap</CardTitle>
-              <p className="text-sm text-[#d0defa]">Hover the globe to see how your purchasing power compares.</p>
-            </div>
+      {/* Map + Top destinations */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card className="bg-white/90">
+          <CardHeader>
+            <CardTitle>PPP score heatmap</CardTitle>
+            <p className="text-sm text-charcoal/70">
+              Hover the globe to see how your purchasing power compares.
+            </p>
           </CardHeader>
-          <CardContent className="space-y-6 text-sm text-[#d0defa]/90">
-            <p>{pppSpotlight}</p>
-            <div className="overflow-hidden rounded-2xl bg-white/5 p-2 ring-1 ring-white/20">
-              <WorldMap markers={pppMarkers} />
-            </div>
+          <CardContent>
+            <WorldMap markers={pppMarkers} />
           </CardContent>
         </Card>
 
-        <SavingsRunwayPanel
-          destinations={topDestinations}
-          stayLengthMonths={6}
-          icon={PiggyBankIcon}
-          subtitle="See how long your savings travel when you follow today’s top PPP plays."
-        />
+        <div className="grid grid-cols-1 gap-4">
+          <SavingsRunwayPanel destinations={topDestinations} stayLengthMonths={6} />
+          <Card className="bg-white/90">
+            <CardHeader>
+              <CardTitle>Top PPP picks</CardTitle>
+              <p className="text-sm text-charcoal/70">
+                GeoBudget = personalized travel & budget forecasting.
+              </p>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {pppTop.map((dest) => (
+                <CityCard
+                  key={dest.city}
+                  city={dest.city}
+                  ppp={dest.ppp}
+                  savingsPct={dest.savings ?? dest.savingsPct}
+                />
+              ))}
+              {pppTop.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-sm text-charcoal/60">
+                  We’re fetching PPP insights — check back shortly.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
