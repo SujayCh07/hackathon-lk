@@ -7,197 +7,128 @@ import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import usePersonalization from '../hooks/usePersonalization.js';
 
-// City → Country resolver using OpenStreetMap Nominatim API
-async function cityToCountry(city) {
-  const resp = await fetch(
-    `https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(city)}&format=json&addressdetails=1`
-  );
-  const data = await resp.json();
-  if (data.length > 0 && data[0].address.country) {
-    return data[0].address.country;
-  }
-  return null;
-}
-
-// Apply a bit of randomization (±10%)
-function applyRandomization(value, maxDeviation = 0.1) {
-  const factor = 1 + (Math.random() * 2 - 1) * maxDeviation; // between 0.9 and 1.1
-  return parseFloat((value * factor).toFixed(1));
-}
-
-// A single row component
-function CityComparisonRow({ id, totals, adjustPrice, getPPPRatio, calculateRunway }) {
-  const [city, setCity] = useState('');
-  const [country, setCountry] = useState(null);
-  const [categories, setCategories] = useState([]);
-  const [status, setStatus] = useState('idle'); // idle | searching | loading | error | done
-  const [monthlyCost, setMonthlyCost] = useState(null);
-  const [runway, setRunway] = useState(null);
-  const [savingsPercent, setSavingsPercent] = useState(null);
-
-  // Static Atlanta spends
-  const atlantaSpends = useMemo(() => ({
-    Groceries: totals['Groceries'] ?? 350,
-    Rent: totals['Rent'] ?? 1400,
-    Transport: totals['Transport'] ?? 120,
-  }), [totals]);
-
-  // Debounce typing (2s)
-  useEffect(() => {
-    if (!city) {
-      setCountry(null);
-      setCategories([]);
-      setStatus('idle');
-      return;
-    }
-
-    setStatus('searching');
-
-    const timer = setTimeout(() => {
-      cityToCountry(city)
-        .then((resolvedCountry) => {
-          if (resolvedCountry) {
-            setCountry(resolvedCountry);
-            setStatus('loading');
-          } else {
-            setCountry(null);
-            setCategories([]);
-            setStatus('error');
-          }
-        })
-        .catch(() => {
-          setCountry(null);
-          setCategories([]);
-          setStatus('error');
-        });
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [city]);
-
-  // Fetch PPP adjustments and monthly cost after country is resolved
-  useEffect(() => {
-    if (!country) return;
-
-    const loadAdjustedCategories = async () => {
-      try {
-        const adjusted = await Promise.all(
-          Object.entries(atlantaSpends).map(async ([category, amount]) => {
-            const foreignAmount = await adjustPrice(amount, 'USA', country);
-            const delta = typeof foreignAmount === 'number'
-              ? ((amount - foreignAmount) / amount) * 100
-              : 0;
-
-            // Randomize deltas a little
-            const randomizedDelta = applyRandomization(delta, 0.1);
-
-            return {
-              title: category,
-              description: `Atlanta ${new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD'
-              }).format(amount)} vs. ${city} ${new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD'
-              }).format(foreignAmount)}`,
-              delta: randomizedDelta,
-            };
-          })
-        );
-        setCategories(adjusted);
-
-        // Also fetch PPP ratio and monthly cost
-        const ratio = await getPPPRatio('USA', country);
-        if (ratio) {
-          const baseCostUSD = 2000;
-          const equivalent = Math.round(baseCostUSD / ratio);
-          setMonthlyCost(equivalent);
-
-          // Example: assume user budget is $10k
-          const budget = 10000;
-          const r = await calculateRunway(budget, 'USA', country, equivalent);
-          setRunway(r);
-
-          // Compute savings %
-          const savings = ((baseCostUSD - equivalent) / baseCostUSD) * 100;
-          setSavingsPercent(applyRandomization(savings, 0.15)); // ±15% wiggle room
-        }
-
-        setStatus('done');
-      } catch (err) {
-        console.error('PPP adjustment failed:', err);
-        setCategories([]);
-        setStatus('error');
-      }
-    };
-
-    loadAdjustedCategories();
-  }, [adjustPrice, atlantaSpends, country, city, getPPPRatio, calculateRunway]);
-
-  return (
-    <div className="mb-8 p-4 border rounded-lg bg-white/70 shadow-sm">
-      <div className="mb-4 flex gap-2">
-        <input
-          type="text"
-          placeholder="Enter city (e.g. Berlin)"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          className="rounded border px-3 py-2 w-64"
-        />
-      </div>
-
-      {status === 'searching' && (
-        <p className="text-sm text-charcoal/70">Searching...</p>
-      )}
-      {status === 'loading' && (
-        <p className="text-sm text-charcoal/70">Loading PPP adjustments...</p>
-      )}
-      {status === 'error' && (
-        <p className="text-sm text-red-600">Not a valid city</p>
-      )}
-      {status === 'done' && categories.length > 0 && (
-        <>
-          <div className="grid gap-6 md:grid-cols-3">
-            {categories.map((category) => (
-              <CategoryTile key={category.title} {...category} />
-            ))}
-          </div>
-          {monthlyCost && (
-            <p className="mt-4 text-sm text-charcoal/70">
-              In {city}, a comfortable lifestyle costs about{' '}
-              {new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD'
-              }).format(monthlyCost)}{' '}
-              per month compared to $2,000 in Atlanta.
-            </p>
-          )}
-          {runway && (
-            <p className="text-sm text-charcoal/70">
-              A $10,000 budget would last roughly {runway} months in {city}.
-            </p>
-          )}
-          {savingsPercent !== null && (
-            <p className="text-sm text-charcoal/70">
-              Overall, living in {city} is about {savingsPercent}% cheaper than Atlanta.
-            </p>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
 export function Insights() {
   const { totals } = useTransactions();
-  const { adjustPrice, getPPPRatio, calculateRunway } = usePPP();
-  const [rows, setRows] = useState([0]);
+  const { rankedBySavings, adjustPrice } = usePPP();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const { profile } = useUserProfile(userId);
+  const { data: personalization } = usePersonalization(userId);
+  const [categories, setCategories] = useState([]);
+  const [chartData, setChartData] = useState([]);
+  const [summary, setSummary] = useState(null);
 
-  const addRow = () => {
-    if (rows.length < 5) {
-      setRows([...rows, rows.length]);
+  const baselineCountry = useMemo(() => {
+    if (profile?.homeCountry?.name) return profile.homeCountry.name;
+    return 'United States';
+  }, [profile?.homeCountry?.name]);
+
+  const atlantaSpends = useMemo(
+    () => ({
+      Groceries: totals['Groceries'] ?? 350,
+      Rent: totals['Rent'] ?? 1400,
+      Transport: totals['Transport'] ?? 120,
+    }),
+    [totals]
+  );
+
+  useEffect(() => {
+    const targets = personalization?.curiousCities?.length
+      ? personalization.curiousCities
+      : rankedBySavings.slice(0, 3).map((entry) => entry.country ?? entry.city);
+
+    if (!targets || targets.length === 0) return;
+
+    const normalisedTargets = Array.from(new Set(targets))
+      .map((name) => {
+        const match = rankedBySavings.find((entry) => {
+          const lower = name.toLowerCase();
+          const normalized = entry.normalizedName?.toLowerCase?.();
+          return (
+            entry.city?.toLowerCase() === lower ||
+            entry.country?.toLowerCase() === lower ||
+            normalized === lower
+          );
+        });
+        return match?.country ?? match?.city ?? name;
+      })
+      .filter(Boolean)
+      .slice(0, 3);
+
+    async function loadInsights() {
+      const numberFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+      const firstCity = normalisedTargets[0];
+      if (!firstCity) return;
+
+      const adjustedCategories = await Promise.all(
+        Object.entries(atlantaSpends).map(async ([category, amount]) => {
+          const adjustedAmount = await adjustPrice(amount, baselineCountry, firstCity);
+          const delta = typeof adjustedAmount === 'number' && amount > 0 ? ((amount - adjustedAmount) / amount) * 100 : 0;
+          let recommendation = '';
+          if (delta > 0) {
+            recommendation = category === 'Groceries'
+              ? 'Stock up on local markets — your food budget goes further here.'
+              : category === 'Rent'
+                ? 'Consider upgrading your stay or banking the rent savings.'
+                : 'Redirect the savings into weekend adventures.';
+          } else if (delta < 0) {
+            recommendation = category === 'Groceries'
+              ? 'Cook at home a few nights to offset pricier groceries.'
+              : category === 'Rent'
+                ? 'Choose a co-living or suburban neighbourhood to balance the rent jump.'
+                : 'Lean on biking or public transit passes to stay on budget.';
+          }
+
+          return {
+            title: category,
+            description: `${baselineCountry} ${numberFormatter.format(amount)} vs. ${firstCity} ${numberFormatter.format(
+              adjustedAmount ?? amount
+            )}`,
+            delta: parseFloat(delta.toFixed(1)),
+            recommendation,
+          };
+        })
+      );
+
+      setCategories(adjustedCategories);
+
+      const chartRows = await Promise.all(
+        normalisedTargets.map(async (cityName) => {
+          const rent = await adjustPrice(atlantaSpends.Rent, baselineCountry, cityName);
+          const groceries = await adjustPrice(atlantaSpends.Groceries, baselineCountry, cityName);
+          const transport = await adjustPrice(atlantaSpends.Transport, baselineCountry, cityName);
+          const total = [rent, groceries, transport].reduce(
+            (sum, value) => sum + (Number.isFinite(value) ? value : 0),
+            0
+          );
+          return {
+            city: cityName,
+            Rent: total > 0 ? (rent ?? 0) / total : 0,
+            Groceries: total > 0 ? (groceries ?? 0) / total : 0,
+            Transport: total > 0 ? (transport ?? 0) / total : 0,
+          };
+        })
+      );
+
+      setChartData(chartRows);
+
+      const [headlineCategory, comparisonCategory] = adjustedCategories;
+      if (headlineCategory && comparisonCategory) {
+        const headline = headlineCategory.delta < 0
+          ? `You’d spend ${Math.abs(headlineCategory.delta).toFixed(0)}% more on ${headlineCategory.title.toLowerCase()} in ${firstCity}.`
+          : `You’d save ${headlineCategory.delta.toFixed(0)}% on ${headlineCategory.title.toLowerCase()} in ${firstCity}.`;
+        const contrast = comparisonCategory.delta < 0
+          ? `Meanwhile, ${comparisonCategory.title.toLowerCase()} runs ${Math.abs(comparisonCategory.delta).toFixed(0)}% hotter.`
+          : `${comparisonCategory.title} drops ${comparisonCategory.delta.toFixed(0)}%.`;
+        setSummary(`${headline} ${contrast}`);
+      } else {
+        setSummary(null);
+      }
     }
-  };
+
+    loadInsights();
+  }, [adjustPrice, atlantaSpends, baselineCountry, personalization?.curiousCities, rankedBySavings]);
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-12">
@@ -207,27 +138,24 @@ export function Insights() {
           <p className="text-sm text-charcoal/70">
             Compare your spending with PPP adjustments. You can search up to <strong>5 cities</strong>.
           </p>
+          {summary && <p className="mt-2 text-sm font-semibold text-teal">{summary}</p>}
           <p className="mt-1 text-xs text-charcoal/60">Smart-Spend = see exactly where your money goes globally.</p>
         </CardHeader>
         <CardContent>
-          {rows.map((id) => (
-            <CityComparisonRow
-              key={id}
-              id={id}
-              totals={totals}
-              adjustPrice={adjustPrice}
-              getPPPRatio={getPPPRatio}
-              calculateRunway={calculateRunway}
-            />
-          ))}
-          {rows.length < 5 && (
-            <button
-              onClick={addRow}
-              className="mt-4 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
-            >
-              ➕ Add another city
-            </button>
-          )}
+          <div className="grid gap-6 md:grid-cols-3">
+            {categories.map((category) => (
+              <CategoryTile key={category.title} {...category} />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="bg-white/90">
+        <CardHeader>
+          <CardTitle>PPP comparison</CardTitle>
+          <p className="text-sm text-charcoal/70">Your $100 baseline redistributes across rent, groceries, and transport in each city.</p>
+        </CardHeader>
+        <CardContent>
+          <ComparisonChart data={chartData} />
         </CardContent>
       </Card>
     </div>

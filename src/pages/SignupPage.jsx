@@ -17,7 +17,8 @@ export function SignupPage() {
   const [message, setMessage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+  const redirectParam = searchParams.get("redirectTo");
+  const nextDestination = redirectParam && redirectParam !== "/personalize" ? redirectParam : "/dashboard";
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -72,7 +73,8 @@ export function SignupPage() {
     }
 
     if (data.session) {
-      navigate(redirectTo, { replace: true });
+      const next = encodeURIComponent(nextDestination);
+      navigate(`/personalize?next=${next}`, { replace: true });
       return;
     }
 
@@ -170,7 +172,7 @@ export function SignupPage() {
           </form>
           <p className="mt-6 text-center text-sm text-charcoal/70">
             Already have an account?{" "}
-            <Link to={`/login?redirectTo=${encodeURIComponent(redirectTo)}`} className="font-semibold text-red hover:underline">
+            <Link to={`/login?redirectTo=${encodeURIComponent(nextDestination)}`} className="font-semibold text-red hover:underline">
               Log in
             </Link>
           </p>

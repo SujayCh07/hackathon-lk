@@ -81,9 +81,10 @@ export function usePersonalization(userId) {
         return persisted;
       } catch (cause) {
         console.error('Failed to complete onboarding', cause);
-        setError(cause instanceof Error ? cause : new Error('Unable to complete onboarding'));
+        const failure = cause instanceof Error ? cause : new Error('Unable to complete onboarding');
+        setError(failure);
         setData(next);
-        return next;
+        throw failure;
       }
     },
     [data, userId]

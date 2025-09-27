@@ -1,4 +1,5 @@
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo } from 'react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
 import WorldMap from '../components/score/WorldMap.jsx';
 import CityCard from '../components/score/CityCard.jsx';
@@ -11,7 +12,21 @@ import { usePPP } from '../hooks/usePPP.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import usePersonalization from '../hooks/usePersonalization.js';
-import OnboardingModal from '../components/onboarding/OnboardingModal.jsx';
+
+const COUNTRY_COORDS = {
+  bahrain: [26.0667, 50.5577],
+  oman: [23.588, 58.3829],
+  kuwait: [29.3759, 47.9774],
+  portugal: [38.7223, -9.1393],
+  mexico: [19.4326, -99.1332],
+  thailand: [13.7563, 100.5018],
+  france: [48.8566, 2.3522],
+  'united states': [38.9072, -77.0369],
+  'united arab emirates': [25.2048, 55.2708],
+  qatar: [25.2854, 51.5310],
+  india: [28.6139, 77.209],
+  canada: [45.4215, -75.6972],
+};
 
 // --- Helpers ---
 function formatUSD(n) {
@@ -77,24 +92,11 @@ function buildNotifications({ bestCity, runnerUp, weeklyChange, budgetDelta }) {
   return notes;
 }
 
-// --- API: fetch country coordinates ---
-async function getCountryCoords(countryName) {
-  const resp = await fetch(
-    `https://nominatim.openstreetmap.org/search?country=${encodeURIComponent(countryName)}&format=json&limit=1`
-  );
-  const data = await resp.json();
-  if (data.length > 0) {
-    return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-  }
-  return null;
-}
-
 // --- Main Component ---
 export function Dashboard() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const { profile } = useUserProfile(userId);
-
   const identityFallback = useMemo(() => {
     if (!user) return '';
     const md = user.user_metadata ?? {};
@@ -105,7 +107,7 @@ export function Dashboard() {
 
   const displayName = profile?.name ?? identityFallback;
 
-  const { data: personalization, loading: personalizationLoading, completeOnboarding } = usePersonalization(userId);
+  const { data: personalization } = usePersonalization(userId);
 
   const { balanceUSD = 0 } = useAccount();
   const baseMonthlyBudget = useMemo(() => {
@@ -143,10 +145,10 @@ export function Dashboard() {
         focus === 'Rent'
           ? 'Best rent-to-income ratio'
           : focus === 'Food'
-          ? 'Strong dining affordability'
-          : focus === 'Leisure'
-          ? 'Leisure spending goes further here'
-          : 'Balanced across categories',
+            ? 'Strong dining affordability'
+            : focus === 'Leisure'
+              ? 'Leisure spending goes further here'
+              : 'Balanced across categories',
       runwayMonths:
         Number.isFinite(city.monthlyCost) && city.monthlyCost > 0
           ? (baseMonthlyBudget ?? 0) / city.monthlyCost
@@ -154,29 +156,11 @@ export function Dashboard() {
     }));
   }, [rankedBySavings, personalization?.budgetFocus, baseMonthlyBudget]);
 
-  // fetch dynamic coords
-  const [coordsCache, setCoordsCache] = useState({});
-  useEffect(() => {
-    const fetchCoords = async () => {
-      const updates = {};
-      for (const city of topDestinations) {
-        const key = (city.country ?? city.city)?.toLowerCase();
-        if (!key || coordsCache[key]) continue;
-        const coords = await getCountryCoords(city.country || city.city);
-        if (coords) updates[key] = coords;
-      }
-      if (Object.keys(updates).length > 0) {
-        setCoordsCache((prev) => ({ ...prev, ...updates }));
-      }
-    };
-    fetchCoords();
-  }, [topDestinations]);
-
   const pppMarkers = useMemo(() => {
     return topDestinations
       .map((city) => {
-        const key = (city.country ?? city.city)?.toLowerCase();
-        const coords = coordsCache[key];
+        const coords =
+          COUNTRY_COORDS[city.country?.toLowerCase?.() ?? ''] ?? COUNTRY_COORDS[city.city?.toLowerCase?.() ?? ''];
         if (!coords) return null;
         return {
           city: city.city,
@@ -187,7 +171,7 @@ export function Dashboard() {
       })
       .filter(Boolean)
       .slice(0, 5);
-  }, [topDestinations, coordsCache]);
+  }, [topDestinations]);
 
   const pppTop = topDestinations.slice(0, 3);
 
@@ -207,23 +191,9 @@ export function Dashboard() {
     ? `Here’s how $${Number(baseMonthlyBudget).toLocaleString()}/month stretches across the globe.`
     : 'Let’s see how your money travels.';
 
-  const showOnboarding = !personalizationLoading && !personalization?.onboardingComplete;
-  const handleOnboardingComplete = async (payload) => {
-    await completeOnboarding(payload);
-  };
-
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-      <OnboardingModal
-        isOpen={showOnboarding}
-        defaultValues={personalization}
-        onComplete={handleOnboardingComplete}
-        onSkip={() => completeOnboarding({ ...personalization, onboardingComplete: true })}
-        displayName={displayName}
-      />
-
-      {/* Hero cards */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+    <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-12">
+      <div className="grid gap-6 md:grid-cols-3">
         <Card className="col-span-1 bg-white/90">
           <CardHeader>
             <CardTitle>{heroLabel}</CardTitle>
@@ -233,7 +203,7 @@ export function Dashboard() {
             <p className="text-3xl font-poppins font-semibold text-teal">{formatUSD(balanceUSD)}</p>
             <p className="mt-2 text-sm text-charcoal/70">{heroSubtitle}</p>
             <p className="mt-3 text-xs text-charcoal/50">
-              Dashboard = balances, travel power, and PPP-led opportunities.
+              Dashboard = at a glance: balances, travel power, and PPP-led opportunities.
             </p>
           </CardContent>
         </Card>
@@ -247,14 +217,11 @@ export function Dashboard() {
             <ul className="space-y-3">
               {recent.length === 0 && (
                 <li className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-center text-sm text-charcoal/60">
-                  We’ll populate this once your transactions sync.
+                  We’ll populate this the moment your Nessie transactions sync.
                 </li>
               )}
               {recent.map((txn) => (
-                <li
-                  key={txn.id}
-                  className="flex flex-col justify-between rounded-2xl bg-offwhite/80 px-4 py-3 sm:flex-row sm:items-center"
-                >
+                <li key={txn.id} className="flex items-center justify-between rounded-2xl bg-offwhite/80 px-4 py-3">
                   <div>
                     <p className="font-semibold text-charcoal">{txn.merchant ?? 'Unknown merchant'}</p>
                     <p className="text-xs text-charcoal/60">
@@ -280,7 +247,7 @@ export function Dashboard() {
             <p className="text-sm text-charcoal/70">
               {weeklyChange != null
                 ? `Your spending is ${weeklyChange > 0 ? 'up' : 'down'} ${Math.abs(weeklyChange).toFixed(1)}% from last week.`
-                : 'We’ll track spend trends once we have two weeks of data.'}
+                : 'We’ll track spend trends once a second week of data lands.'}
             </p>
           </CardHeader>
           <CardContent>
@@ -291,13 +258,12 @@ export function Dashboard() {
         <NotificationsWidget items={notifications} />
       </div>
 
-      {/* Map + Top destinations */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card className="bg-white/90">
           <CardHeader>
             <CardTitle>PPP score heatmap</CardTitle>
             <p className="text-sm text-charcoal/70">
-              Hover the globe to see how your purchasing power compares.
+              Hover the globe to see how your purchasing power compares city by city.
             </p>
           </CardHeader>
           <CardContent>
@@ -305,27 +271,20 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid gap-4">
           <SavingsRunwayPanel destinations={topDestinations} stayLengthMonths={6} />
           <Card className="bg-white/90">
             <CardHeader>
               <CardTitle>Top PPP picks</CardTitle>
-              <p className="text-sm text-charcoal/70">
-                GeoBudget = personalized travel & budget forecasting.
-              </p>
+              <p className="text-sm text-charcoal/70">GeoBudget = plan travels with personalised budget forecasting.</p>
             </CardHeader>
             <CardContent className="grid gap-3">
               {pppTop.map((dest) => (
-                <CityCard
-                  key={dest.city}
-                  city={dest.city}
-                  ppp={dest.ppp}
-                  savingsPct={dest.savings ?? dest.savingsPct}
-                />
+                <CityCard key={dest.city} city={dest.city} ppp={dest.ppp} savingsPct={dest.savings ?? dest.savingsPct} />
               ))}
               {pppTop.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-sm text-charcoal/60">
-                  We’re fetching PPP insights — check back shortly.
+                  We’re fetching PPP insights — check back in a beat.
                 </div>
               )}
             </CardContent>
