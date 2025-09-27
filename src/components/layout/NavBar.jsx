@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import Button from '../ui/Button.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
 import { UserCircleIcon } from '@heroicons/react/24/outline'; // account icon
+import UserAccountMenu from '../../../components/user-account-menu.js';
 
 const authenticatedLinks = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -76,7 +77,7 @@ export function NavBar() {
           {user ? (
             <>
               <NavLink
-                to="../../../components/user-account-menu"
+                to="UserAccountMenu"
                 className="flex items-center gap-2 text-sm font-semibold text-navy/70 hover:text-navy"
               >
                 <UserCircleIcon className="h-5 w-5 text-navy/70" />
