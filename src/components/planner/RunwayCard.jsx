@@ -28,6 +28,8 @@ export function RunwayCard({
   breakdown = {},
   isHighlighted = false,
   badgeLabel = null,
+  interests = [],
+  continent = null,
 }) {
   const percent = Math.min(100, (Number(runway) / stayDurationMonths) * 100);
   const stayCost = Number(monthlyCost) * stayDurationMonths;
@@ -53,6 +55,21 @@ export function RunwayCard({
         <span className="rounded-full bg-turquoise/20 px-3 py-1 text-xs font-semibold text-teal">
           {formatRunway(runway)}
         </span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {continent && (
+          <span className="rounded-full bg-turquoise/15 px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-teal">
+            {continent}
+          </span>
+        )}
+        {interests.slice(0, 3).map((interest) => (
+          <span
+            key={interest}
+            className="rounded-full bg-navy/10 px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-navy/80"
+          >
+            {interest}
+          </span>
+        ))}
       </div>
       <p className="mt-3 text-sm text-charcoal/70">
         {formatCurrency(monthlyCost, currency)} /mo · {formatCurrency(stayCost, currency)} for {stayDurationMonths} month

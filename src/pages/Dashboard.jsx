@@ -5,6 +5,7 @@ import CityCard from '../components/score/CityCard.jsx';
 import SpendingTrendChart from '../components/dashboard/SpendingTrendChart.jsx';
 import SavingsRunwayPanel from '../components/dashboard/SavingsRunwayPanel.jsx';
 import NotificationsWidget from '../components/dashboard/NotificationsWidget.jsx';
+import Progress from '../components/ui/Progress.jsx';
 import { useAccount } from '../hooks/useAccount.js';
 import { useTransactions } from '../hooks/useTransactions.js';
 import { usePPP } from '../hooks/usePPP.js';
@@ -12,6 +13,7 @@ import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import usePersonalization from '../hooks/usePersonalization.js';
 import OnboardingModal from '../components/onboarding/OnboardingModal.jsx';
+import { fetchRecentNudges, saveNudges, normaliseNudge } from '../lib/nudges.js';
 
 // --- Helpers ---
 function formatUSD(n) {
@@ -49,29 +51,120 @@ function groupTransactionsByWeek(transactions) {
   return Array.from(weekMap.values()).sort((a, b) => a.date - b.date);
 }
 
-function buildNotifications({ bestCity, runnerUp, weeklyChange, budgetDelta }) {
+const CATEGORY_COLORS = {
+  Groceries: 'bg-emerald-100 text-emerald-700',
+  Rent: 'bg-orange-100 text-orange-700',
+  Transport: 'bg-sky-100 text-sky-700',
+  Dining: 'bg-rose-100 text-rose-700',
+  Entertainment: 'bg-purple-100 text-purple-700',
+  Travel: 'bg-indigo-100 text-indigo-700',
+  Utilities: 'bg-amber-100 text-amber-700',
+  Healthcare: 'bg-lime-100 text-lime-700',
+  Fitness: 'bg-blue-100 text-blue-700',
+  General: 'bg-slate-100 text-slate-700',
+};
+
+function categoryBadgeClass(category) {
+  return CATEGORY_COLORS[category] ?? CATEGORY_COLORS.General;
+}
+
+function buildNotifications({
+  topDestinations = [],
+  weeklyChange,
+  budgetDelta,
+  personalization,
+  balanceUSD,
+  budgetGoal,
+}) {
   const notes = [];
 
+  const [bestCity, runnerUp] = topDestinations;
   if (bestCity && runnerUp) {
     const monthlyDiff = Math.max(0, Number(runnerUp.monthlyCost ?? 0) - Number(bestCity.monthlyCost ?? 0));
     if (monthlyDiff > 0) {
-      notes.push(
-        `Choosing ${bestCity.city} over ${runnerUp.city} saves about $${Math.round(monthlyDiff).toLocaleString()} each month.`
-      );
+      notes.push({
+        message: `Choosing ${bestCity.city} over ${runnerUp.city} frees up ${formatUSD(monthlyDiff)} each month.`,
+        subtitle: 'Reallocate that surplus to flights or remote-work upgrades.',
+        tone: 'positive',
+        category: 'GeoBudget',
+        icon: 'sparkles',
+        actionLabel: 'Compare in GeoBudget',
+        actionHref: '/planner',
+        impact: monthlyDiff,
+      });
     }
   }
 
   if (Number.isFinite(weeklyChange)) {
-    const label = weeklyChange > 0 ? 'up' : 'down';
-    notes.push(`Your weekly spending is ${label} ${Math.abs(Math.round(weeklyChange))}% vs. last week.`);
+    notes.push({
+      message: `Your weekly spend is ${weeklyChange > 0 ? 'up' : 'down'} ${Math.abs(Math.round(weeklyChange))}% versus last week.`,
+      subtitle: weeklyChange > 0
+        ? 'Nudge: rein in variable categories like dining and rideshares.'
+        : 'Momentum check: keep routing that surplus to travel goals.',
+      tone: weeklyChange > 0 ? 'caution' : 'positive',
+      category: 'Spending trend',
+      icon: weeklyChange > 0 ? 'trending-up' : 'trending-down',
+      actionLabel: 'Open Insights',
+      actionHref: '/insights',
+      impact: weeklyChange,
+    });
   }
 
   if (Number.isFinite(budgetDelta)) {
     if (budgetDelta > 0) {
-      notes.push(`You’re pacing $${Math.round(budgetDelta).toLocaleString()} under budget — bank the surplus for travel.`);
+      notes.push({
+        message: `You’re pacing ${formatUSD(budgetDelta)} under budget this month.`,
+        subtitle: 'Lock it in with an automatic transfer to your travel fund.',
+        tone: 'positive',
+        category: 'Budget',
+        icon: 'piggy-bank',
+        actionLabel: 'Adjust savings plan',
+        actionHref: '/settings',
+        impact: budgetDelta,
+      });
     } else if (budgetDelta < 0) {
-      notes.push(`You’re trending $${Math.abs(Math.round(budgetDelta)).toLocaleString()} over budget — adjust for your next trip.`);
+      notes.push({
+        message: `Projected overspend: ${formatUSD(Math.abs(budgetDelta))} above your goal.`,
+        subtitle: 'Trim discretionary categories or shorten the next stay length.',
+        tone: 'warning',
+        category: 'Budget',
+        icon: 'warning',
+        actionLabel: 'Review transactions',
+        actionHref: '/dashboard',
+        impact: budgetDelta,
+      });
     }
+  }
+
+  if (personalization?.travelInterests?.length && bestCity?.interests?.length) {
+    const alignedInterest = bestCity.interests.find((interest) =>
+      personalization.travelInterests.some((pref) => pref.toLowerCase() === interest.toLowerCase())
+    );
+    if (alignedInterest) {
+      notes.push({
+        message: `${bestCity.city} hits your “${alignedInterest}” interest with ${bestCity.savings?.toFixed?.(0) ?? 0}% better PPP.`,
+        subtitle: 'Mark it as a favourite to surface more picks like this.',
+        tone: 'info',
+        category: 'Personalisation',
+        icon: 'star',
+        actionLabel: 'Save to wishlist',
+        actionHref: '/planner',
+      });
+    }
+  }
+
+  if (Number.isFinite(balanceUSD) && Number.isFinite(budgetGoal) && budgetGoal > 0) {
+    const coverage = balanceUSD / budgetGoal;
+    notes.push({
+      message: `Your current balance covers roughly ${coverage.toFixed(1)} months of your target lifestyle.`,
+      subtitle: 'Keep topping up to extend your runway before your next move.',
+      tone: 'info',
+      category: 'Runway',
+      icon: 'globe',
+      actionLabel: 'Plan next stay',
+      actionHref: '/planner',
+      impact: coverage,
+    });
   }
 
   return notes;
@@ -109,10 +202,23 @@ export function Dashboard() {
 
   const { balanceUSD = 0 } = useAccount();
   const baseMonthlyBudget = useMemo(() => {
-    if (personalization?.monthlyBudget) return personalization.monthlyBudget;
-    if (profile?.monthlyBudget) return profile.monthlyBudget;
+    const personalGoal = personalization?.monthlyBudgetGoal ?? personalization?.monthlyBudget;
+    if (typeof personalGoal === 'number' && Number.isFinite(personalGoal)) {
+      return personalGoal;
+    }
+    const profileGoal = profile?.monthlyBudgetGoal ?? profile?.monthlyBudget;
+    if (typeof profileGoal === 'number' && Number.isFinite(profileGoal)) {
+      return profileGoal;
+    }
     return 2500;
-  }, [personalization?.monthlyBudget, profile?.monthlyBudget]);
+  }, [
+    personalization?.monthlyBudgetGoal,
+    personalization?.monthlyBudget,
+    profile?.monthlyBudgetGoal,
+    profile?.monthlyBudget,
+  ]);
+
+  const [persistedNudges, setPersistedNudges] = useState([]);
 
   const { transactions, recent, spendingMetrics } = useTransactions({
     limit: 6,
@@ -133,26 +239,88 @@ export function Dashboard() {
 
   const { rankedBySavings } = usePPP();
 
+  useEffect(() => {
+    if (!userId) {
+      setPersistedNudges([]);
+      return;
+    }
+
+    let active = true;
+    fetchRecentNudges(userId)
+      .then((rows) => {
+        if (!active) return;
+        const normalised = rows.map(normaliseNudge).filter(Boolean);
+        setPersistedNudges(normalised);
+      })
+      .catch((cause) => {
+        console.warn('Unable to load stored nudges', cause);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
   const topDestinations = useMemo(() => {
     if (!Array.isArray(rankedBySavings)) return [];
+
+    const interestSet = new Set((personalization?.travelInterests ?? []).map((item) => item.toLowerCase()));
+    const continentSet = new Set((personalization?.preferredContinents ?? []).map((item) => item.toLowerCase()));
+    const categorySet = new Set((personalization?.favoriteCategories ?? []).map((item) => item.toLowerCase()));
     const focus = personalization?.budgetFocus ?? 'Balanced';
-    return rankedBySavings.slice(0, 6).map((city) => ({
-      ...city,
-      city: toTitleCase(city.city ?? ''),
-      context:
-        focus === 'Rent'
-          ? 'Best rent-to-income ratio'
-          : focus === 'Food'
-          ? 'Strong dining affordability'
-          : focus === 'Leisure'
-          ? 'Leisure spending goes further here'
-          : 'Balanced across categories',
-      runwayMonths:
-        Number.isFinite(city.monthlyCost) && city.monthlyCost > 0
-          ? (baseMonthlyBudget ?? 0) / city.monthlyCost
-          : null,
-    }));
-  }, [rankedBySavings, personalization?.budgetFocus, baseMonthlyBudget]);
+
+    const filtered = rankedBySavings.filter((city) => {
+      const matchesInterest =
+        interestSet.size === 0 ||
+        (Array.isArray(city.interests) && city.interests.some((interest) => interestSet.has(interest.toLowerCase())));
+      const matchesContinent =
+        continentSet.size === 0 ||
+        (typeof city.continent === 'string' && continentSet.has(city.continent.toLowerCase()));
+      const matchesCategory =
+        categorySet.size === 0 ||
+        (Array.isArray(city.categoryTags) && city.categoryTags.some((category) => categorySet.has(category.toLowerCase())));
+      return matchesInterest && matchesContinent && matchesCategory;
+    });
+
+    const source = filtered.length > 0 ? filtered : rankedBySavings;
+
+    return source.slice(0, 6).map((city) => {
+      const runwayMonths =
+        Number.isFinite(city.monthlyCost) && city.monthlyCost > 0 && Number.isFinite(baseMonthlyBudget)
+          ? baseMonthlyBudget / city.monthlyCost
+          : null;
+
+      const interestContext = Array.isArray(city.interests)
+        ? city.interests.find((interest) => interestSet.has(interest.toLowerCase()))
+        : null;
+
+      let context = 'Balanced cost profile';
+      if (interestContext) {
+        context = `Made for ${interestContext.toLowerCase()}`;
+      } else if (focus === 'Rent') {
+        context = 'Rent advantage vs. your city';
+      } else if (focus === 'Food') {
+        context = 'Food scene stretches further';
+      } else if (focus === 'Leisure') {
+        context = 'Leisure budget goes further';
+      }
+
+      return {
+        ...city,
+        city: toTitleCase(city.city ?? ''),
+        continent: city.continent ? toTitleCase(city.continent) : null,
+        context,
+        runwayMonths,
+      };
+    });
+  }, [
+    rankedBySavings,
+    personalization?.travelInterests,
+    personalization?.preferredContinents,
+    personalization?.favoriteCategories,
+    personalization?.budgetFocus,
+    baseMonthlyBudget,
+  ]);
 
   // fetch dynamic coords
   const [coordsCache, setCoordsCache] = useState({});
@@ -191,20 +359,77 @@ export function Dashboard() {
 
   const pppTop = topDestinations.slice(0, 3);
 
-  const notifications = useMemo(
+  const budgetStatus = useMemo(() => {
+    if (!Number.isFinite(baseMonthlyBudget) || baseMonthlyBudget <= 0) return null;
+    const delta = balanceUSD - baseMonthlyBudget;
+    const ratio = (balanceUSD / baseMonthlyBudget) * 100;
+    if (!Number.isFinite(ratio)) return null;
+    if (delta >= 0) {
+      return {
+        tone: 'positive',
+        ratio,
+        message: `Ahead by ${formatUSD(delta)} versus your ${formatUSD(baseMonthlyBudget)} goal.`,
+      };
+    }
+    return {
+      tone: 'warning',
+      ratio,
+      message: `Short ${formatUSD(Math.abs(delta))} of your ${formatUSD(baseMonthlyBudget)} target.`,
+    };
+  }, [baseMonthlyBudget, balanceUSD]);
+
+  const balanceProgress = useMemo(() => {
+    if (!Number.isFinite(baseMonthlyBudget) || baseMonthlyBudget <= 0) return 0;
+    const pct = (balanceUSD / baseMonthlyBudget) * 100;
+    return Math.max(0, Math.min(200, pct));
+  }, [balanceUSD, baseMonthlyBudget]);
+
+  const nudgeCards = useMemo(
     () =>
       buildNotifications({
-        bestCity: topDestinations[0],
-        runnerUp: topDestinations[1],
+        topDestinations,
         weeklyChange,
         budgetDelta: spendingMetrics?.budgetDelta ?? null,
+        personalization,
+        balanceUSD,
+        budgetGoal: baseMonthlyBudget,
       }),
-    [spendingMetrics?.budgetDelta, topDestinations, weeklyChange]
+    [
+      topDestinations,
+      weeklyChange,
+      spendingMetrics?.budgetDelta,
+      personalization,
+      balanceUSD,
+      baseMonthlyBudget,
+    ]
   );
+
+  useEffect(() => {
+    if (!userId || nudgeCards.length === 0) return;
+    let cancelled = false;
+
+    saveNudges(userId, nudgeCards)
+      .then((rows) => {
+        if (cancelled || !rows) return;
+        const normalised = rows.map(normaliseNudge).filter(Boolean);
+        if (normalised.length > 0) {
+          setPersistedNudges(normalised);
+        }
+      })
+      .catch((cause) => {
+        console.warn('Unable to persist nudges', cause);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, nudgeCards]);
+
+  const displayedNudges = persistedNudges.length > 0 ? persistedNudges : nudgeCards;
 
   const heroLabel = displayName ? `${displayName.split(' ')[0]}'s budget` : 'Your budget';
   const heroSubtitle = baseMonthlyBudget
-    ? `Here’s how $${Number(baseMonthlyBudget).toLocaleString()}/month stretches across the globe.`
+    ? `Goal: ${formatUSD(baseMonthlyBudget)} each month · Balance synced from Nessie.`
     : 'Let’s see how your money travels.';
 
   const showOnboarding = !personalizationLoading && !personalization?.onboardingComplete;
@@ -232,9 +457,24 @@ export function Dashboard() {
           <CardContent>
             <p className="text-3xl font-poppins font-semibold text-teal">{formatUSD(balanceUSD)}</p>
             <p className="mt-2 text-sm text-charcoal/70">{heroSubtitle}</p>
-            <p className="mt-3 text-xs text-charcoal/50">
-              Dashboard = balances, travel power, and PPP-led opportunities.
-            </p>
+            {Number.isFinite(balanceProgress) && (
+              <div className="mt-4 space-y-2">
+                <Progress
+                  value={balanceProgress}
+                  color={budgetStatus?.tone === 'warning' ? 'bg-coral' : 'bg-teal'}
+                />
+                {budgetStatus && (
+                  <p
+                    className={`text-xs ${
+                      budgetStatus.tone === 'warning' ? 'text-coral' : 'text-teal'
+                    }`}
+                  >
+                    {budgetStatus.message}
+                  </p>
+                )}
+              </div>
+            )}
+            <p className="mt-3 text-xs text-charcoal/50">Parity maps your runway, nudges, and PPP opportunities.</p>
           </CardContent>
         </Card>
 
@@ -253,17 +493,44 @@ export function Dashboard() {
               {recent.map((txn) => (
                 <li
                   key={txn.id}
-                  className="flex flex-col justify-between rounded-2xl bg-offwhite/80 px-4 py-3 sm:flex-row sm:items-center"
+                  className="rounded-2xl bg-offwhite/90 px-4 py-4 shadow-sm"
                 >
-                  <div>
-                    <p className="font-semibold text-charcoal">{txn.merchant ?? 'Unknown merchant'}</p>
-                    <p className="text-xs text-charcoal/60">
-                      {new Date(txn.timestamp ?? txn.date ?? Date.now()).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="mt-2 text-right sm:mt-0">
-                    <p className="font-semibold text-coral">{formatUSD(txn.amount)}</p>
-                    <p className="text-xs text-charcoal/60">{txn.category ?? 'General'}</p>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-charcoal">{txn.merchant ?? 'Unknown merchant'}</p>
+                        {txn.origin === 'nessie' && (
+                          <span className="rounded-full bg-teal/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-teal">
+                            Synced
+                          </span>
+                        )}
+                      </div>
+                      {txn.description && (
+                        <p className="mt-1 text-xs text-charcoal/60">{txn.description}</p>
+                      )}
+                      <p className="mt-1 text-xs text-charcoal/50">
+                        {new Date(txn.timestamp ?? txn.date ?? Date.now()).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <p className="font-semibold text-coral">
+                        {`${txn.amount >= 0 ? '' : '-'}${formatUSD(Math.abs(txn.amount))}`}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`rounded-full px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-wide ${categoryBadgeClass(
+                            txn.category ?? 'General'
+                          )}`}
+                        >
+                          {txn.category ?? 'General'}
+                        </span>
+                        {Number.isFinite(txn.categoryConfidence) && (
+                          <span className="text-[0.65rem] text-charcoal/60">
+                            {(txn.categoryConfidence * 100).toFixed(0)}% match
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </li>
               ))}
@@ -288,7 +555,7 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        <NotificationsWidget items={notifications} />
+        <NotificationsWidget items={displayedNudges} />
       </div>
 
       {/* Map + Top destinations */}

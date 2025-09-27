@@ -6,7 +6,11 @@ const EMPTY_PAYLOAD = {
   travelStyle: null,
   budgetFocus: null,
   monthlyBudget: null,
+  monthlyBudgetGoal: null,
   curiousCities: [],
+  travelInterests: [],
+  preferredContinents: [],
+  favoriteCategories: [],
   onboardingComplete: false,
 };
 
