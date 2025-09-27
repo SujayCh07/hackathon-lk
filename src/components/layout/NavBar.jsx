@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import Button from '../ui/Button.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
 
@@ -14,16 +14,26 @@ const linkClasses =
   'rounded-full px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red';
 
 export function NavBar() {
+  const navigate = useNavigate();
   const { user, signOut, isLoading } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const links = user ? authenticatedLinks : [];
-  const displayName = user?.user_metadata?.displayName?.trim();
-  const identityLabel = displayName || user?.email || 'Logged in';
+  const identityLabel = useMemo(() => {
+    const metadata = user?.user_metadata ?? {};
+    return (
+      metadata.displayName?.trim() ||
+      metadata.name?.trim() ||
+      [metadata.first_name, metadata.last_name].filter(Boolean).join(' ').trim() ||
+      user?.email ||
+      'Logged in'
+    );
+  }, [user]);
 
   async function handleSignOut() {
     try {
       setIsSigningOut(true);
       await signOut();
+      navigate('/', { replace: true });
     } finally {
       setIsSigningOut(false);
     }
@@ -59,10 +69,6 @@ export function NavBar() {
           ))}
         </div>
 
-        {/* CTA Button - always visible on desktop */}
-
-
-        {/* Auth Actions - Desktop */}
         <div className="hidden items-center gap-3 md:flex">
           {user ? (
             <>
@@ -116,15 +122,31 @@ export function NavBar() {
                   </NavLink>
                 </li>
               ))}
-
-              <li className="pt-2">
-                <Button
-                  as={NavLink}
-                  to="/dashboard"
-                  className="w-full text-sm"
-                >
-                  Enter App
-                </Button>
+              <li className="pt-3">
+                {user ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full text-sm"
+                    onClick={handleSignOut}
+                    disabled={isSigningOut || isLoading}
+                  >
+                    {isSigningOut ? 'Signing out…' : 'Sign out'}
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    <Button as={NavLink} to="/login" variant="secondary" className="w-full text-sm">
+                      Log in
+                    </Button>
+                    <Button
+                      as={NavLink}
+                      to="/signup"
+                      className="w-full border border-red/10 bg-gradient-to-r from-red to-navy text-sm font-semibold text-white shadow-sm transition hover:from-red/90 hover:to-navy/90"
+                    >
+                      Sign up
+                    </Button>
+                  </div>
+                )}
               </li>
 
               <li className="pt-3">

@@ -1,24 +1,14 @@
+"use client"
+
+import { useEffect, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { MapContainer } from "@/components/map-container"
 import { CreditCard, TrendingUp, MapPin, DollarSign } from "lucide-react"
-
-// Mock data for Nessie API
-const mockAccountData = {
-  balance: 4250.75,
-  accountNumber: "****1234",
-  accountType: "Checking",
-}
-
-const mockTransactions = [
-  { id: 1, merchant: "Whole Foods Market", category: "Groceries", amount: -89.32, date: "2024-01-15" },
-  { id: 2, merchant: "Shell Gas Station", category: "Transportation", amount: -45.2, date: "2024-01-14" },
-  { id: 3, merchant: "Netflix", category: "Entertainment", amount: -15.99, date: "2024-01-13" },
-  { id: 4, merchant: "Starbucks", category: "Food & Dining", amount: -6.75, date: "2024-01-12" },
-  { id: 5, merchant: "Amazon", category: "Shopping", amount: -127.84, date: "2024-01-11" },
-]
+import { useAuth } from "@/hooks/use-auth"
 
 const mockPPPData = {
   currentCity: "New York, NY",
@@ -31,112 +21,188 @@ const mockPPPData = {
 }
 
 export default function Dashboard() {
+  const { user, loading, nessie, syncingNessie } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace(`/login?redirectTo=${encodeURIComponent("/dashboard")}`)
+    }
+  }, [loading, user, router])
+
+  const primaryAccount = useMemo(() => (nessie.accounts.length > 0 ? nessie.accounts[0] : null), [nessie.accounts])
+
+  const transactions = useMemo(() => nessie.transactions.slice(0, 5), [nessie.transactions])
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
+          {loading ? "Checking your session…" : "Redirecting you to log in…"}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
 
-      <div className="container px-4 py-8 mx-auto max-w-screen-xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Your financial overview and PPP insights</p>
+      <div className="container mx-auto max-w-screen-xl px-4 py-8">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground">Your financial overview and PPP insights</p>
+          </div>
+          {primaryAccount?.currencyCode && (
+            <Badge variant="secondary">{primaryAccount.currencyCode}</Badge>
+          )}
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {/* Account Balance Card */}
-          <Card className="lg:col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Account Balance</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${mockAccountData.balance.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">
-                {mockAccountData.accountType} {mockAccountData.accountNumber}
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* PPP Score Card */}
-          <Card className="lg:col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">PPP Score</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{mockPPPData.pppScore}/100</div>
-              <p className="text-xs text-muted-foreground">{mockPPPData.currentCity}</p>
-              <Progress value={mockPPPData.pppScore} className="mt-2" />
-            </CardContent>
-          </Card>
-
-          {/* Current Location Card */}
-          <Card className="lg:col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Current Location</CardTitle>
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-lg font-semibold">{mockPPPData.currentCity}</div>
-              <p className="text-xs text-muted-foreground">Your purchasing power baseline</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-6 mt-6 lg:grid-cols-2">
-          {/* Recent Transactions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Transactions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {mockTransactions.map((transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-2 h-2 rounded-full bg-primary" />
-                      <div>
-                        <p className="text-sm font-medium">{transaction.merchant}</p>
-                        <p className="text-xs text-muted-foreground">{transaction.category}</p>
-                      </div>
+        <div className="grid gap-6 md:grid-cols-[1fr_380px]">
+          <div className="grid gap-6">
+            <Card className="border-0 bg-card/90 shadow-xl backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center justify-between">
+                  <span>Spending Overview</span>
+                  <Badge variant="secondary">PPP Adjusted</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="flex items-center gap-4 rounded-xl bg-muted/30 p-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                      <CreditCard className="h-6 w-6 text-primary" />
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium">${Math.abs(transaction.amount).toFixed(2)}</p>
-                      <p className="text-xs text-muted-foreground">{transaction.date}</p>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Account Balance</p>
+                      <p className="text-2xl font-semibold tracking-tight">
+                        $
+                        {(primaryAccount?.balance ?? 0).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {primaryAccount?.type ?? "Checking"} · {primaryAccount?.mask ?? "••••"}
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="flex items-center gap-4 rounded-xl bg-muted/30 p-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
+                      <TrendingUp className="h-6 w-6 text-emerald-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Monthly PPP Gain</p>
+                      <p className="text-2xl font-semibold tracking-tight">+$642.30</p>
+                      <p className="text-xs text-muted-foreground">vs. last month</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-6">
+                  <p className="mb-2 text-sm font-semibold text-muted-foreground">Budget Allocation</p>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span>Essentials</span>
+                        <span className="text-muted-foreground">$2,800 / $3,500</span>
+                      </div>
+                      <Progress value={80} className="h-2 rounded-full" />
+                    </div>
+                    <div>
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span>Experiences</span>
+                        <span className="text-muted-foreground">$1,200 / $1,600</span>
+                      </div>
+                      <Progress value={75} className="h-2 rounded-full" />
+                    </div>
+                    <div>
+                      <div className="mb-2 flex items-center justify-between text-sm">
+                        <span>Savings</span>
+                        <span className="text-muted-foreground">$800 / $1,200</span>
+                      </div>
+                      <Progress value={66} className="h-2 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* PPP Map Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle>PPP Score Map</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <MapContainer />
-            </CardContent>
-          </Card>
+            <Card className="border-0 bg-card/90 shadow-xl backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle>Recent Transactions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {transactions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {syncingNessie
+                      ? "Syncing your latest purchases…"
+                      : "No transactions found for this account yet."}
+                  </p>
+                ) : (
+                  transactions.map((transaction) => (
+                    <div
+                      key={transaction.id}
+                      className="flex items-center justify-between rounded-xl bg-muted/30 p-3"
+                    >
+                      <div>
+                        <p className="font-medium text-foreground">{transaction.merchant}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {transaction.category} • {new Date(transaction.date).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <span className="font-semibold text-destructive">
+                        ${transaction.amount.toFixed(2)}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-6">
+            <Card className="border-0 bg-card/90 shadow-xl backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center justify-between">
+                  <span>Current Location</span>
+                  <MapPin className="h-5 w-5 text-primary" />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-lg font-semibold">{mockPPPData.currentCity}</div>
+                <p className="text-sm text-muted-foreground">Your purchasing power baseline</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 bg-card/90 shadow-xl backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle>PPP Score Map</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MapContainer />
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
-        {/* City Comparison Cards */}
-        <div className="mt-6">
-          <h2 className="text-xl font-semibold mb-4">Top Cities for Your Money</h2>
+        <div className="mt-10">
+          <h2 className="mb-4 text-xl font-semibold">Top Cities for Your Money</h2>
           <div className="grid gap-4 md:grid-cols-3">
             {mockPPPData.topCities.map((city, index) => (
-              <Card key={city.name}>
+              <Card key={city.name} className="border-0 bg-card/90 shadow-xl backdrop-blur-sm">
                 <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2 flex items-center justify-between">
                     <Badge variant="secondary">#{index + 1}</Badge>
                     <div className="text-right">
-                      <span className="text-lg font-bold text-green-600">+{city.savings}%</span>
+                      <span className="text-lg font-bold text-emerald-500">+{city.savings}%</span>
                     </div>
                   </div>
-                  <h3 className="font-semibold text-sm mb-1">{city.name}</h3>
-                  <p className="text-xs text-muted-foreground mb-3">PPP Score: {city.pppScore}/100</p>
+                  <h3 className="mb-1 text-sm font-semibold">{city.name}</h3>
+                  <p className="mb-3 text-xs text-muted-foreground">PPP Score: {city.pppScore}/100</p>
                   <div className="flex items-center text-xs text-muted-foreground">
-                    <DollarSign className="h-3 w-3 mr-1" />
+                    <DollarSign className="mr-1 h-3 w-3" />
                     <span>Your money goes {city.savings}% further</span>
                   </div>
                 </CardContent>

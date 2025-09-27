@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ShareCard } from "@/components/share-card"
 import { Download, Share2, Copy, Twitter, Facebook, Linkedin } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/hooks/use-auth"
 
 // Mock data for share cards
 const shareTemplates = [
@@ -40,10 +42,29 @@ const mockUserData = {
 }
 
 export default function ShareCardGenerator() {
+  const { user, loading } = useAuth()
+  const router = useRouter()
   const [selectedTemplate, setSelectedTemplate] = useState("ppp-score")
   const [selectedCity, setSelectedCity] = useState("Bangkok, Thailand")
   const cardRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace(`/login?redirectTo=${encodeURIComponent("/share")}`)
+    }
+  }, [loading, user, router])
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
+          {loading ? "Checking your session…" : "Redirecting you to log in…"}
+        </div>
+      </div>
+    )
+  }
 
   const handleDownloadPNG = async () => {
     // Placeholder for PNG download functionality
