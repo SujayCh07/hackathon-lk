@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase.js";
 import { upsertUserProfileName, upsertUserRow } from "../lib/userIdentity.js";
+import { ensureNessieCustomer } from "../lib/nessie.js";  // 🔥 Added Nessie
 import Button from "../components/ui/Button.jsx";
 import Barcelona from "../assets/cities/barcelona.jpg"; // background image
 
@@ -39,12 +40,11 @@ export function SignupPage() {
       password,
       options: {
         data: {
-          full_name: displayName.trim(),   // Supabase expects full_name
-          displayName: displayName.trim()  // keep both for consistency
+          full_name: displayName.trim(),
+          displayName: displayName.trim(),
         },
       },
     });
-
 
     if (error) {
       setFormError(error.message);
@@ -54,6 +54,16 @@ export function SignupPage() {
 
     if (data.user) {
       await persistUserIdentity(data.user, displayName.trim());
+
+      // 🔥 Create Nessie customer and attach ID
+      try {
+        await ensureNessieCustomer(data.user);
+      } catch (err) {
+        console.error("Failed to set up Nessie profile:", err);
+        setFormError("We couldn’t set up your banking profile. Try again.");
+        setIsSubmitting(false);
+        return;
+      }
     }
 
     if (data.session) {
@@ -69,11 +79,8 @@ export function SignupPage() {
     <section className="grid h-screen grid-cols-1 md:grid-cols-2">
       {/* Left side background with overlay */}
       <div className="relative hidden md:block">
-        <img
-          src={Barcelona}
-          alt="City view"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+        <img src={Barcelona} alt="City view"
+          className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
         <div className="relative z-10 flex h-full flex-col justify-center px-12 text-white">
           <p className="mb-4 text-sm font-bold uppercase tracking-[0.25em] text-red-300">
@@ -90,23 +97,11 @@ export function SignupPage() {
 
       {/* Right side signup form */}
       <div className="relative flex h-full flex-col justify-center overflow-hidden bg-gradient-to-br from-white/95 via-sky/10 to-offwhite/90 px-8 sm:px-12 md:px-16 lg:px-24">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -right-12 -top-24 h-64 w-64 rounded-full bg-gradient-to-br from-red/30 via-red/10 to-transparent blur-3xl" />
-          <div className="absolute -left-28 bottom-[-18%] h-80 w-80 rounded-full bg-gradient-to-tr from-navy/25 via-sky/20 to-transparent blur-3xl" />
-          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-white/80 via-white/50 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white/70 via-white/40 to-transparent" />
-        </div>
         <div className="relative">
           <h2 className="text-2xl font-semibold text-navy">Sign Up</h2>
-          <p className="mt-2 text-sm text-charcoal/70">
-            Tell us who you are and we’ll handle your account integration automatically.
-          </p>
           <form onSubmit={handleSubmit} className="mt-8 space-y-6">
             <div>
-              <label
-                htmlFor="signup-display-name"
-                className="block text-sm font-semibold text-charcoal"
-              >
+              <label htmlFor="signup-display-name" className="block text-sm font-semibold text-charcoal">
                 Full name
               </label>
               <input
@@ -115,15 +110,12 @@ export function SignupPage() {
                 required
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal shadow-inner shadow-white/40 focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal"
                 placeholder="What is your full name?"
               />
             </div>
             <div>
-              <label
-                htmlFor="signup-email"
-                className="block text-sm font-semibold text-charcoal"
-              >
+              <label htmlFor="signup-email" className="block text-sm font-semibold text-charcoal">
                 Email
               </label>
               <input
@@ -133,33 +125,26 @@ export function SignupPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal shadow-inner shadow-white/40 focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal"
                 placeholder="you@example.com"
               />
             </div>
             <div>
-              <label
-                htmlFor="signup-password"
-                className="block text-sm font-semibold text-charcoal"
-              >
+              <label htmlFor="signup-password" className="block text-sm font-semibold text-charcoal">
                 Password
               </label>
               <input
                 id="signup-password"
                 type="password"
-                autoComplete="new-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal shadow-inner shadow-white/40 focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal"
                 placeholder="Create a secure password"
               />
             </div>
             <div>
-              <label
-                htmlFor="signup-confirm-password"
-                className="block text-sm font-semibold text-charcoal"
-              >
+              <label htmlFor="signup-confirm-password" className="block text-sm font-semibold text-charcoal">
                 Confirm password
               </label>
               <input
@@ -168,26 +153,19 @@ export function SignupPage() {
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal shadow-inner shadow-white/40 focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                className="mt-2 w-full rounded-2xl border border-navy/20 bg-white/70 px-4 py-3 text-sm text-charcoal"
                 placeholder="Re-enter your password"
               />
             </div>
             {formError && <p className="text-sm text-coral">{formError}</p>}
             {message && <p className="text-sm text-teal">{message}</p>}
-            <Button
-              type="submit"
-              className="w-full justify-center"
-              disabled={isSubmitting}
-            >
+            <Button type="submit" className="w-full justify-center" disabled={isSubmitting}>
               {isSubmitting ? "Creating account…" : "Create account"}
             </Button>
           </form>
           <p className="mt-6 text-center text-sm text-charcoal/70">
             Already have an account?{" "}
-            <Link
-              to={`/login?redirectTo=${encodeURIComponent(redirectTo)}`}
-              className="font-semibold text-red hover:underline"
-            >
+            <Link to={`/login?redirectTo=${encodeURIComponent(redirectTo)}`} className="font-semibold text-red hover:underline">
               Log in
             </Link>
           </p>
