@@ -6,6 +6,8 @@ import { useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/hooks/use-auth"
+import { UserAccountMenu } from "@/components/user-account-menu"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard" },
@@ -17,7 +19,7 @@ const navigation = [
 export function Navigation() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, signOut, loading } = useAuth()
+  const { user, signOut, loading, nessie, syncingNessie } = useAuth()
   const [signingOut, setSigningOut] = useState(false)
 
   const identityLabel = useMemo(() => {
@@ -85,14 +87,27 @@ export function Navigation() {
             <span className="font-bold text-foreground">PPP Pocket</span>
           </Link>
           <div className="flex items-center gap-2">
-            {user ? (
+            {loading ? (
+              <Skeleton className="h-10 w-32 rounded-full" />
+            ) : user ? (
               <>
-                <span className="hidden text-sm font-semibold text-foreground/80 sm:inline">{identityLabel}</span>
+                <UserAccountMenu
+                  user={user}
+                  identityLabel={identityLabel}
+                  onSignOut={handleSignOut}
+                  signingOut={signingOut || loading}
+                  nessieAccounts={Array.isArray(nessie?.accounts) ? nessie.accounts : []}
+                  nessieLoading={syncingNessie}
+                />
                 <Button
-                  variant="secondary"
-                  className="text-sm"
-                  onClick={handleSignOut}
-                  disabled={signingOut || loading}
+                  variant="outline"
+                  onClick={() => {
+                    if (!signingOut) {
+                      void handleSignOut()
+                    }
+                  }}
+                  disabled={signingOut}
+                  className="text-sm font-semibold"
                 >
                   {signingOut ? "Signing out…" : "Sign out"}
                 </Button>
