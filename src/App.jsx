@@ -11,13 +11,13 @@ import LoginPage from './pages/LoginPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import Settings from './pages/Settings.jsx';
 import { useAuth } from './hooks/useAuth.js';
-import { getPurchasingPowerRatio } from './Econ.js';
 
 function App() {
   const location = useLocation();
 
   return (
-    <div className="min-h-screen bg-offwhite text-charcoal">
+    <div className="relative min-h-screen text-charcoal">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.7),rgba(255,255,255,0))]" />
       <NavBar />
       <RouteTransitions key={location.pathname}>
         <Routes location={location}>

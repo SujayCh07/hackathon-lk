@@ -51,7 +51,8 @@ function mapProfile(row) {
     currentCity: normaliseCity(row.current_city),
     homeCity: normaliseCity(row.home_city),
     currentCountry: normaliseCountry(row.current_country),
-    homeCountry: normaliseCountry(row.home_country)
+    homeCountry: normaliseCountry(row.home_country),
+    streetAddress: row.street_address?.trim() || null
   };
 }
 
@@ -71,6 +72,7 @@ export function useUserProfile(userId) {
         `
         name,
         monthly_budget,
+        street_address,
         current_city:ppp_city!user_profile_current_city_code_fkey(code, name, flag, ppp),
         home_city:ppp_city!user_profile_home_city_code_fkey(code, name, flag, ppp),
         current_country:country_ref!user_profile_current_country_fkey(code, country),
