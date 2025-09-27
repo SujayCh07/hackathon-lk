@@ -114,7 +114,7 @@ export async function getPurchasingPowerRatio(originalCountry, finalCountry) {
 
     // The ratio calculation: higher PPP index means more expensive
     // So to maintain same purchasing power, you need more money in expensive countries
-    const ratio = final.ppp_index / original.ppp_index;
+    const ratio = original.ppp_index / final.ppp_index;
     
     console.log(`PPP ratio calculated: ${ratio.toFixed(4)} (${original.ppp_index} -> ${final.ppp_index})`);
     return ratio;
