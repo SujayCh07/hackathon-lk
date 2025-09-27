@@ -19,6 +19,7 @@ import {
   HomeModernIcon,
   MapPinIcon,
   PencilSquareIcon,
+  UserCircleIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline"
 
@@ -157,6 +158,7 @@ export function UserAccountMenu({
                 {initials}
               </AvatarFallback>
             </Avatar>
+            <UserCircleIcon className="hidden size-5 text-primary sm:block" aria-hidden="true" />
             <div className="flex min-w-0 flex-col text-left">
               <span className="max-w-[10rem] truncate text-sm font-semibold text-foreground/90">{displayName}</span>
               {user.email && (
