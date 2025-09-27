@@ -33,7 +33,9 @@ export function Planner() {
 
   const runwayData = useMemo(() => {
     return cities.map((city) => {
-      const runwayMonths = calculateRunway(budget, city.city);
+      /*const calculateRunway: (monthlyBudgetUSD: any, fromCountry: any, toCountry: any, monthlyCostInTargetCountry: any) => Promise<number>
+  */
+      const runwayMonths = calculateRunway(budget, "Portugal", city.country, city.monthlyCost);
       return {
         city: city.city,
         runway: runwayMonths,
