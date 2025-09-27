@@ -1,4 +1,4 @@
-// supabase/functions/nessie-sync/index.ts
+Deno.env.set("JWT_VERIFICATION", "false");
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 type NessieAccount = {
