@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase.js";
 import { upsertUserProfileName, upsertUserRow } from "../lib/userIdentity.js";
 import Button from "../components/ui/Button.jsx";
-import Barcelona from "../assets/cities/barcelona.jpg"; // example background
+import Barcelona from "../assets/cities/barcelona.jpg"; // background image
 
 export function SignupPage() {
   const navigate = useNavigate();
@@ -24,7 +24,7 @@ export function SignupPage() {
     setMessage(null);
 
     if (!displayName.trim()) {
-      setFormError("Please choose a display name.");
+      setFormError("Please choose a full name.");
       return;
     }
     if (password !== confirmPassword) {
@@ -38,9 +38,13 @@ export function SignupPage() {
       email,
       password,
       options: {
-        data: { displayName: displayName.trim() },
+        data: {
+          full_name: displayName.trim(),   // Supabase expects full_name
+          displayName: displayName.trim()  // keep both for consistency
+        },
       },
     });
+
 
     if (error) {
       setFormError(error.message);
@@ -96,7 +100,7 @@ export function SignupPage() {
               htmlFor="signup-display-name"
               className="block text-sm font-semibold text-charcoal"
             >
-              Username
+              Full name
             </label>
             <input
               id="signup-display-name"
@@ -105,7 +109,7 @@ export function SignupPage() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               className="mt-2 w-full rounded-2xl border border-navy/20 bg-offwhite px-4 py-3 text-sm text-charcoal focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
-              placeholder="How should we greet you?"
+              placeholder="What is your full name?"
             />
           </div>
           <div>
