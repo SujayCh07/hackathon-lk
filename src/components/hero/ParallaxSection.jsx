@@ -6,7 +6,7 @@ import {
   ChartBarIcon,
 } from "@heroicons/react/24/outline";
 
-// Images for each section (replace with your own high-quality ones in /assets)
+// Images for each section (replace with your own high-quality ones in /assets
 import PPPImage from "../../assets/ppp.jpg";
 import GeoBudgetImage from "../../assets/geobudget.jpg";
 import SmartSpendImage from "../../assets/smartspend.jpg";
