@@ -1,13 +1,3 @@
-import { NavLink } from 'react-router-dom';
-import Button from '../ui/Button.jsx';
-import logo from '../../assets/logo.png';
-
-const links = [
-  { to: '/', label: 'Home' },
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/planner', label: 'GeoBudget' },
-  { to: '/insights', label: 'Smart-Spend' }
-=======
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import Button from '../ui/Button.jsx';
@@ -39,17 +29,16 @@ export function NavBar() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-navy/10 bg-white/95 text-navy shadow-sm backdrop-blur">
-      {/* reduced padding in nav to make bar thinner */}
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-2" aria-label="Primary">
 
-        {/* Logo shifted left and enlarged */}
+        {/* Logo */}
         <NavLink to="/" className="flex items-center gap-3">
           <span className="text-2xl font-bold tracking-tight text-navy hover:text-red transition-colors">
             Parity
           </span>
         </NavLink>
 
-        {/* Links */}
+        {/* Desktop Links */}
         <div className="hidden items-center gap-6 md:flex">
           {links.map((link) => (
             <NavLink
@@ -68,7 +57,7 @@ export function NavBar() {
           ))}
         </div>
 
-        {/* CTA button */}
+        {/* CTA Button - visible to everyone */}
         <Button
           as={NavLink}
           to="/dashboard"
@@ -76,11 +65,14 @@ export function NavBar() {
         >
           Enter App
         </Button>
-        {/* Auth actions */}
+
+        {/* Auth Actions - Desktop */}
         <div className="hidden items-center gap-3 md:flex">
           {user ? (
             <>
-              <span className="text-sm font-semibold text-navy/70">{user.email ?? 'Logged in'}</span>
+              <span className="text-sm font-semibold text-navy/70">
+                {user.email ?? 'Logged in'}
+              </span>
               <Button
                 type="button"
                 variant="secondary"
@@ -107,7 +99,7 @@ export function NavBar() {
           )}
         </div>
 
-        {/* Mobile menu */}
+        {/* Mobile Menu */}
         <details className="relative md:hidden" role="list">
           <summary className="list-none rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red">
             Menu
@@ -130,6 +122,7 @@ export function NavBar() {
                   </NavLink>
                 </li>
               ))}
+
               <li className="pt-2">
                 <Button
                   as={NavLink}
@@ -138,6 +131,8 @@ export function NavBar() {
                 >
                   Enter App
                 </Button>
+              </li>
+
               <li className="pt-3">
                 {user ? (
                   <Button
