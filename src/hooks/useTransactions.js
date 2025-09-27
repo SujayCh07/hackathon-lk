@@ -3,7 +3,6 @@ import { useAuth } from './useAuth.js';
 
 export function useTransactions(limit = 5) {
   const { nessie, isSyncingNessie } = useAuth();
-
   const orderedTransactions = useMemo(() => {
     return [...nessie.transactions].sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()

@@ -41,17 +41,16 @@ export function NavBar() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-navy/10 bg-white/95 text-navy shadow-sm backdrop-blur">
-      {/* reduced padding in nav to make bar thinner */}
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-2" aria-label="Primary">
 
-        {/* Logo shifted left and enlarged */}
+        {/* Logo */}
         <NavLink to="/" className="flex items-center gap-3">
           <span className="text-2xl font-bold tracking-tight text-navy hover:text-red transition-colors">
             Parity
           </span>
         </NavLink>
 
-        {/* Links */}
+        {/* Desktop Links */}
         <div className="hidden items-center gap-6 md:flex">
           {links.map((link) => (
             <NavLink
@@ -101,7 +100,38 @@ export function NavBar() {
           )}
         </div>
 
-        {/* Mobile menu */}
+        {/* Auth Actions - Desktop */}
+        <div className="hidden items-center gap-3 md:flex">
+          {user ? (
+            <>
+              <span className="text-sm font-semibold text-navy/70">{identityLabel}</span>
+              <Button
+                type="button"
+                variant="secondary"
+                className="px-5 py-2 text-sm"
+                onClick={handleSignOut}
+                disabled={isSigningOut || isLoading}
+              >
+                {isSigningOut ? 'Signing out…' : 'Sign out'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button as={NavLink} to="/login" variant="secondary" className="px-5 py-2 text-sm">
+                Log in
+              </Button>
+              <Button
+                as={NavLink}
+                to="/signup"
+                className="border border-red/10 bg-gradient-to-r from-red to-navy px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:from-red/90 hover:to-navy/90"
+              >
+                Sign up
+              </Button>
+            </>
+          )}
+        </div>
+
+        {/* Mobile Menu */}
         <details className="relative md:hidden" role="list">
           <summary className="list-none rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red">
             Menu
@@ -124,6 +154,33 @@ export function NavBar() {
                   </NavLink>
                 </li>
               ))}
+              <li className="pt-3">
+                {user ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full text-sm"
+                    onClick={handleSignOut}
+                    disabled={isSigningOut || isLoading}
+                  >
+                    {isSigningOut ? 'Signing out…' : 'Sign out'}
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    <Button as={NavLink} to="/login" variant="secondary" className="w-full text-sm">
+                      Log in
+                    </Button>
+                    <Button
+                      as={NavLink}
+                      to="/signup"
+                      className="w-full border border-red/10 bg-gradient-to-r from-red to-navy text-sm font-semibold text-white shadow-sm transition hover:from-red/90 hover:to-navy/90"
+                    >
+                      Sign up
+                    </Button>
+                  </div>
+                )}
+              </li>
+
               <li className="pt-3">
                 {user ? (
                   <Button
