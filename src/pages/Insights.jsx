@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.
 import { useTransactions } from '../hooks/useTransactions.js';
 import { usePPP } from '../hooks/usePPP.js';
 import { useAuth } from '../hooks/useAuth.js';
+import { useUserProfile } from '../hooks/useUserProfile.js';
 import usePersonalization from '../hooks/usePersonalization.js';
 
 // City → Country resolver using OpenStreetMap Nominatim API
@@ -25,8 +26,8 @@ function applyRandomization(value, maxDeviation = 0.1) {
 }
 
 // A single row component
-function CityComparisonRow({ id, totals, adjustPrice, getPPPRatio, calculateRunway, initialCity = '' }) {
-  const [city, setCity] = useState(initialCity);
+function CityComparisonRow({ id, totals, adjustPrice, getPPPRatio, calculateRunway }) {
+  const [city, setCity] = useState('');
   const [country, setCountry] = useState(null);
   const [categories, setCategories] = useState([]);
   const [status, setStatus] = useState('idle'); // idle | searching | loading | error | done
@@ -42,10 +43,6 @@ function CityComparisonRow({ id, totals, adjustPrice, getPPPRatio, calculateRunw
   }), [totals]);
 
   // Debounce typing (2s)
-  useEffect(() => {
-    setCity(initialCity ?? '');
-  }, [initialCity]);
-
   useEffect(() => {
     if (!city) {
       setCountry(null);
@@ -194,26 +191,13 @@ function CityComparisonRow({ id, totals, adjustPrice, getPPPRatio, calculateRunw
 export function Insights() {
   const { totals } = useTransactions();
   const { adjustPrice, getPPPRatio, calculateRunway } = usePPP();
-  const [rows, setRows] = useState([{ id: 0, city: '' }]);
-  const { user } = useAuth();
-  const userId = user?.id ?? null;
-  const { data: personalization } = usePersonalization(userId);
+  const [rows, setRows] = useState([0]);
 
   const addRow = () => {
     if (rows.length < 5) {
-      setRows((current) => [...current, { id: current.length, city: '' }]);
+      setRows([...rows, rows.length]);
     }
   };
-
-  useEffect(() => {
-    if (!personalization?.curiousCities?.length) return;
-    setRows((current) => {
-      const hasSeed = current.some((row) => row.city && row.city.trim().length > 0);
-      if (hasSeed) return current;
-      const seeded = personalization.curiousCities.slice(0, 3).map((city, index) => ({ id: index, city }));
-      return seeded.length > 0 ? seeded : current;
-    });
-  }, [personalization?.curiousCities]);
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-12">
@@ -226,15 +210,14 @@ export function Insights() {
           <p className="mt-1 text-xs text-charcoal/60">Smart-Spend = see exactly where your money goes globally.</p>
         </CardHeader>
         <CardContent>
-          {rows.map((row) => (
+          {rows.map((id) => (
             <CityComparisonRow
-              key={row.id}
-              id={row.id}
+              key={id}
+              id={id}
               totals={totals}
               adjustPrice={adjustPrice}
               getPPPRatio={getPPPRatio}
               calculateRunway={calculateRunway}
-              initialCity={row.city}
             />
           ))}
           {rows.length < 5 && (

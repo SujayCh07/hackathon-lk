@@ -7,11 +7,6 @@ import { usePPP } from '../hooks/usePPP.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import usePersonalization from '../hooks/usePersonalization.js';
-import {
-  TRAVEL_INTEREST_OPTIONS,
-  CONTINENT_OPTIONS,
-  CATEGORY_FOCUS_OPTIONS,
-} from '../lib/personalizationOptions.js';
 
 // Debounce hook
 function useDebounce(value, delay = 300) {
@@ -39,10 +34,6 @@ export function Planner() {
   const [maxPriceFilter, setMaxPriceFilter] = useState('');
   const [sortOption, setSortOption] = useState('runway');
   const [stayDuration, setStayDuration] = useState(6);
-  const [selectedInterests, setSelectedInterests] = useState([]);
-  const [selectedContinents, setSelectedContinents] = useState([]);
-  const [selectedCategories, setSelectedCategories] = useState([]);
-  const [filtersInitialised, setFiltersInitialised] = useState(false);
 
   const debouncedBudget = useDebounce(budget, 300);
 
@@ -72,9 +63,6 @@ export function Planner() {
               runway: Number.isFinite(runway) ? runway : 0,
               monthlyCost: city.monthlyCost,
               currency: city.currency,
-              continent: city.continent ?? null,
-              interests: Array.isArray(city.interests) ? city.interests : [],
-              categories: Array.isArray(city.categoryTags) ? city.categoryTags : [],
             };
           })
         );
@@ -103,20 +91,6 @@ export function Planner() {
     return personalization.curiousCities.map((city) => city.toLowerCase());
   }, [personalization?.curiousCities]);
 
-  useEffect(() => {
-    if (!personalization || filtersInitialised) return;
-    const hasPref =
-      (personalization.travelInterests?.length ?? 0) > 0 ||
-      (personalization.preferredContinents?.length ?? 0) > 0 ||
-      (personalization.favoriteCategories?.length ?? 0) > 0;
-    if (hasPref) {
-      setSelectedInterests(personalization.travelInterests ?? []);
-      setSelectedContinents(personalization.preferredContinents ?? []);
-      setSelectedCategories(personalization.favoriteCategories ?? []);
-    }
-    setFiltersInitialised(true);
-  }, [personalization, filtersInitialised]);
-
   const focus = personalization?.budgetFocus ?? 'Balanced';
 
   const focusBreakdown = useMemo(() => {
@@ -134,10 +108,6 @@ export function Planner() {
   }, [focus]);
 
   const filteredAndSortedData = useMemo(() => {
-    const interestSet = new Set((selectedInterests ?? []).map((value) => value.toLowerCase()));
-    const continentSet = new Set((selectedContinents ?? []).map((value) => value.toLowerCase()));
-    const categorySet = new Set((selectedCategories ?? []).map((value) => value.toLowerCase()));
-
     let data = runwayData.map((entry) => ({
       ...entry,
       isCurious: curiousCities.some((city) => entry.city.toLowerCase().includes(city)),
@@ -148,27 +118,6 @@ export function Planner() {
     if (searchTerm.trim() !== '') {
       const lowerTerm = searchTerm.toLowerCase();
       data = data.filter((entry) => entry.city.toLowerCase().includes(lowerTerm));
-    }
-
-    if (continentSet.size > 0) {
-      data = data.filter((entry) => {
-        if (!entry.continent) return false;
-        return continentSet.has(entry.continent.toLowerCase());
-      });
-    }
-
-    if (interestSet.size > 0) {
-      data = data.filter((entry) => {
-        const interests = Array.isArray(entry.interests) ? entry.interests : [];
-        return interests.some((interest) => interestSet.has(interest.toLowerCase()));
-      });
-    }
-
-    if (categorySet.size > 0) {
-      data = data.filter((entry) => {
-        const categories = Array.isArray(entry.categories) ? entry.categories : [];
-        return categories.some((category) => categorySet.has(category.toLowerCase()));
-      });
     }
 
     // Filter by max price (if a valid number)
@@ -306,95 +255,6 @@ export function Planner() {
               <option value="az">City A-Z</option>
               <option value="za">City Z-A</option>
             </select>
-          </div>
-
-          <div className="mt-4 space-y-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-teal/60">Interests</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {TRAVEL_INTEREST_OPTIONS.map((option) => {
-                  const isActive = selectedInterests.includes(option);
-                  return (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() =>
-                        setSelectedInterests((prev) =>
-                          prev.includes(option)
-                            ? prev.filter((item) => item !== option)
-                            : [...prev, option]
-                        )
-                      }
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                        isActive
-                          ? 'border-teal bg-teal/15 text-teal'
-                          : 'border-teal/20 bg-white text-charcoal/80 hover:border-teal/50'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-coral/60">Continents</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {CONTINENT_OPTIONS.map((option) => {
-                  const isActive = selectedContinents.includes(option);
-                  return (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() =>
-                        setSelectedContinents((prev) =>
-                          prev.includes(option)
-                            ? prev.filter((item) => item !== option)
-                            : [...prev, option]
-                        )
-                      }
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                        isActive
-                          ? 'border-coral bg-coral/15 text-coral'
-                          : 'border-coral/20 bg-white text-charcoal/80 hover:border-coral/50'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-navy/60">Categories</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {CATEGORY_FOCUS_OPTIONS.map((option) => {
-                  const isActive = selectedCategories.includes(option);
-                  return (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() =>
-                        setSelectedCategories((prev) =>
-                          prev.includes(option)
-                            ? prev.filter((item) => item !== option)
-                            : [...prev, option]
-                        )
-                      }
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                        isActive
-                          ? 'border-navy bg-navy/15 text-navy'
-                          : 'border-navy/20 bg-white text-charcoal/80 hover:border-navy/40'
-                      }`}
-                    >
-                      {option}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </div>
         </CardContent>
       </Card>

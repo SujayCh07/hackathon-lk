@@ -32,22 +32,6 @@ export function SavingsRunwayPanel({ destinations = [], stayLengthMonths = 6 }) 
                 <p className="text-xs text-charcoal/60">
                   PPP score {destination.ppp?.toFixed?.(0) ?? '—'} · {destination.context ?? 'Balanced cost breakdown'}
                 </p>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {destination.continent && (
-                    <span className="rounded-full bg-teal/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-teal">
-                      {destination.continent}
-                    </span>
-                  )}
-                  {Array.isArray(destination.interests) &&
-                    destination.interests.slice(0, 2).map((interest) => (
-                      <span
-                        key={interest}
-                        className="rounded-full bg-navy/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-navy/80"
-                      >
-                        {interest}
-                      </span>
-                    ))}
-                </div>
               </div>
               <div className="text-right text-sm">
                 <p className="font-semibold text-charcoal">{formatRunway(destination.runwayMonths)}</p>
