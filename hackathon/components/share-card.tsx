@@ -45,10 +45,10 @@ export function ShareCard({ template, userData, compareCity }: ShareCardProps) {
     <Card className="w-80 bg-gradient-to-br from-primary/5 to-accent/5 border-2">
       <CardContent className="p-6 text-center space-y-4">
         <div className="flex items-center justify-center gap-2 mb-4">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">PP</span>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+            <span className="text-primary-foreground text-sm font-bold">PA</span>
           </div>
-          <span className="font-bold text-lg">PPP Pocket</span>
+          <span className="text-lg font-bold">Parity</span>
         </div>
 
         <div className="space-y-2">
@@ -79,10 +79,10 @@ export function ShareCard({ template, userData, compareCity }: ShareCardProps) {
       <Card className="w-80 bg-gradient-to-br from-accent/5 to-primary/5 border-2">
         <CardContent className="p-6 space-y-4">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">PP</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+              <span className="text-primary-foreground text-sm font-bold">PA</span>
             </div>
-            <span className="font-bold text-lg">PPP Pocket</span>
+            <span className="text-lg font-bold">Parity</span>
           </div>
 
           <div className="text-center space-y-2">
@@ -115,7 +115,7 @@ export function ShareCard({ template, userData, compareCity }: ShareCardProps) {
           )}
 
           <div className="pt-2 border-t border-border/50 text-center">
-            <p className="text-xs text-muted-foreground">Powered by PPP insights</p>
+            <p className="text-xs text-muted-foreground">Powered by Parity insights</p>
           </div>
         </CardContent>
       </Card>
@@ -129,10 +129,10 @@ export function ShareCard({ template, userData, compareCity }: ShareCardProps) {
       <Card className="w-80 bg-gradient-to-br from-green-50 to-blue-50 border-2">
         <CardContent className="p-6 space-y-4">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">PP</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+              <span className="text-primary-foreground text-sm font-bold">PA</span>
             </div>
-            <span className="font-bold text-lg">PPP Pocket</span>
+            <span className="text-lg font-bold">Parity</span>
           </div>
 
           <div className="text-center space-y-3">
@@ -166,7 +166,7 @@ export function ShareCard({ template, userData, compareCity }: ShareCardProps) {
           </div>
 
           <div className="pt-2 border-t border-border/50 text-center">
-            <p className="text-xs text-muted-foreground">Discover your purchasing power with PPP Pocket</p>
+            <p className="text-xs text-muted-foreground">Discover your purchasing power with Parity</p>
           </div>
         </CardContent>
       </Card>

@@ -19,10 +19,10 @@ export function Navigation() {
       <div className="container flex h-16 max-w-screen-xl items-center">
         <div className="mr-4 hidden md:flex">
           <Link className="mr-6 flex items-center space-x-2" href="/">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">PP</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+              <span className="text-primary-foreground text-sm font-bold">PA</span>
             </div>
-            <span className="hidden font-bold sm:inline-block text-foreground">PPP Pocket</span>
+            <span className="hidden font-bold sm:inline-block text-foreground">Parity</span>
           </Link>
           <nav className="flex items-center gap-6 text-sm">
             {navigation.map((item) => (
@@ -41,11 +41,11 @@ export function Navigation() {
         </div>
         <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
           <div className="w-full flex-1 md:w-auto md:flex-none">
-            <Link className="inline-flex md:hidden items-center space-x-2" href="/">
-              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">PP</span>
+            <Link className="inline-flex items-center space-x-2 md:hidden" href="/">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                <span className="text-primary-foreground text-sm font-bold">PA</span>
               </div>
-              <span className="font-bold text-foreground">PPP Pocket</span>
+              <span className="font-bold text-foreground">Parity</span>
             </Link>
           </div>
         </div>

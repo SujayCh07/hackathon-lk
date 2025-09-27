@@ -5,7 +5,8 @@ export function Home() {
   return (
     <div className="flex flex-col bg-offwhite text-charcoal">
       <div className="relative">
-        <HeroCarousel />
+        {/* Pass showLogo to surface the Parity mark above the hero headline when desired */}
+        <HeroCarousel showLogo />
         <div
           className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent via-offwhite/40 to-offwhite"
           aria-hidden="true"

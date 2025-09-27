@@ -18,8 +18,8 @@ const playfair = Playfair_Display({
 })
 
 export const metadata: Metadata = {
-  title: "PPP Pocket - Same dollars, smarter world",
-  description: "See where your money goes the farthest with PPP-adjusted insights",
+  title: "Parity - Same dollars, smarter world",
+  description: "See where your money goes the farthest with Parity insights",
   generator: "v0.app",
 }
 
