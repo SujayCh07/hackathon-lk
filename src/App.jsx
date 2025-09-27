@@ -10,6 +10,7 @@ import Home from './pages/Home.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import { useAuth } from './hooks/useAuth.js';
+import { getPurchasingPowerRatio } from './Econ.js';
 
 function App() {
   const location = useLocation();
