@@ -20,7 +20,7 @@ export async function getPurchasingPowerRatio(originalCountry, finalCountry) {
     .select('country, ppp_index')
 
   if (error) {
-    console.error('Error fetching data:', error)
+    console.error('Error fetching data:', error.message)
     return "doesn't exist"
   }
 
@@ -31,6 +31,8 @@ export async function getPurchasingPowerRatio(originalCountry, finalCountry) {
   }))
 
   const original = normalizedData.find(row => row.country === originalCountry.toLowerCase())
+  // console.log(originalCountry);
+  // console.log(finalCountry); 
   const final = normalizedData.find(row => row.country === finalCountry.toLowerCase())
 
   if (!original || !final || original.value == null || final.value == null) {

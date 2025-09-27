@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import supabase, { getPurchasingPowerRatio, getAdjustedPrice, calculateLivingTime } from '../Econ.js';
 
 export function usePPP() {
-  console.log(adjustPrice(100, 'USA', 'Portugal'));
   const [pppData, setPPPData] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -56,7 +55,9 @@ export function usePPP() {
 
   const adjustPrice = async (amountUSD, fromCountry, toCountry) => {
     try {
-      const result = await getAdjustedPrice(fromCountry, toCountry, amountUSD);
+      console.log(toCountry);
+      console.log(fromCountry);
+      const result = await getAdjustedPrice(amountUSD, fromCountry, toCountry);
       return typeof result === 'number' ? result : amountUSD;
     } catch (error) {
       console.error('Error adjusting price:', error);
