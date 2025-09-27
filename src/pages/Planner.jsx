@@ -6,7 +6,7 @@ import { useAccount } from '../hooks/useAccount.js';
 import { usePPP } from '../hooks/usePPP.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
-import { Link } from 'react-router-dom';
+import usePersonalization from '../hooks/usePersonalization.js';
 
 // Debounce hook
 function useDebounce(value, delay = 300) {
@@ -22,6 +22,7 @@ export function Planner() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const { profile, loading: profileLoading } = useUserProfile(userId);
+  const { data: personalization } = usePersonalization(userId);
   const { balanceUSD } = useAccount();
   const { cities, calculateRunway, isLoading: citiesLoading } = usePPP();
 
@@ -31,7 +32,8 @@ export function Planner() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [maxPriceFilter, setMaxPriceFilter] = useState('');
-  const [sortOption, setSortOption] = useState('az');
+  const [sortOption, setSortOption] = useState('runway');
+  const [stayDuration, setStayDuration] = useState(6);
 
   const debouncedBudget = useDebounce(budget, 300);
 
@@ -84,8 +86,33 @@ export function Planner() {
   }, [debouncedBudget, cities, calculateRunway]);
 
   // Filtering and sorting
+  const curiousCities = useMemo(() => {
+    if (!personalization?.curiousCities) return [];
+    return personalization.curiousCities.map((city) => city.toLowerCase());
+  }, [personalization?.curiousCities]);
+
+  const focus = personalization?.budgetFocus ?? 'Balanced';
+
+  const focusBreakdown = useMemo(() => {
+    const base = { Rent: 0.45, Food: 0.25, Transport: 0.15, Leisure: 0.15 };
+    switch (focus) {
+      case 'Rent':
+        return { ...base, Rent: 0.55, Leisure: 0.1 };
+      case 'Food':
+        return { ...base, Food: 0.4, Leisure: 0.1 };
+      case 'Leisure':
+        return { ...base, Leisure: 0.35, Rent: 0.35 };
+      default:
+        return base;
+    }
+  }, [focus]);
+
   const filteredAndSortedData = useMemo(() => {
-    let data = runwayData;
+    let data = runwayData.map((entry) => ({
+      ...entry,
+      isCurious: curiousCities.some((city) => entry.city.toLowerCase().includes(city)),
+      breakdown: focusBreakdown,
+    }));
 
     // Filter by search term (case insensitive)
     if (searchTerm.trim() !== '') {
@@ -101,24 +128,31 @@ export function Planner() {
 
     // Sort
     switch (sortOption) {
+      case 'affordable':
+        data = data.slice().sort((a, b) => a.monthlyCost - b.monthlyCost);
+        break;
+      case 'runway':
+        data = data.slice().sort((a, b) => b.runway - a.runway);
+        break;
+      case 'closest':
+        data = data
+          .slice()
+          .sort((a, b) =>
+            Math.abs(a.monthlyCost - budget) - Math.abs(b.monthlyCost - budget)
+          );
+        break;
       case 'az':
         data = data.slice().sort((a, b) => a.city.localeCompare(b.city));
         break;
       case 'za':
         data = data.slice().sort((a, b) => b.city.localeCompare(a.city));
         break;
-      case 'price-asc':
-        data = data.slice().sort((a, b) => a.monthlyCost - b.monthlyCost);
-        break;
-      case 'price-desc':
-        data = data.slice().sort((a, b) => b.monthlyCost - a.monthlyCost);
-        break;
       default:
         break;
     }
 
     return data;
-  }, [runwayData, searchTerm, maxPriceFilter, sortOption]);
+  }, [runwayData, searchTerm, maxPriceFilter, sortOption, curiousCities, focusBreakdown, budget]);
 
   // Find the best-value city (max runway)
   const highlightCity = useMemo(() => {
@@ -149,6 +183,7 @@ export function Planner() {
             <p className="text-sm text-charcoal/70">
               Adjust your monthly spend target to understand how far your money stretches in each destination.
             </p>
+            <p className="mt-1 text-xs text-charcoal/60">GeoBudget = plan your travels with budget forecasting.</p>
           </div>
           <div className="flex flex-col items-start gap-2 text-sm font-semibold text-teal md:items-end">
             <div className="rounded-2xl bg-turquoise/15 px-4 py-2 shadow-sm shadow-teal/10">
@@ -163,6 +198,26 @@ export function Planner() {
 
         <CardContent>
           <BudgetSlider value={budget} onChange={setBudget} />
+
+          <div className="mt-6 rounded-3xl border border-teal/30 bg-turquoise/10 p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-teal">Stay duration timeline</p>
+                <p className="text-xs text-charcoal/60">
+                  Drag to see how long your savings last across destinations.
+                </p>
+              </div>
+              <span className="text-sm font-semibold text-teal">{stayDuration} months</span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={36}
+              value={stayDuration}
+              onChange={(event) => setStayDuration(Number(event.target.value))}
+              className="mt-3 h-2 w-full appearance-none rounded-full bg-teal/30 accent-teal"
+            />
+          </div>
 
           {/* Search, filter, sort */}
           <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
@@ -194,10 +249,11 @@ export function Planner() {
                          focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               aria-label="Sort options"
             >
-              <option value="az">Sort A-Z</option>
-              <option value="za">Sort Z-A</option>
-              <option value="price-asc">Price (low to high)</option>
-              <option value="price-desc">Price (high to low)</option>
+              <option value="runway">Longest runway</option>
+              <option value="affordable">Most affordable</option>
+              <option value="closest">Closest match to my budget</option>
+              <option value="az">City A-Z</option>
+              <option value="za">City Z-A</option>
             </select>
           </div>
         </CardContent>
@@ -210,6 +266,13 @@ export function Planner() {
           <strong>{formatPrice(budget)}</strong> monthly budget,{' '}
           <strong>{highlightCity.city}</strong> gives you the most value — your budget lasts{' '}
           <strong>{Number.isFinite(highlightCity.runway) ? highlightCity.runway.toFixed(1) : 'N/A'} months</strong> there.
+          Plan a {stayDuration}-month stay for around{' '}
+          <strong>
+            {Number.isFinite(highlightCity.monthlyCost)
+              ? formatPrice(highlightCity.monthlyCost * stayDuration)
+              : 'N/A'}
+          </strong>
+          .
         </div>
       )}
 
@@ -219,7 +282,10 @@ export function Planner() {
           <RunwayCard
             key={entry.city}
             {...entry}
-            monthlyCost={formatPrice(entry.monthlyCost) === 'N/A' ? 'N/A' : entry.monthlyCost}
+            monthlyCost={entry.monthlyCost}
+            stayDurationMonths={stayDuration}
+            isHighlighted={entry.city === highlightCity.city}
+            badgeLabel={entry.isCurious ? 'On your wishlist' : entry.city === highlightCity.city ? 'Best pick' : null}
           />
         ))}
       </div>
