@@ -1,11 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Navigation } from "@/components/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
 import { Calculator, TrendingUp, DollarSign } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
 
 // Mock PPP data for different cities
 const cityData = [
@@ -18,6 +20,8 @@ const cityData = [
 ]
 
 export default function GeoBudgetPlanner() {
+  const { user, loading } = useAuth()
+  const router = useRouter()
   const [monthlyBudget, setMonthlyBudget] = useState([3000])
 
   const calculateMonthsInCity = (budget: number, costMultiplier: number) => {
@@ -30,6 +34,23 @@ export default function GeoBudgetPlanner() {
     if (months >= 2) return "bg-green-500"
     if (months >= 1.5) return "bg-yellow-500"
     return "bg-red-500"
+  }
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace(`/login?redirectTo=${encodeURIComponent("/planner")}`)
+    }
+  }, [loading, user, router])
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
+          {loading ? "Checking your session…" : "Redirecting you to log in…"}
+        </div>
+      </div>
+    )
   }
 
   return (
