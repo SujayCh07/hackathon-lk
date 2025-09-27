@@ -42,9 +42,19 @@ export function WorldMap({ markers = [] }) {
         color: '#2EC4B6',
         weight: 2,
         fillColor: '#EE6C4D',
-        fillOpacity: 0.7
+        fillOpacity: 0.75,
+        className: 'ppp-circle-marker'
       });
-      circle.bindPopup(`<strong>${marker.city}</strong><br/>PPP: ${marker.ppp.toFixed(2)}`);
+      const tooltipHtml = `<div class="text-sm"><strong>${marker.city}</strong><br/>PPP score ${marker.ppp.toFixed(
+        1
+      )}<br/><span style="opacity:0.7;">${marker.context ?? 'Hover to compare with your base city'}</span></div>`;
+      circle.bindPopup(tooltipHtml);
+      circle.bindTooltip(tooltipHtml, {
+        direction: 'top',
+        offset: [0, -8],
+        opacity: 0.9,
+        sticky: true
+      });
       circle.addTo(map);
       layersRef.current.push(circle);
     });

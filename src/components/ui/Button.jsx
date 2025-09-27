@@ -9,7 +9,7 @@ const variants = {
   secondary:
     'bg-offwhite text-navy border border-navy hover:bg-navy hover:text-offwhite focus-visible:outline-navy',
   ghost:
-    'bg-transparent text-offwhite border border-offwhite hover:bg-offwhite hover:text-navy focus-visible:outline-offwhite'
+    'bg-transparent text-navy border border-navy/40 hover:bg-navy hover:text-offwhite focus-visible:outline-navy'
 };
 
 export function Button({ as: Component = 'button', variant = 'primary', className, children, ...props }) {
