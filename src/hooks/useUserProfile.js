@@ -56,8 +56,50 @@ function buildAddressString(parts) {
   return [lineOne, lineTwo].filter((line) => line.length > 0).join("\n");
 }
 
+function fromAddressObject(payload) {
+  if (!payload || typeof payload !== "object") return null;
+
+  const parts = {
+    houseNumber:
+      typeof payload.houseNumber === "string"
+        ? payload.houseNumber.trim()
+        : typeof payload.house_number === "string"
+        ? payload.house_number.trim()
+        : "",
+    street: typeof payload.street === "string" ? payload.street.trim() : "",
+    city: typeof payload.city === "string" ? payload.city.trim() : "",
+    state:
+      typeof payload.state === "string"
+        ? payload.state.trim().toUpperCase()
+        : typeof payload.region === "string"
+        ? payload.region.trim().toUpperCase()
+        : "",
+  };
+
+  const formatted =
+    typeof payload.formatted === "string" && payload.formatted.trim().length > 0
+      ? payload.formatted.trim()
+      : buildAddressString(parts);
+
+  const rawValue =
+    typeof payload.raw === "string" && payload.raw.trim().length > 0
+      ? payload.raw.trim()
+      : JSON.stringify({ ...parts, formatted });
+
+  return {
+    raw: rawValue,
+    formatted,
+    ...parts,
+  };
+}
+
 function normaliseStreetAddress(value) {
   if (!value) return { ...EMPTY_ADDRESS };
+
+  if (typeof value === "object") {
+    const fromObject = fromAddressObject(value);
+    if (fromObject) return fromObject;
+  }
 
   let rawValue = value;
   if (typeof rawValue !== "string") {
@@ -70,25 +112,11 @@ function normaliseStreetAddress(value) {
   // Attempt to parse JSON payloads from newer clients
   try {
     const parsed = JSON.parse(cleaned);
-    if (parsed && typeof parsed === "object") {
-      const parts = {
-        houseNumber: typeof parsed.houseNumber === "string" ? parsed.houseNumber.trim() : "",
-        street: typeof parsed.street === "string" ? parsed.street.trim() : "",
-        city: typeof parsed.city === "string" ? parsed.city.trim() : "",
-        state:
-          typeof parsed.state === "string"
-            ? parsed.state.trim().toUpperCase()
-            : "",
-      };
-
-      const formattedRaw =
-        typeof parsed.formatted === "string" && parsed.formatted.trim().length > 0
-          ? parsed.formatted.trim()
-          : buildAddressString(parts);
+    const fromObject = fromAddressObject(parsed);
+    if (fromObject) {
       return {
+        ...fromObject,
         raw: cleaned,
-        formatted: formattedRaw,
-        ...parts,
       };
     }
   } catch (error) {
@@ -152,6 +180,12 @@ function mapProfile(row) {
 
   const monthlyBudget = normaliseNumber(row.monthly_budget);
   const streetAddress = normaliseStreetAddress(row.street_address);
+  const streetAddressRaw =
+    typeof row.street_address === "string"
+      ? row.street_address
+      : row.street_address && typeof row.street_address === "object"
+      ? JSON.stringify(row.street_address)
+      : null;
   const currentCountryCode =
     typeof row.current_country_code === "string"
       ? row.current_country_code.trim().toUpperCase()
@@ -173,7 +207,7 @@ function mapProfile(row) {
     name: typeof row.name === "string" ? row.name : "",
     monthlyBudget,
     streetAddress,
-    streetAddressRaw: row.street_address ?? null,
+    streetAddressRaw,
     currentCountryCode,
     homeCountryCode,
     currentCityCode,
