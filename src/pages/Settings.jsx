@@ -155,7 +155,7 @@ export default function Settings() {
   // countries list
   useEffect(() => {
     let active = true;
-    setCountriesLoading(true);
+    setCountriesLoading(false);
     setCountriesError(null);
 
     supabase
@@ -280,11 +280,6 @@ export default function Settings() {
         if (mdErr) throw mdErr;
       }
 
-      try {
-        await refreshProfile();
-      } catch (err) {
-        console.warn('Profile refresh failed:', err);
-      }
 
       showToast({
         type: 'success',
@@ -574,19 +569,8 @@ export default function Settings() {
 
             {/* Capital One section */}
             <SettingsSection
-              title="Capital One™ sync"
+              title="Capital One™ Account Balance:"
               description="See the latest balances pulled from your demo Capital One™ account and refresh whenever you need."
-              actions={
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="px-4 py-2 text-sm"
-                  onClick={handleRefreshAccounts}
-                  disabled={isSyncingNessie}
-                >
-                  {isSyncingNessie ? 'Refreshing…' : 'Refresh balances'}
-                </Button>
-              }
               footer="Balances are simulated for the hackathon environment and reset frequently."
               contentClassName="space-y-4"
             >

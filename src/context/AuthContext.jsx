@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import { supabase } from '../lib/supabase.js';
 import {
   ensureNessieCustomer,
@@ -25,60 +33,74 @@ const initialNessieState = {
 
 const AuthContext = createContext(null);
 
+function getCachedSession() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    if (!supabaseUrl) {
+      return null;
+    }
+
+    const projectRef = new URL(supabaseUrl).host.split('.')[0];
+    if (!projectRef) {
+      return null;
+    }
+
+    const stored = window.localStorage.getItem(`sb-${projectRef}-auth-token`);
+    if (!stored) {
+      return null;
+    }
+
+    const parsed = JSON.parse(stored);
+    return parsed?.currentSession ?? null;
+  } catch (error) {
+    console.warn('Failed to read cached Supabase session from storage', error);
+    return null;
+  }
+}
+
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(null);
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const cachedSessionRef = useRef(getCachedSession());
+  const cachedSession = cachedSessionRef.current;
+  const [session, setSession] = useState(cachedSession);
+  const [user, setUser] = useState(cachedSession?.user ?? null);
+  const [isLoading, setIsLoading] = useState(!cachedSession);
   const [nessieState, setNessieState] = useState(initialNessieState);
   const [isSyncingNessie, setIsSyncingNessie] = useState(false);
   const [authError, setAuthError] = useState(null);
+  const activeSessionRef = useRef(cachedSession);
 
   useEffect(() => {
-    const initialise = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        setAuthError(error);
-        setIsLoading(false);
-        return;
-      }
-
-      setSession(data.session ?? null);
-      setUser(data.session?.user ?? null);
-      setIsLoading(false);
-
-      if (data.session?.user) {
-        await syncNessie(data.session.user);
-      }
-    };
-
-    initialise();
-
-    const {
-      data: { subscription }
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-      if (nextSession?.user) {
-        await syncNessie(nextSession.user);
-      } else {
-        setNessieState(initialNessieState);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    activeSessionRef.current = session;
+  }, [session]);
 
   const syncNessie = useCallback(
     async (authUser) => {
+      if (!authUser?.id) {
+        return;
+      }
+
+      const isStale = () => activeSessionRef.current?.user?.id !== authUser.id;
+      if (isStale()) {
+        return;
+      }
+
       setIsSyncingNessie(true);
       try {
         const userWithIdentity = await ensureUserIdentity(authUser);
+        if (isStale()) {
+          return;
+        }
+
         const { customerId, user: updatedUser } = await ensureNessieCustomer(userWithIdentity);
         const effectiveUser = updatedUser ?? userWithIdentity;
         if (effectiveUser) {
+          if (isStale()) {
+            return;
+          }
           setUser(effectiveUser);
         }
 
@@ -87,10 +109,18 @@ export function AuthProvider({ children }) {
           syncTransactionsFromNessie({ userId: effectiveUser?.id, customerId })
         ]);
 
+        if (isStale()) {
+          return;
+        }
+
         const [accounts, transactions] = await Promise.all([
           loadAccountsFromSupabase(effectiveUser?.id),
           loadTransactionsFromSupabase(effectiveUser?.id)
         ]);
+
+        if (isStale()) {
+          return;
+        }
 
         setNessieState({
           customerId,
@@ -106,6 +136,10 @@ export function AuthProvider({ children }) {
           ]);
 
           if ((accounts?.length ?? 0) > 0 || (transactions?.length ?? 0) > 0) {
+            if (isStale()) {
+              return;
+            }
+
             setNessieState({
               customerId: authUser?.user_metadata?.nessieCustomerId ?? null,
               accounts: normaliseAccounts(accounts),
@@ -115,6 +149,10 @@ export function AuthProvider({ children }) {
           }
         } catch (loadError) {
           console.warn('Failed to load cached Nessie data from Supabase', loadError);
+        }
+
+        if (isStale()) {
+          return;
         }
 
         setNessieState({
@@ -138,11 +176,73 @@ export function AuthProvider({ children }) {
     []
   );
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const initialise = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (!isMounted) {
+        return;
+      }
+
+      if (error) {
+        setAuthError(error);
+        setIsLoading(false);
+        return;
+      }
+
+      activeSessionRef.current = data.session ?? null;
+      setSession(data.session ?? null);
+      setUser(data.session?.user ?? null);
+      setAuthError(null);
+      setIsLoading(false);
+
+      if (data.session?.user) {
+        await syncNessie(data.session.user);
+      }
+    };
+
+    if (!cachedSession?.user) {
+      setIsLoading(true);
+    }
+
+    initialise();
+
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      activeSessionRef.current = nextSession ?? null;
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+      setAuthError(null);
+      if (nextSession?.user) {
+        await syncNessie(nextSession.user);
+      } else {
+        setNessieState(initialNessieState);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [cachedSession?.user, syncNessie]);
+
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
     setSession(null);
     setUser(null);
     setNessieState(initialNessieState);
+    activeSessionRef.current = null;
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        setAuthError(error);
+        console.error('Failed to sign out from Supabase', error);
+      }
+    } catch (error) {
+      setAuthError(error);
+      console.error('Unexpected error during sign out', error);
+    }
   }, []);
 
   const value = useMemo(
