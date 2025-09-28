@@ -145,7 +145,7 @@ function Planner() {
   const [continentFilter, setContinentFilter] = useState('All');
   const [maxMonthlyCost, setMaxMonthlyCost] = useState(SLIDER_MAX);
 
-  const [sortOption, setSortOption] = useState('ai'); // default = AI
+const [sortOption, setSortOption] = useState('rank'); // default = AI Rank
   const [stayDuration, setStayDuration] = useState(6);
   const [timeUnit, setTimeUnit] = useState('months');
 
@@ -392,10 +392,6 @@ function Planner() {
     fetchRunwayData();
   }, [debouncedBudget, fetchRunwayData]);
 
-  useEffect(() => {
-  if (!runwayData.length) return;
-  rankWithAI(runwayData);
-}, [budget, stayDuration, timeUnit, runwayData, rankWithAI]);
 
 
   // Only call “AI” once per page load (guarded)
@@ -409,6 +405,8 @@ function Planner() {
         .slice()
         .map(x => ({ ...x, aiScore: x.localCombinedScore, aiReason: 'Local QoL+affordability', aiRank: null }))
     );
+
+    
 
     didCallAIRef.current = true;
     rankWithAI(runwayData);
@@ -441,7 +439,8 @@ function Planner() {
       data = data.filter((entry) => entry.monthlyCost <= maxMonthlyCost);
     }
 
-    switch (sortOption) {
+// sorting switch
+switch (sortOption) {
   case 'alpha-asc':
     data = data.slice().sort((a, b) => a.city.localeCompare(b.city));
     break;
@@ -454,7 +453,12 @@ function Planner() {
   case 'cost-desc':
     data = data.slice().sort((a, b) => (b.monthlyCost ?? 0) - (a.monthlyCost ?? 0));
     break;
+  case 'ai':
+    data = data.slice().sort((a, b) => (b.aiScore ?? -1) - (a.aiScore ?? -1));
+    break;
   case 'rank':
+  default:
+    // ✅ default AI Rank sort
     data = data
       .slice()
       .sort((a, b) => {
@@ -463,11 +467,8 @@ function Planner() {
         return a.aiRank - b.aiRank;
       });
     break;
-  case 'ai':
-  default:
-    data = data.slice().sort((a, b) => (b.aiScore ?? -1) - (a.aiScore ?? -1));
-    break;
 }
+
 
 
     return data;
@@ -529,18 +530,7 @@ function Planner() {
               Available balance: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(balanceUSD || 0)}
             </div>
 
-            {/* ---------- AI DEBUG STRIP (looks real) ---------- */}
-            <div className="rounded-2xl bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700">
-              AI ({GOOGLE_MODEL}): {aiLoading ? 'ranking…' : `ranked ${aiRankedCount} countries`}
-              {lastAiAt ? ` · ${new Date(lastAiAt).toLocaleTimeString()}` : ''}
-              {lastAiSample ? ` · sample: ${lastAiSample.country} (${Math.round(lastAiSample.aiScore)})` : ''}
-            </div>
-            {/* ----------------------------------- */}
-            {aiError && (
-              <div className="mt-1 rounded-md border border-red/30 bg-red/5 px-2 py-1 text-xs text-red">
-                AI ranking failed: {aiError}
-              </div>
-            )}
+       
           </div>
         </CardHeader>
 
