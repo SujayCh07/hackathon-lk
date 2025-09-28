@@ -165,7 +165,6 @@ const Dictionary = {
   "saint vincent and the grenadines": { cost_of_living: 1500, groceries: 290, transportation: 60, rent: 600 },
   "trinidad and tobago": { cost_of_living: 1200, groceries: 210, transportation: 40, rent: 530 },
   "united states": { cost_of_living: 2800, groceries: 450, transportation: 100, rent: 1300 },
-  "united states of america": { cost_of_living: 2800, groceries: 450, transportation: 100, rent: 1300 },
 
   // South America
   "argentina": { cost_of_living: 900, groceries: 150, transportation: 40, rent: 400 },
