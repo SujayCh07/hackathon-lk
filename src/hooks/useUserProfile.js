@@ -150,19 +150,16 @@ function normaliseStreetAddress(value) {
 function mapProfile(row) {
   if (!row) return null;
   return {
-    name: row.name?.trim() || null,
-    monthlyBudget: normaliseNumber(row.monthly_budget),
-    currentCity: normaliseCity(row.current_city),
-    homeCity: normaliseCity(row.home_city),
-    currentCountry: normaliseCountry(row.current_country),
-    homeCountry: normaliseCountry(row.home_country),
-    currentCountryCode: row.current_country_code ?? null,
-    homeCountryCode: row.home_country_code ?? null,
-    currentCityCode: row.current_city_code ?? null,
-    homeCityCode: row.home_city_code ?? null,
-    streetAddress: normaliseStreetAddress(row.street_address),
+    name: row.name ?? '',
+    monthlyBudget: row.monthly_budget ?? null,
+    streetAddress: row.street_address ?? null,
+    currentCountryCode: row.current_country_code ?? '',
+    homeCountryCode: row.home_country_code ?? '',
+    currentCityCode: row.current_city_code ?? '',
+    homeCityCode: row.home_city_code ?? '',
   };
 }
+
 
 // --------------------
 // Hook

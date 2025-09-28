@@ -118,7 +118,7 @@ export default function Settings() {
   const [profileStatus, setProfileStatus] = useState(null);
   const [accountsStatus, setAccountsStatus] = useState(null);
   const [countries, setCountries] = useState([]);
-  const [countriesLoading, setCountriesLoading] = useState(false);
+  const [countriesLoading, setCountriesLoading] = useState(true);
   const [countriesError, setCountriesError] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -250,7 +250,7 @@ export default function Settings() {
         );
         setCountries([]);
       })
-      .finally(() => active && setCountriesLoading(true));
+      .finally(() => active && setCountriesLoading(false));
 
     return () => {
       active = false;
@@ -324,7 +324,7 @@ export default function Settings() {
       city: addressCity,
       state: addressState,
     });
-    const street_address = serialiseAddress(normalisedAddress);
+    const street_address = addressPreview; // plain string
 
     const optimisticSeed = {
       displayName: trimmedName,
