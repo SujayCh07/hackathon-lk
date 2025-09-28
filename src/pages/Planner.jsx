@@ -586,29 +586,6 @@ function Planner() {
               </select>
             </div>
 
-            <div className="rounded-3xl border border-dashed border-teal/40 bg-turquoise/10 px-4 py-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-teal">Monthly cost range</p>
-                  <p className="text-xs text-charcoal/60">
-                    Cap results to destinations under {budgetFormatter.format(maxMonthlyCost)} per month.
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min={300}
-                    max={4000}
-                    step={50}
-                    value={maxMonthlyCost}
-                    onChange={(event) => setMaxMonthlyCost(Number(event.target.value))}
-                    className="h-2 w-48 flex-1 cursor-pointer appearance-none rounded-full bg-teal/20 accent-teal"
-                  />
-                  <span className="text-sm font-semibold text-teal">{budgetFormatter.format(maxMonthlyCost)}</span>
-                </div>
-              </div>
-            </div>
-
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
