@@ -4,8 +4,6 @@ import Button from '../ui/Button.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
 import { UserCircleIcon } from '@heroicons/react/24/outline'; // Account icon
 
-// ✅ Added: import logo asset for brand mark
-
 const authenticatedLinks = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/planner', label: 'GeoBudget' },
@@ -58,18 +56,36 @@ export function NavBar() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-navy/10 bg-white/95 text-navy shadow-md shadow-slate-100/50 backdrop-blur">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-8 py-3" aria-label="Primary">
+    <header className="sticky top-0 z-50">
+          {/* 🔹 FDIC Insured Banner */}
+          <div className="w-full bg-white border-b border-gray-200">
+            <div className="mx-auto max-w-7xl flex items-center justify-center px-4 py-2">
+              <div className="flex items-center gap-1">
+                {/* FDIC wordmark */}
+                <span className="text-lg font-black text-blue-900 tracking-tight" style={{ fontFamily: 'Arial Black, sans-serif' }}>
+                  FDIC
+                </span>
+                {/* Tagline */}
+                <span className="text-xs italic text-gray-700 ml-1" style={{ fontStyle: 'italic' }}>
+                  FDIC-Insured - Backed by the full faith and credit of the U.S. Government
+                </span>
+              </div>
+            </div>
+          </div>
 
-        {/* ✅ Changed: Logo + Wordmark (stronger branding) */}
+      {/* 🔹 Main Nav */}
+      <nav
+        className="mx-auto flex max-w-7xl items-center justify-between px-8 py-3 bg-white/95 text-navy shadow-md shadow-slate-100/50 backdrop-blur"
+        aria-label="Primary"
+      >
+        {/* Logo + Wordmark */}
         <NavLink to="/" className="flex items-center gap-3">
-          {/* <img src={Logo} alt="Parity Logo" className="h-9 w-9 object-contain" /> */}
           <span className="text-2xl font-extrabold bg-gradient-to-r from-red to-navy bg-clip-text text-transparent">
             Parity
           </span>
         </NavLink>
 
-        {/* ✅ Changed: More spacing between nav links */}
+        {/* Nav Links */}
         <div className="hidden items-center gap-10 md:flex">
           {links.map((link) => (
             <NavLink
@@ -88,11 +104,10 @@ export function NavBar() {
           ))}
         </div>
 
-        {/* ✅ Changed: Better account section layout */}
+        {/* Account Section */}
         <div className="hidden items-center gap-5 md:flex border-l border-slate/200 pl-6">
           {user ? (
             <>
-              {/* ✅ User label + icon link to settings */}
               <NavLink
                 to="/settings"
                 className="flex items-center gap-2 text-sm font-semibold text-navy/80 hover:text-navy"
@@ -100,7 +115,6 @@ export function NavBar() {
                 <UserCircleIcon className="h-6 w-6 text-navy/70" />
                 <span>{identityLabel}</span>
               </NavLink>
-              {/* Sign out button */}
               <Button
                 type="button"
                 variant="secondary"
@@ -127,7 +141,7 @@ export function NavBar() {
           )}
         </div>
 
-        {/* Mobile Menu (kept same for now) */}
+        {/* Mobile Menu */}
         <details className="relative md:hidden" role="list">
           <summary className="list-none rounded-full border border-navy/20 px-4 py-2 text-sm font-semibold text-navy/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red">
             Menu
@@ -150,7 +164,7 @@ export function NavBar() {
                   </NavLink>
                 </li>
               ))}
-             <li className="pt-3">
+              <li className="pt-3">
                 {user ? (
                   <div className="space-y-2">
                     <NavLink
