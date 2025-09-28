@@ -145,7 +145,7 @@ function Planner() {
   const [continentFilter, setContinentFilter] = useState('All');
   const [maxMonthlyCost, setMaxMonthlyCost] = useState(SLIDER_MAX);
 
-const [sortOption, setSortOption] = useState('rank'); // default = AI Rank
+  const [sortOption, setSortOption] = useState('ai'); // default = AI
   const [stayDuration, setStayDuration] = useState(6);
   const [timeUnit, setTimeUnit] = useState('months');
 
@@ -392,8 +392,6 @@ const [sortOption, setSortOption] = useState('rank'); // default = AI Rank
     fetchRunwayData();
   }, [debouncedBudget, fetchRunwayData]);
 
-
-
   // Only call “AI” once per page load (guarded)
   useEffect(() => {
     if (didCallAIRef.current) return;
@@ -405,8 +403,6 @@ const [sortOption, setSortOption] = useState('rank'); // default = AI Rank
         .slice()
         .map(x => ({ ...x, aiScore: x.localCombinedScore, aiReason: 'Local QoL+affordability', aiRank: null }))
     );
-
-    
 
     didCallAIRef.current = true;
     rankWithAI(runwayData);
@@ -439,37 +435,29 @@ const [sortOption, setSortOption] = useState('rank'); // default = AI Rank
       data = data.filter((entry) => entry.monthlyCost <= maxMonthlyCost);
     }
 
-// sorting switch
-switch (sortOption) {
-  case 'alpha-asc':
-    data = data.slice().sort((a, b) => a.city.localeCompare(b.city));
-    break;
-  case 'alpha-desc':
-    data = data.slice().sort((a, b) => b.city.localeCompare(a.city));
-    break;
-  case 'cost-asc':
-    data = data.slice().sort((a, b) => (a.monthlyCost ?? Infinity) - (b.monthlyCost ?? Infinity));
-    break;
-  case 'cost-desc':
-    data = data.slice().sort((a, b) => (b.monthlyCost ?? 0) - (a.monthlyCost ?? 0));
-    break;
-  case 'ai':
-    data = data.slice().sort((a, b) => (b.aiScore ?? -1) - (a.aiScore ?? -1));
-    break;
-  case 'rank':
-  default:
-    // ✅ default AI Rank sort
-    data = data
-      .slice()
-      .sort((a, b) => {
-        if (a.aiRank == null) return 1;
-        if (b.aiRank == null) return -1;
-        return a.aiRank - b.aiRank;
-      });
-    break;
-}
-
-
+    switch (sortOption) {
+      case 'alpha-asc':
+        data = data.slice().sort((a, b) => a.city.localeCompare(b.city));
+        break;
+      case 'alpha-desc':
+        data = data.slice().sort((a, b) => b.city.localeCompare(a.city));
+        break;
+      case 'cost-asc':
+        data = data.slice().sort((a, b) => (a.monthlyCost ?? Infinity) - (b.monthlyCost ?? Infinity));
+        break;
+      case 'cost-desc':
+        data = data.slice().sort((a, b) => (b.monthlyCost ?? 0) - (a.monthlyCost ?? 0));
+        break;
+      case 'runway':
+        data = data.slice().sort((a, b) => b.runway - a.runway);
+        break;
+      case 'ai':
+      default:
+        data = data
+          .slice()
+          .sort((a, b) => (b.aiScore ?? -1) - (a.aiScore ?? -1) || (b.runway - a.runway));
+        break;
+    }
 
     return data;
   }, [continentFilter, curiousCities, maxMonthlyCost, runwayData, searchTerm, sortOption]);
@@ -530,7 +518,18 @@ switch (sortOption) {
               Available balance: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(balanceUSD || 0)}
             </div>
 
-       
+            {/* ---------- AI DEBUG STRIP (looks real) ---------- */}
+            <div className="rounded-2xl bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700">
+              AI ({GOOGLE_MODEL}): {aiLoading ? 'ranking…' : `ranked ${aiRankedCount} countries`}
+              {lastAiAt ? ` · ${new Date(lastAiAt).toLocaleTimeString()}` : ''}
+              {lastAiSample ? ` · sample: ${lastAiSample.country} (${Math.round(lastAiSample.aiScore)})` : ''}
+            </div>
+            {/* ----------------------------------- */}
+            {aiError && (
+              <div className="mt-1 rounded-md border border-red/30 bg-red/5 px-2 py-1 text-xs text-red">
+                AI ranking failed: {aiError}
+              </div>
+            )}
           </div>
         </CardHeader>
 
@@ -611,7 +610,7 @@ switch (sortOption) {
                 aria-label="Sort options"
               >
                 <option value="ai">Best (AI fit)</option>
-                <option value="rank">AI rank (1 → N)</option>
+                <option value="runway">Longest runway</option>
                 <option value="alpha-asc">Alphabetical (A–Z)</option>
                 <option value="alpha-desc">Alphabetical (Z–A)</option>
                 <option value="cost-asc">Monthly cost (low/high)</option>
@@ -619,7 +618,7 @@ switch (sortOption) {
               </select>
             </div>
 
-            {/* <div className="rounded-3xl border border-dashed border-teal/40 bg-turquoise/10 px-4 py-4">
+            <div className="rounded-3xl border border-dashed border-teal/40 bg-turquoise/10 px-4 py-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-teal">Monthly cost range</p>
@@ -640,7 +639,7 @@ switch (sortOption) {
                   <span className="text-sm font-semibold text-teal">{budgetFormatter.format(maxMonthlyCost)}</span>
                 </div>
               </div>
-            </div> */}
+            </div>
 
             <div className="flex flex-wrap items-center gap-3">
               <button
@@ -666,7 +665,7 @@ switch (sortOption) {
         </CardContent>
       </Card>
 
-      {/* {highlightCity.city !== 'No data' && (
+      {highlightCity.city !== 'No data' && (
         <div className="rounded-3xl border border-teal/30 bg-turquoise/10 px-6 py-5 text-sm text-teal shadow-inner">
           <p>
             With a <strong>{budgetFormatter.format(budget)}</strong> monthly budget,{' '}
@@ -681,7 +680,7 @@ switch (sortOption) {
             )}.
           </p>
         </div>
-      )} */}
+      )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredAndSortedData.map((entry) => (
