@@ -34,85 +34,30 @@ function normalizeAddress(parts = EMPTY_ADDRESS) {
 function parsePersistedAddress(value) {
   if (!value) return { ...EMPTY_ADDRESS };
 
-  const fromObject = (input) => ({
-    houseNumber:
-      typeof input.houseNumber === 'string'
-        ? input.houseNumber.trim()
-        : typeof input.house_number === 'string'
-        ? input.house_number.trim()
-        : '',
-    street: typeof input.street === 'string' ? input.street.trim() : '',
-    city: typeof input.city === 'string' ? input.city.trim() : '',
-    state:
-      typeof input.state === 'string'
-        ? input.state.trim().toUpperCase()
-        : typeof input.region === 'string'
-        ? input.region.trim().toUpperCase()
-        : '',
-  });
-
   if (typeof value === 'string') {
-    const cleaned = value.replace(/\r/g, '').trim();
-    if (!cleaned) return { ...EMPTY_ADDRESS };
-
     try {
-      const parsed = JSON.parse(cleaned);
+      const parsed = JSON.parse(value);
       if (parsed && typeof parsed === 'object') {
-        return fromObject(parsed);
+        return {
+          houseNumber: parsed.houseNumber ?? parsed.house_number ?? '',
+          street: parsed.street ?? '',
+          city: parsed.city ?? '',
+          state: parsed.state ?? '',
+        };
       }
     } catch (error) {
-      // fall through to parsing as a formatted string
+      // fall through to object parsing below
     }
-
-    const lines = cleaned
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    let lineOne = lines[0] ?? '';
-    let remainder = lines.slice(1).join(', ');
-
-    if (!remainder && lineOne.includes(',')) {
-      const [first, ...rest] = lineOne
-        .split(',')
-        .map((segment) => segment.trim())
-        .filter(Boolean);
-      lineOne = first ?? '';
-      remainder = rest.join(', ');
-    }
-
-    const parts = { ...EMPTY_ADDRESS };
-
-    const numberMatch = lineOne.match(/^(?<number>[\dA-Za-z-]+)\s+(?<street>.*)$/);
-    if (numberMatch?.groups) {
-      parts.houseNumber = numberMatch.groups.number ?? '';
-      parts.street = numberMatch.groups.street ?? '';
-    } else {
-      parts.street = lineOne ?? '';
-    }
-
-    const locality = remainder || lines[1] || '';
-    const localityParts = locality
-      .split(',')
-      .map((segment) => segment.trim())
-      .filter(Boolean);
-
-    if (localityParts.length === 1) {
-      if (localityParts[0].length <= 3) {
-        parts.state = localityParts[0].toUpperCase();
-      } else {
-        parts.city = localityParts[0];
-      }
-    } else if (localityParts.length > 1) {
-      parts.city = localityParts[0];
-      parts.state = localityParts[1]?.toUpperCase() ?? '';
-    }
-
-    return parts;
+    return { ...EMPTY_ADDRESS };
   }
 
   if (typeof value === 'object') {
-    return fromObject(value);
+    return {
+      houseNumber: value.houseNumber ?? value.house_number ?? '',
+      street: value.street ?? '',
+      city: value.city ?? '',
+      state: value.state ?? '',
+    };
   }
 
   return { ...EMPTY_ADDRESS };
@@ -128,8 +73,8 @@ function formatAddressPreview(parts) {
 function serialiseAddress(parts) {
   const normalised = normalizeAddress(parts);
   const formatted = formatAddressPreview(normalised);
-  const hasAny = Object.values(normalised).some((v) => v.length > 0);
-  return hasAny ? formatted : null;
+  const hasAny = Object.values(normalised).some(v => v.length > 0);
+  return hasAny ? JSON.stringify({ ...normalised, formatted }) : null;
 }
 
 /* ---------- page ---------- */
@@ -177,7 +122,7 @@ export default function Settings() {
   const [countriesError, setCountriesError] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const disableProfileInputs = savingProfile || profileLoading;
+  const disableProfileInputs = savingProfile;
 
   const identityFallback = useMemo(() => {
     if (!user) return '';
@@ -281,7 +226,7 @@ export default function Settings() {
   // countries list
   useEffect(() => {
     let active = true;
-    setCountriesLoading(true);
+    setCountriesLoading(false);
     setCountriesError(null);
 
     supabase
@@ -309,11 +254,7 @@ export default function Settings() {
         );
         setCountries([]);
       })
-      .finally(() => {
-        if (active) {
-          setCountriesLoading(false);
-        }
-      });
+      .finally(() => active && setCountriesLoading(false));
 
     return () => {
       active = false;
