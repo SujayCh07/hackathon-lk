@@ -1,13 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase.js";
 import { upsertUserProfileName, upsertUserRow } from "../lib/userIdentity.js";
 import Button from "../components/ui/Button.jsx";
 import Barcelona from "../assets/cities/barcelona.jpg"; // background image
+import OnboardingModal from "../components/onboarding/OnboardingModal.jsx";
+import usePersonalization from "../hooks/usePersonalization.js";
+import { useAuth } from "../hooks/useAuth.js";
 
 export function SignupPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { signOut: authSignOut } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,8 +19,46 @@ export function SignupPage() {
   const [formError, setFormError] = useState(null);
   const [message, setMessage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdUser, setCreatedUser] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  const createdUserId = createdUser?.id ?? null;
+  const { data: personalization, completeOnboarding, loading: personalizationLoading } = usePersonalization(createdUserId);
 
   const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+  const loginDestination = `/login?redirectTo=${encodeURIComponent(redirectTo)}`;
+
+  useEffect(() => {
+    if (!createdUserId) return;
+    if (personalizationLoading) return;
+    if (!personalization?.onboardingComplete) {
+      setShowOnboarding(true);
+    }
+  }, [createdUserId, personalization?.onboardingComplete, personalizationLoading]);
+
+  const handleOnboardingFinished = async (payload = null) => {
+    if (!createdUserId) return;
+    const base = personalization ?? {};
+    if (payload) {
+      await completeOnboarding({ ...base, ...payload, onboardingComplete: true });
+    } else {
+      await completeOnboarding({ ...base, onboardingComplete: true });
+    }
+    setShowOnboarding(false);
+    setCreatedUser(null);
+
+    try {
+      if (typeof authSignOut === "function") {
+        await authSignOut();
+      } else {
+        await supabase.auth.signOut({ scope: "global" });
+      }
+    } catch (error) {
+      console.warn("Failed to end onboarding session", error);
+    }
+
+    navigate(loginDestination, { replace: true });
+  };
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -53,10 +95,12 @@ export function SignupPage() {
 
     if (data.user) {
       await persistUserIdentity(data.user, displayName.trim());
+      setCreatedUser(data.user);
     }
 
-    if (data.session) {
-      navigate(redirectTo, { replace: true });
+    if (data.session && data.user) {
+      setShowOnboarding(true);
+      setIsSubmitting(false);
       return;
     }
 
@@ -160,6 +204,13 @@ export function SignupPage() {
           </p>
         </div>
       </div>
+      <OnboardingModal
+        isOpen={showOnboarding && !personalizationLoading}
+        defaultValues={personalization ?? {}}
+        displayName={displayName}
+        onComplete={handleOnboardingFinished}
+        onSkip={() => handleOnboardingFinished(null)}
+      />
     </section>
   );
 }

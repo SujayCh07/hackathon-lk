@@ -8,8 +8,6 @@ import SavingsRunwayPanel from '../components/dashboard/SavingsRunwayPanel.jsx';
 import NotificationsWidget from '../components/dashboard/NotificationsWidget.jsx';
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
-import usePersonalization from '../hooks/usePersonalization.js';
-import OnboardingModal from '../components/onboarding/OnboardingModal.jsx';
 import { supabase } from '../lib/supabase.js';
 
 const ACCT_LS_KEY = 'parity:selectedAccountId';
@@ -48,11 +46,9 @@ async function getCountryCoords(countryName) {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading, isSyncingNessie, refreshNessie, nessie } = useAuth();
   const userId = user?.id ?? null;
   const { profile } = useUserProfile(userId);
-  const { data: personalization, loading: personalizationLoading, completeOnboarding } = usePersonalization(userId);
-
   // identity/budget
   const identityFallback = useMemo(() => {
     if (!user) return '';
@@ -63,26 +59,71 @@ export default function Dashboard() {
   }, [user]);
   const displayName = profile?.name ?? identityFallback;
   const baseMonthlyBudget = useMemo(() => {
-    if (personalization?.monthlyBudget) return personalization.monthlyBudget;
     if (profile?.monthly_budget) return profile.monthly_budget;
     return 2500;
-  }, [personalization?.monthlyBudget, profile?.monthly_budget]);
+  }, [profile?.monthly_budget]);
 
   // ── Accounts & selection ───────────────────────────────────────────────────
   const [accounts, setAccounts] = useState([]); // [{ id, type, balance, nickname, snapshot_ts }]
   const [selectedId, setSelectedId] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   const [balanceUSD, setBalanceUSD] = useState(0);
+  const [accountsLoading, setAccountsLoading] = useState(false);
 
   // recent tx for selected account (rendered after load)
   const [recent, setRecent] = useState([]);
   // 90-day tx for trends (all accounts)
   const [trendTx, setTrendTx] = useState([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [hasRequestedNessieRefresh, setHasRequestedNessieRefresh] = useState(false);
+
+  useEffect(() => {
+    setHasRequestedNessieRefresh(false);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    if (isSyncingNessie) return;
+    if (hasRequestedNessieRefresh) return;
+    const hasNessieAccounts = Array.isArray(nessie?.accounts) && nessie.accounts.length > 0;
+    if (hasNessieAccounts) {
+      return;
+    }
+
+    if (typeof refreshNessie === 'function') {
+      setHasRequestedNessieRefresh(true);
+      refreshNessie().catch((error) => {
+        console.warn('Failed to refresh Nessie data for dashboard', error);
+        setHasRequestedNessieRefresh(false);
+      });
+    }
+  }, [
+    hasRequestedNessieRefresh,
+    isSyncingNessie,
+    nessie?.accounts,
+    refreshNessie,
+    userId
+  ]);
 
   // Load accounts (prefer nickname if column exists)
   useEffect(() => {
     let alive = true;
-    if (!userId) return;
+    if (!userId) {
+      setAccounts([]);
+      setSelectedId(null);
+      setSelectedType(null);
+      setBalanceUSD(0);
+      setAccountsLoading(false);
+      return;
+    }
+
+    if (isSyncingNessie) {
+      return () => {
+        alive = false;
+      };
+    }
+
+    setAccountsLoading(true);
 
     (async () => {
       let rows = null;
@@ -105,13 +146,49 @@ export default function Dashboard() {
         rows = res.data || [];
       }
 
-      if (!Array.isArray(rows) || rows.length === 0) {
+      const hasRows = Array.isArray(rows) && rows.length > 0;
+
+      if (!hasRows) {
         if (alive) {
-          setAccounts([]);
-          setSelectedId(null);
-          setBalanceUSD(0);
-          setSelectedType(null);
+          const fallbackAccounts = Array.isArray(nessie?.accounts)
+            ? nessie.accounts.map((account) => ({
+                id: account.nessieAccountId ?? account.id,
+                type: account.type ?? null,
+                balance: Number(account.balance ?? 0),
+                nickname: account.name ?? null,
+                snapshot_ts: account.snapshot_ts ?? null
+              }))
+            : [];
+
+          if (fallbackAccounts.length > 0) {
+            const saved = typeof window !== 'undefined' ? window.localStorage.getItem(ACCT_LS_KEY) : null;
+            const defaultId =
+              saved && fallbackAccounts.some((a) => a.id === saved) ? saved : fallbackAccounts[0]?.id ?? null;
+
+            setAccounts(fallbackAccounts);
+            setSelectedId(defaultId);
+
+            const def = fallbackAccounts.find((a) => a.id === defaultId);
+            if (def) {
+              setBalanceUSD(def.balance);
+              setSelectedType(def.type ?? null);
+            } else {
+              setBalanceUSD(0);
+              setSelectedType(null);
+            }
+          } else {
+            setAccounts([]);
+            setSelectedId(null);
+            setBalanceUSD(0);
+            setSelectedType(null);
+          }
+          setAccountsLoading(false);
         }
+        return;
+      }
+
+      if (!alive) {
+        setAccountsLoading(false);
         return;
       }
 
@@ -142,7 +219,7 @@ export default function Dashboard() {
       setAccounts(list);
 
       // Default: last chosen (localStorage) or the oldest account created (firstSeen)
-      const saved = localStorage.getItem(ACCT_LS_KEY);
+      const saved = typeof window !== 'undefined' ? window.localStorage.getItem(ACCT_LS_KEY) : null;
       const defaultId = saved && list.some((a) => a.id === saved) ? saved : firstSeenOrder[0] ?? null;
       setSelectedId(defaultId);
 
@@ -151,20 +228,42 @@ export default function Dashboard() {
         setBalanceUSD(def.balance);
         setSelectedType(def.type ?? null);
       }
-    })();
+    })()
+      .catch((error) => {
+        console.warn('Failed to hydrate accounts for dashboard', error);
+      })
+      .finally(() => {
+        if (alive) {
+          setAccountsLoading(false);
+        }
+      });
 
-    return () => { alive = false; };
-  }, [userId]);
+    return () => {
+      alive = false;
+    };
+  }, [nessie?.accounts, userId, isSyncingNessie]);
 
   // Persist selection
   useEffect(() => {
-    if (selectedId) localStorage.setItem(ACCT_LS_KEY, selectedId);
+    if (typeof window === 'undefined') return;
+    if (selectedId) window.localStorage.setItem(ACCT_LS_KEY, selectedId);
   }, [selectedId]);
 
   // Fetch data for current selection (runs on load and after hard refresh)
   useEffect(() => {
     let alive = true;
-    if (!userId || !selectedId) return;
+    if (!userId || !selectedId) {
+      setTransactionsLoading(false);
+      return;
+    }
+
+    if (isSyncingNessie) {
+      return () => {
+        alive = false;
+      };
+    }
+
+    setTransactionsLoading(true);
 
     (async () => {
       // Confirm latest snapshot (and nickname if we just learned it)
@@ -204,8 +303,9 @@ export default function Dashboard() {
           .limit(10);
       }
 
-      if ((txResp.error && /nessie_account_id/i.test(txResp.error.message || '')) ||
-          (Array.isArray(txResp.data) && txResp.data.length === 0)) {
+      const hasTxData = Array.isArray(txResp.data) && txResp.data.length > 0;
+
+      if ((txResp.error && /nessie_account_id/i.test(txResp.error.message || '')) || !hasTxData) {
         let alt = await supabase
           .from('transactions')
           .select('id, merchant, amount, category, ts, account_id, status')
@@ -224,7 +324,7 @@ export default function Dashboard() {
             .limit(10);
         }
 
-        if (!alt.error && Array.isArray(alt.data)) {
+        if (!alt.error && Array.isArray(alt.data) && alt.data.length > 0) {
           setRecent(
             alt.data.map((t) => ({
               id: t.id,
@@ -235,6 +335,25 @@ export default function Dashboard() {
               status: (t.status || 'completed').toString(),
             }))
           );
+        } else if (Array.isArray(nessie?.transactions) && nessie.transactions.length > 0) {
+          const fallbackTx = nessie.transactions
+            .filter((t) => {
+              const raw = t.raw ?? {};
+              const rawAccountId =
+                raw.nessie_account_id ?? raw.account_id ?? raw.accountId ?? raw.account?.id ?? raw.accountIdRef ?? null;
+              return !rawAccountId || rawAccountId === selectedId;
+            })
+            .slice(0, 10)
+            .map((t) => ({
+              id: t.id,
+              merchant: t.merchant ?? 'Unknown merchant',
+              amount: Number(t.amount ?? 0),
+              category: t.category ?? 'General',
+              timestamp: t.date ?? t.raw?.ts ?? t.raw?.timestamp ?? t.raw?.created_at ?? new Date().toISOString(),
+              status: (t.raw?.status || 'completed').toString(),
+            }));
+
+          setRecent(fallbackTx);
         }
       } else if (!txResp.error && Array.isArray(txResp.data)) {
         setRecent(
@@ -259,7 +378,7 @@ export default function Dashboard() {
         .gte('ts', since.toISOString())
         .order('ts', { ascending: true });
 
-      if (alive && Array.isArray(last90)) {
+      if (alive && Array.isArray(last90) && last90.length > 0) {
         setTrendTx(
           last90.map((t) => ({
             id: t.id,
@@ -269,28 +388,72 @@ export default function Dashboard() {
             timestamp: t.ts,
           }))
         );
+      } else if (alive && Array.isArray(nessie?.transactions) && nessie.transactions.length > 0) {
+        setTrendTx(
+          nessie.transactions.map((t) => ({
+            id: t.id,
+            merchant: t.merchant ?? 'Unknown merchant',
+            amount: Number(t.amount ?? 0),
+            category: t.category ?? 'General',
+            timestamp: t.date ?? t.raw?.ts ?? t.raw?.timestamp ?? t.raw?.created_at ?? new Date().toISOString(),
+          }))
+        );
       }
-    })();
+    })()
+      .catch((error) => {
+        console.warn('Failed to hydrate transactions for dashboard', error);
+      })
+      .finally(() => {
+        if (alive) {
+          setTransactionsLoading(false);
+        }
+      });
 
-    return () => { alive = false; };
-  }, [userId, selectedId]);
+    return () => {
+      alive = false;
+    };
+  }, [
+    isSyncingNessie,
+    nessie?.transactions,
+    selectedId,
+    userId
+  ]);
 
   // PPP (unchanged)
   const [pppTop, setPppTop] = useState([]);
   const [pppMarkers, setPppMarkers] = useState([]);
   const [coordsCache, setCoordsCache] = useState({});
+  const [pppLoading, setPppLoading] = useState(false);
   useEffect(() => {
     let alive = true;
-    if (!userId) return;
+    if (!userId) {
+      setPppTop([]);
+      setPppMarkers([]);
+      setPppLoading(false);
+      return () => {
+        alive = false;
+      };
+    }
+    setPppLoading(true);
     (async () => {
-      const { data: prof } = await supabase.from('user_profile').select('current_country_code').eq('user_id', userId).maybeSingle();
+      const { data: prof } = await supabase
+        .from('user_profile')
+        .select('current_country_code')
+        .eq('user_id', userId)
+        .maybeSingle();
       const currentCode = (prof?.current_country_code || 'USA').toUpperCase();
       const { data: rows } = await supabase
         .from('ppp_country')
         .select('code, country, 2024_y')
         .not('2024_y', 'is', null)
         .limit(300);
-      if (!Array.isArray(rows) || rows.length === 0) return;
+      if (!Array.isArray(rows) || rows.length === 0) {
+        if (alive) {
+          setPppTop([]);
+          setPppMarkers([]);
+        }
+        return;
+      }
       const items = rows
         .map((r) => ({ code: String(r.code || '').toUpperCase(), name: String(r.country || '').toLowerCase(), p: Number(r['2024_y']) }))
         .filter((r) => r.p > 0);
@@ -326,8 +489,16 @@ export default function Dashboard() {
             .slice(0, 5)
         );
       }
-    })();
-    return () => { alive = false; };
+    })()
+      .catch((error) => {
+        console.warn('Failed to hydrate PPP data', error);
+      })
+      .finally(() => {
+        if (alive) setPppLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, coordsCache]);
 
@@ -353,11 +524,19 @@ export default function Dashboard() {
     ? `Here’s how $${Number(baseMonthlyBudget).toLocaleString()}/month stretches across the globe.`
     : 'Let’s see how your money travels.';
 
+  const showDashboardLoader =
+    authLoading ||
+    (userId &&
+      (isSyncingNessie || accountsLoading || (transactionsLoading && recent.length === 0)) &&
+      accounts.length === 0);
+
+  if (showDashboardLoader) {
+    return <DashboardLoader message="Loading your latest balances" />;
+  }
+
   // Render
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-      <OnboardingModal onSkip={() => completeOnboarding({ ...personalization, onboardingComplete: true })} />
-
       {/* Hero / Accounts */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <Card className="col-span-1 bg-white/90">
@@ -374,16 +553,19 @@ export default function Dashboard() {
                 value={selectedId ?? ''}
                 onChange={(e) => {
                   const next = e.target.value || null;
-                  if (next) {
-                    localStorage.setItem(ACCT_LS_KEY, next);
-                  } else {
-                    localStorage.removeItem(ACCT_LS_KEY);
+                  if (typeof window !== 'undefined') {
+                    if (next) {
+                      window.localStorage.setItem(ACCT_LS_KEY, next);
+                    } else {
+                      window.localStorage.removeItem(ACCT_LS_KEY);
+                    }
+                    // force full reload to guarantee fresh data render
+                    window.location.reload();
                   }
-                  // force full reload to guarantee fresh data render
-                  window.location.reload();
                 }}
               >
-                {accounts.length === 0 && <option value="">No accounts</option>}
+                {accountsLoading && <option value="">Loading accounts…</option>}
+                {!accountsLoading && accounts.length === 0 && <option value="">No accounts</option>}
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.nickname?.trim() || `${a.type || 'Account'} • ${a.id.slice(-4)}`}
@@ -392,7 +574,9 @@ export default function Dashboard() {
               </select>
             </div>
 
-            <p className="text-3xl font-poppins font-semibold text-teal">{fmtUSD(balanceUSD)}</p>
+            <p className="text-3xl font-poppins font-semibold text-teal">
+              {accountsLoading ? <InlineLoader label="Fetching balance" /> : fmtUSD(balanceUSD)}
+            </p>
             <p className="mt-1 text-xs text-charcoal/60">
               {selectedType ? `Type: ${selectedType}` : accounts.length === 0 ? 'No accounts yet.' : 'Select an account.'}
             </p>
@@ -409,7 +593,12 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-3">
-              {recent.length === 0 && (
+              {transactionsLoading && recent.length === 0 && (
+                <li className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-center text-sm text-charcoal/60">
+                  <InlineLoader label="Fetching recent activity" />
+                </li>
+              )}
+              {!transactionsLoading && recent.length === 0 && (
                 <li className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-center text-sm text-charcoal/60">
                   We’ll populate this once your transactions sync.
                 </li>
@@ -445,6 +634,7 @@ export default function Dashboard() {
             <CardTitle>Trends & insights</CardTitle>
             <p className="text-sm text-charcoal/70">
               {(() => {
+                if (transactionsLoading) return <InlineLoader label="Loading weekly trends" />;
                 if (trendData.length < 2) return 'We’ll track spend trends once we have two weeks of data.';
                 const last = trendData.at(-1).amount;
                 const prev = trendData.at(-2).amount || 1;
@@ -456,7 +646,13 @@ export default function Dashboard() {
             </p>
           </CardHeader>
           <CardContent>
-            <SpendingTrendChart data={groupByWeek(trendTx).map(({ label, amount }) => ({ label, amount }))} />
+            {transactionsLoading && trendData.length === 0 ? (
+              <div className="flex min-h-[200px] items-center justify-center">
+                <InlineLoader label="Preparing trend chart" />
+              </div>
+            ) : (
+              <SpendingTrendChart data={groupByWeek(trendTx).map(({ label, amount }) => ({ label, amount }))} />
+            )}
           </CardContent>
         </Card>
 
@@ -488,7 +684,13 @@ export default function Dashboard() {
             <p className="text-sm text-charcoal/70">Hover the globe to see how your purchasing power compares.</p>
           </CardHeader>
           <CardContent>
-            <WorldMap markers={pppMarkers} />
+            {pppMarkers.length === 0 ? (
+              <div className="flex min-h-[240px] items-center justify-center text-sm text-charcoal/60">
+                {pppLoading ? <InlineLoader label="Loading PPP map" /> : 'PPP data is on the way — check back shortly.'}
+              </div>
+            ) : (
+              <WorldMap markers={pppMarkers} />
+            )}
           </CardContent>
         </Card>
 
@@ -508,7 +710,7 @@ export default function Dashboard() {
               ))}
               {pppTop.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-sm text-charcoal/60">
-                  We’re fetching PPP insights — check back shortly.
+                  {pppLoading ? <InlineLoader label="Collecting PPP insights" /> : 'We’ll surface PPP picks once data syncs.'}
                 </div>
               )}
             </CardContent>
@@ -516,5 +718,23 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+function DashboardLoader({ message }) {
+  return (
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-sm text-charcoal/70" role="status">
+      <span className="h-8 w-8 animate-spin rounded-full border-2 border-teal/30 border-t-teal" aria-hidden="true" />
+      <span>{message ?? 'Loading dashboard…'}</span>
+    </div>
+  );
+}
+
+function InlineLoader({ label }) {
+  return (
+    <span className="inline-flex items-center gap-2 text-sm text-charcoal/70" role="status">
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-teal/30 border-t-teal" aria-hidden="true" />
+      <span>{label ?? 'Loading…'}</span>
+    </span>
   );
 }
