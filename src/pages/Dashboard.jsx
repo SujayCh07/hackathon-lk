@@ -307,29 +307,6 @@ export function Dashboard() {
 
         <div className="grid grid-cols-1 gap-4">
           <SavingsRunwayPanel destinations={topDestinations} stayLengthMonths={6} />
-          <Card className="bg-white/90">
-            <CardHeader>
-              <CardTitle>Top PPP picks</CardTitle>
-              <p className="text-sm text-charcoal/70">
-                GeoBudget = personalized travel & budget forecasting.
-              </p>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              {pppTop.map((dest) => (
-                <CityCard
-                  key={dest.city}
-                  city={dest.city}
-                  ppp={dest.ppp}
-                  savingsPct={dest.savings ?? dest.savingsPct}
-                />
-              ))}
-              {pppTop.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-sm text-charcoal/60">
-                  We’re fetching PPP insights — check back shortly.
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

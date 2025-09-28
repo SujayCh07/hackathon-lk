@@ -10,7 +10,7 @@ import { useTransactions } from '../hooks/useTransactions.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import { supabase } from '../lib/supabase.js';
 
-/* ---------- small helpers ---------- */
+/* ---------- helpers ---------- */
 
 function formatCurrency(amount, currency = 'USD') {
   try {
@@ -66,12 +66,10 @@ export default function Settings() {
     refresh: refreshAccounts,
   } = useAccount();
 
-  const monthlyBudgetNumber = typeof profile?.monthlyBudget === 'number' ? profile.monthlyBudget : null;
-
-  const {
-    isRefreshing: transactionsRefreshing,
-    refresh: refreshTransactions,
-  } = useTransactions({ limit: 5, monthlyBudget: monthlyBudgetNumber, balanceUSD });
+  const monthlyBudgetNumber =
+    typeof profile?.monthlyBudget === 'number' ? profile.monthlyBudget : null;
+  const { isRefreshing: transactionsRefreshing, refresh: refreshTransactions } =
+    useTransactions({ limit: 5, monthlyBudget: monthlyBudgetNumber, balanceUSD });
 
   // form state
   const [displayName, setDisplayName] = useState('');
@@ -81,18 +79,16 @@ export default function Settings() {
   const [addressCity, setAddressCity] = useState('');
   const [addressState, setAddressState] = useState('');
   const [currentCountryCode, setCurrentCountryCode] = useState('');
-  const [homeCountryCode, setHomeCountryCode] = useState('');
 
-  // ui state
+  // ui + toast state
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileStatus, setProfileStatus] = useState(null);
   const [accountsStatus, setAccountsStatus] = useState(null);
   const [countries, setCountries] = useState([]);
   const [countriesLoading, setCountriesLoading] = useState(false);
   const [countriesError, setCountriesError] = useState(null);
-
-  // toast
   const [toast, setToast] = useState(null);
+
   const showToast = useCallback((t) => setToast({ id: Date.now(), ...t }), []);
   const dismissToast = useCallback(() => setToast(null), []);
   useEffect(() => {
@@ -107,7 +103,7 @@ export default function Settings() {
     if (accountsError) {
       setAccountsStatus({
         type: 'error',
-        message: 'Unable to reach Nessie right now. Showing cached balances.'
+        message: 'Unable to reach Nessie right now. Showing cached balances.',
       });
     }
   }, [accountsError]);
@@ -125,19 +121,23 @@ export default function Settings() {
     if (profileLoading) return;
     setDisplayName(profile?.name ?? identityFallback);
     setMonthlyBudget(
-      profile?.monthlyBudget != null && !Number.isNaN(profile.monthlyBudget) ? String(profile.monthlyBudget) : ''
+      profile?.monthlyBudget != null && !Number.isNaN(profile.monthlyBudget)
+        ? String(profile.monthlyBudget)
+        : ''
     );
-    const addr = profile?.streetAddress ?? null; // could be stringified JSON from earlier saves
+    const addr = profile?.streetAddress ?? null;
     if (addr && typeof addr === 'object') {
       setAddressHouseNumber(addr.houseNumber ?? '');
       setAddressStreet(addr.street ?? '');
       setAddressCity(addr.city ?? '');
       setAddressState(addr.state ? String(addr.state).toUpperCase() : '');
     } else {
-      setAddressHouseNumber(''); setAddressStreet(''); setAddressCity(''); setAddressState('');
+      setAddressHouseNumber('');
+      setAddressStreet('');
+      setAddressCity('');
+      setAddressState('');
     }
     setCurrentCountryCode(profile?.currentCountry?.code ?? '');
-    setHomeCountryCode(profile?.homeCountry?.code ?? '');
   }, [profile, profileLoading, identityFallback]);
 
   // countries list
@@ -166,12 +166,16 @@ export default function Settings() {
       })
       .catch((e) => {
         if (!active) return;
-        setCountriesError(e instanceof Error ? e.message : 'Unable to load countries right now.');
+        setCountriesError(
+          e instanceof Error ? e.message : 'Unable to load countries right now.'
+        );
         setCountries([]);
       })
       .finally(() => active && setCountriesLoading(false));
 
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
   const countryOptions = useMemo(() => {
@@ -184,13 +188,16 @@ export default function Settings() {
     };
     countries.forEach(put);
     if (profile?.currentCountry) put(profile.currentCountry);
-    if (profile?.homeCountry) put(profile.homeCountry);
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [countries, profile?.currentCountry, profile?.homeCountry]);
+  }, [countries, profile?.currentCountry]);
 
   const totalBalance = useMemo(() => {
     if (!Array.isArray(accounts)) return 0;
-    return accounts.reduce((sum, account) => sum + (typeof account?.balance === 'number' ? account.balance : 0), 0);
+    return accounts.reduce(
+      (sum, account) =>
+        sum + (typeof account?.balance === 'number' ? account.balance : 0),
+      0
+    );
   }, [accounts]);
   const headlineCurrency = accounts?.[0]?.currencyCode ?? 'USD';
 
@@ -215,13 +222,22 @@ export default function Settings() {
     const budgetStr = monthlyBudget.trim();
     const parsedBudget = budgetStr === '' ? null : Number(budgetStr);
     if (parsedBudget != null && Number.isNaN(parsedBudget)) {
-      setProfileStatus({ type: 'error', message: 'Monthly budget must be a valid number.' });
-      showToast({ type: 'error', title: 'Check your monthly budget', description: 'Please enter a valid number.', duration: 4200 });
+      setProfileStatus({
+        type: 'error',
+        message: 'Monthly budget must be a valid number.',
+      });
+      showToast({
+        type: 'error',
+        title: 'Check your monthly budget',
+        description: 'Please enter a valid number.',
+        duration: 4200,
+      });
       return;
     }
 
-    const currentCode = currentCountryCode?.trim() ? currentCountryCode.trim().toUpperCase() : null;
-    const homeCode = homeCountryCode?.trim() ? homeCountryCode.trim().toUpperCase() : null;
+    const currentCode = currentCountryCode?.trim()
+      ? currentCountryCode.trim().toUpperCase()
+      : null;
     const street_address = serialiseAddress({
       houseNumber: addressHouseNumber,
       street: addressStreet,
@@ -238,20 +254,26 @@ export default function Settings() {
         name: trimmedName || null,
         monthly_budget: parsedBudget,
         current_country_code: currentCode,
-        home_country_code: homeCode,
-        street_address, // stringified JSON or null
+        street_address,
       };
 
-      const { error } = await supabase.from('user_profile').upsert(updates, { onConflict: 'user_id' });
+      const { error } = await supabase
+        .from('user_profile')
+        .upsert(updates, { onConflict: 'user_id' });
       if (error) throw error;
 
       if (trimmedName) {
-        const { error: mdErr } = await supabase.auth.updateUser({ data: { ...(user?.user_metadata ?? {}), displayName: trimmedName } });
+        const { error: mdErr } = await supabase.auth.updateUser({
+          data: { ...(user?.user_metadata ?? {}), displayName: trimmedName },
+        });
         if (mdErr) throw mdErr;
       }
 
-      // refresh only the profile hook (NOT Nessie) to keep UI in sync
-      try { await refreshProfile(); } catch (err) { console.warn('Profile refresh failed:', err); }
+      try {
+        await refreshProfile();
+      } catch (err) {
+        console.warn('Profile refresh failed:', err);
+      }
 
       showToast({
         type: 'success',
@@ -262,9 +284,15 @@ export default function Settings() {
         duration: 4500,
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to update profile settings.';
+      const msg =
+        err instanceof Error ? err.message : 'Failed to update profile settings.';
       setProfileStatus({ type: 'error', message: msg });
-      showToast({ type: 'error', title: 'Could not save settings', description: msg, duration: 5000 });
+      showToast({
+        type: 'error',
+        title: 'Could not save settings',
+        description: msg,
+        duration: 5000,
+      });
     } finally {
       setSavingProfile(false);
     }
@@ -276,7 +304,8 @@ export default function Settings() {
       await Promise.all([refreshAccounts(), refreshTransactions()]);
       setAccountsStatus({ type: 'success', message: 'Account balances refreshed.' });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unable to refresh accounts right now.';
+      const msg =
+        err instanceof Error ? err.message : 'Unable to refresh accounts right now.';
       setAccountsStatus({ type: 'error', message: msg });
     }
   }
@@ -308,10 +337,13 @@ export default function Settings() {
 
       <main className="mx-auto w-full max-w-6xl px-6 py-12">
         <header className="mb-10 space-y-2">
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-red/80">Account</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-red/80">
+            Account
+          </p>
           <h1 className="text-4xl font-bold tracking-tight text-navy">Settings</h1>
           <p className="max-w-2xl text-base text-slate/80">
-            Update your personal details, budgeting preferences, and refresh your linked Capital One™ data.
+            Update your personal details, budgeting preferences, and refresh your
+            linked Capital One™ data.
           </p>
         </header>
 
@@ -323,7 +355,8 @@ export default function Settings() {
           )}
           {profileError && (
             <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-sm text-red">
-              {profileError.message || 'We were unable to load your profile information.'}
+              {profileError.message ||
+                'We were unable to load your profile information.'}
             </div>
           )}
 
@@ -333,14 +366,22 @@ export default function Settings() {
               title="Profile"
               description="Control how your name appears across PPP Pocket and track your monthly travel savings target."
               actions={
-                <Button type="submit" form="profile-form" className="px-5 py-2 text-sm" disabled={savingProfile}>
+                <Button
+                  type="submit"
+                  form="profile-form"
+                  className="px-5 py-2 text-sm"
+                  disabled={savingProfile}
+                >
                   {savingProfile ? 'Saving…' : 'Save changes'}
                 </Button>
               }
             >
               <form id="profile-form" onSubmit={handleSaveProfile} className="grid gap-6">
                 <div className="grid gap-2">
-                  <label htmlFor="display-name" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
+                  <label
+                    htmlFor="display-name"
+                    className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60"
+                  >
                     Display name
                   </label>
                   <input
@@ -349,16 +390,16 @@ export default function Settings() {
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="How should we greet you?"
-                    className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                    className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner focus:border-red focus:ring-2 focus:ring-red/20"
                     disabled={savingProfile}
                   />
-                  <p className="text-xs text-slate/60">
-                    This name appears on your dashboard and shared parity summaries.
-                  </p>
                 </div>
 
                 <div className="grid gap-2">
-                  <label htmlFor="monthly-budget" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
+                  <label
+                    htmlFor="monthly-budget"
+                    className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60"
+                  >
                     Monthly travel budget (USD)
                   </label>
                   <input
@@ -369,7 +410,7 @@ export default function Settings() {
                     value={monthlyBudget}
                     onChange={(e) => setMonthlyBudget(e.target.value)}
                     placeholder="e.g. 2500"
-                    className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                    className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner focus:border-red focus:ring-2 focus:ring-red/20"
                     disabled={savingProfile}
                   />
                 </div>
@@ -378,115 +419,104 @@ export default function Settings() {
                   <legend className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
                     Mailing address
                   </legend>
-                  <div className="grid gap-4 sm:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
+                  <div className="grid gap-4 sm:grid-cols-[0.75fr_1.25fr]">
                     <div className="grid gap-1.5">
-                      <label htmlFor="address-house-number" className="text-xs font-medium text-slate/70">House number</label>
+                      <label htmlFor="address-house-number" className="text-xs font-medium text-slate/70">
+                        House number
+                      </label>
                       <input
                         id="address-house-number"
                         type="text"
                         inputMode="numeric"
-                        autoComplete="address-line1"
                         value={addressHouseNumber}
                         onChange={(e) => setAddressHouseNumber(e.target.value)}
-                        placeholder="e.g. 123"
-                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                        placeholder="123"
+                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm"
                         disabled={savingProfile}
                       />
                     </div>
                     <div className="grid gap-1.5">
-                      <label htmlFor="address-street" className="text-xs font-medium text-slate/70">Street</label>
+                      <label htmlFor="address-street" className="text-xs font-medium text-slate/70">
+                        Street
+                      </label>
                       <input
                         id="address-street"
                         type="text"
-                        autoComplete="address-line1"
                         value={addressStreet}
                         onChange={(e) => setAddressStreet(e.target.value)}
                         placeholder="Market Street"
-                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm"
                         disabled={savingProfile}
                       />
                     </div>
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
+                  <div className="grid gap-4 sm:grid-cols-3">
                     <div className="grid gap-1.5">
-                      <label htmlFor="address-city" className="text-xs font-medium text-slate/70">City</label>
+                      <label htmlFor="address-city" className="text-xs font-medium text-slate/70">
+                        City
+                      </label>
                       <input
                         id="address-city"
                         type="text"
-                        autoComplete="address-level2"
                         value={addressCity}
                         onChange={(e) => setAddressCity(e.target.value)}
                         placeholder="San Francisco"
-                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm"
                         disabled={savingProfile}
                       />
                     </div>
                     <div className="grid gap-1.5">
-                      <label htmlFor="address-state" className="text-xs font-medium text-slate/70">State / region</label>
+                      <label htmlFor="address-state" className="text-xs font-medium text-slate/70">
+                        State / region
+                      </label>
                       <input
                         id="address-state"
                         type="text"
-                        autoComplete="address-level1"
                         value={addressState}
                         onChange={(e) => setAddressState(e.target.value.toUpperCase())}
                         placeholder="CA"
-                        maxLength={32}
-                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm"
                         disabled={savingProfile}
                       />
                     </div>
+                    <div className="grid gap-1.5">
+                      <label htmlFor="current-country" className="text-xs font-medium text-slate/70">
+                        Country
+                      </label>
+                      <select
+                        id="current-country"
+                        value={currentCountryCode}
+                        onChange={(e) => setCurrentCountryCode(e.target.value)}
+                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
+                        disabled={savingProfile || countriesLoading}
+                      >
+                        <option value="">Select a country</option>
+                        {countriesLoading && <option disabled>Loading…</option>}
+                        {countryOptions.map((c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-
-                  <div className="rounded-3xl border border-slate/15 bg-white/80 px-4 py-3 shadow-inner shadow-white/40">
+                  <div className="rounded-3xl border border-slate/15 bg-white/80 px-4 py-3">
                     {addressPreview ? (
                       <div className="space-y-1">
-                        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate/60">Preview</p>
-                        <p className="whitespace-pre-wrap text-xs font-mono text-slate/70">{addressPreview}</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate/60">
+                          Preview
+                        </p>
+                        <p className="whitespace-pre-wrap text-xs font-mono text-slate/70">
+                          {addressPreview}
+                        </p>
                       </div>
                     ) : (
-                      <p className="text-xs text-slate/60">We'll format your address automatically as you type.</p>
+                      <p className="text-xs text-slate/60">
+                        We'll format your address automatically as you type.
+                      </p>
                     )}
                   </div>
                 </fieldset>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="grid gap-2">
-                    <label htmlFor="current-country" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
-                      Current country
-                    </label>
-                    <select
-                      id="current-country"
-                      value={currentCountryCode}
-                      onChange={(e) => setCurrentCountryCode(e.target.value)}
-                      className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
-                      disabled={savingProfile || countriesLoading}
-                    >
-                      <option value="">Select a country</option>
-                      {countriesLoading && <option value="" disabled>Loading countries…</option>}
-                      {countryOptions.map((c) => (
-                        <option key={c.code} value={c.code}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="grid gap-2">
-                    <label htmlFor="home-country" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
-                      Home country
-                    </label>
-                    <select
-                      id="home-country"
-                      value={homeCountryCode}
-                      onChange={(e) => setHomeCountryCode(e.target.value)}
-                      className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
-                      disabled={savingProfile || countriesLoading}
-                    >
-                      <option value="">Select a country</option>
-                      {countriesLoading && <option value="" disabled>Loading countries…</option>}
-                      {countryOptions.map((c) => (
-                        <option key={`home-${c.code}`} value={c.code}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
 
                 {countriesError && (
                   <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-xs text-red">
@@ -496,7 +526,7 @@ export default function Settings() {
               </form>
             </SettingsSection>
 
-            {/* Capital One / Nessie */}
+            {/* Capital One section */}
             <SettingsSection
               title="Capital One™ sync"
               description="See the latest balances pulled from your demo Capital One™ account and refresh whenever you need."
@@ -515,7 +545,9 @@ export default function Settings() {
               contentClassName="space-y-4"
             >
               <div className="rounded-2xl border border-white/60 bg-gradient-to-br from-white/80 to-white/30 px-4 py-3 shadow-inner">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">Total balance</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
+                  Total balance
+                </p>
                 <p className="mt-2 text-2xl font-semibold text-navy">
                   {formatCurrency(totalBalance, headlineCurrency)}
                 </p>
@@ -526,7 +558,7 @@ export default function Settings() {
                   accounts.map((a) => (
                     <div
                       key={a.id}
-                      className="flex items-center justify-between rounded-2xl border border-slate/15 bg-white/70 px-4 py-3 shadow-sm shadow-white/60"
+                      className="flex items-center justify-between rounded-2xl border border-slate/15 bg-white/70 px-4 py-3 shadow-sm"
                     >
                       <div>
                         <p className="text-sm font-semibold text-navy">{a.name ?? 'Account'}</p>
@@ -538,7 +570,9 @@ export default function Settings() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-slate/60">Connect an account to see balances here.</p>
+                  <p className="text-sm text-slate/60">
+                    Connect an account to see balances here.
+                  </p>
                 )}
               </div>
 
