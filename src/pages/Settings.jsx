@@ -90,7 +90,7 @@ export default function Settings() {
   const [countriesError, setCountriesError] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const disableProfileInputs = false;
+  const disableProfileInputs = savingProfile;
 
   const showToast = useCallback((t) => setToast({ id: Date.now(), ...t }), []);
   const dismissToast = useCallback(() => setToast(null), []);
@@ -119,31 +119,36 @@ export default function Settings() {
     return '';
   }, [user]);
 
-  // load profile -> seed form
+  // load profile -> seed form with latest data only when it changes
   useEffect(() => {
     if (profileLoading) return;
-    setDisplayName(profile?.name ?? identityFallback);
-    setMonthlyBudget(
+
+    const nextDisplayName = profile?.name?.trim?.() || identityFallback || '';
+    const nextBudget =
       profile?.monthlyBudget != null && !Number.isNaN(profile.monthlyBudget)
         ? String(profile.monthlyBudget)
-        : ''
+        : '';
+    const addr =
+      profile?.streetAddress && typeof profile.streetAddress === 'object'
+        ? profile.streetAddress
+        : EMPTY_ADDRESS;
+    const normalizedAddress = normalizeAddress(addr);
+    const nextCountryCode =
+      typeof profile?.currentCountry?.code === 'string'
+        ? profile.currentCountry.code.trim().toUpperCase()
+        : '';
+
+    setDisplayName((prev) => (prev !== nextDisplayName ? nextDisplayName : prev));
+    setMonthlyBudget((prev) => (prev !== nextBudget ? nextBudget : prev));
+    setAddressHouseNumber((prev) =>
+      prev !== normalizedAddress.houseNumber ? normalizedAddress.houseNumber : prev
     );
-    const addr = profile?.streetAddress ?? null;
-    if (addr && typeof addr === 'object') {
-      setAddressHouseNumber(addr.houseNumber ?? '');
-      setAddressStreet(addr.street ?? '');
-      setAddressCity(addr.city ?? '');
-      setAddressState(addr.state ? String(addr.state).toUpperCase() : '');
-    } else {
-      setAddressHouseNumber('');
-      setAddressStreet('');
-      setAddressCity('');
-      setAddressState('');
-    }
-    const selectedCode = profile?.currentCountry?.code ?? '';
-    setCurrentCountryCode(
-      typeof selectedCode === 'string' ? selectedCode.trim().toUpperCase() : ''
+    setAddressStreet((prev) =>
+      prev !== normalizedAddress.street ? normalizedAddress.street : prev
     );
+    setAddressCity((prev) => (prev !== normalizedAddress.city ? normalizedAddress.city : prev));
+    setAddressState((prev) => (prev !== normalizedAddress.state ? normalizedAddress.state : prev));
+    setCurrentCountryCode((prev) => (prev !== nextCountryCode ? nextCountryCode : prev));
   }, [profile, profileLoading, identityFallback]);
 
   useEffect(() => {
@@ -229,7 +234,7 @@ export default function Settings() {
 
   async function handleSaveProfile(e) {
     e.preventDefault();
-    if (!userId) return;
+    if (!userId || savingProfile) return;
 
     const trimmedName = displayName.trim();
     const budgetStr = monthlyBudget.trim();
@@ -251,13 +256,26 @@ export default function Settings() {
     const currentCode = currentCountryCode?.trim()
       ? currentCountryCode.trim().toUpperCase()
       : null;
-    const street_address = serialiseAddress({
+    const normalizedAddress = normalizeAddress({
       houseNumber: addressHouseNumber,
       street: addressStreet,
       city: addressCity,
       state: addressState,
     });
+    const street_address = serialiseAddress(normalizedAddress);
 
+    setProfileStatus(null);
+    setProfileActionState('saving');
+    setSavingProfile(true);
+
+    // Optimistically sync trimmed/normalized values locally
+    setDisplayName(trimmedName || '');
+    setMonthlyBudget(budgetStr === '' ? '' : String(parsedBudget));
+    setAddressHouseNumber(normalizedAddress.houseNumber);
+    setAddressStreet(normalizedAddress.street);
+    setAddressCity(normalizedAddress.city);
+    setAddressState(normalizedAddress.state);
+    setCurrentCountryCode(currentCode ?? '');
 
     try {
       const updates = {
@@ -280,6 +298,7 @@ export default function Settings() {
         if (mdErr) throw mdErr;
       }
 
+      await refreshProfile();
 
       showToast({
         type: 'success',
@@ -290,6 +309,7 @@ export default function Settings() {
         duration: 4500,
       });
       setProfileActionState('success');
+      setProfileStatus(null);
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : 'Failed to update profile settings.';
@@ -386,7 +406,7 @@ export default function Settings() {
                         fill="currentColor"
                       />
                     </svg>
-                    <span>Saved</span>
+                    <span>Saved ✅</span>
                   </div>
                 ) : (
                   <Button
