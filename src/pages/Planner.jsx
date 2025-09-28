@@ -316,12 +316,25 @@ function Planner() {
   const [runwayData, setRunwayData] = useState([]);
   const [isCalculating, setIsCalculating] = useState(false);
 
+  const [searchTerm, setSearchTerm] = useState('');
   const [continentFilter, setContinentFilter] = useState('All');
+  const [maxMonthlyCost, setMaxMonthlyCost] = useState(2500);
   const [activeTags, setActiveTags] = useState([]);
   const [sortOption, setSortOption] = useState('runway');
   const [stayDuration, setStayDuration] = useState(6);
 
   const debouncedBudget = useDebounce(budget, 300);
+
+  const budgetFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }),
+    []
+  );
 
   const formatPrice = useCallback((value) => {
     if (!value || value <= 0) return 'N/A';
@@ -407,8 +420,19 @@ function Planner() {
       isCurious: curiousCities.some((city) => entry.city.toLowerCase().includes(city)),
     }));
 
+    if (searchTerm.trim()) {
+      const lowerTerm = searchTerm.toLowerCase();
+      data = data.filter((entry) =>
+        entry.city.toLowerCase().includes(lowerTerm) || entry.country.toLowerCase().includes(lowerTerm)
+      );
+    }
+
     if (continentFilter !== 'All') {
       data = data.filter((entry) => entry.continent === continentFilter);
+    }
+
+    if (Number.isFinite(maxMonthlyCost)) {
+      data = data.filter((entry) => entry.monthlyCost <= maxMonthlyCost);
     }
 
     if (activeTags.length > 0) {
@@ -432,7 +456,7 @@ function Planner() {
     }
 
     return data;
-  }, [activeTags, continentFilter, curiousCities, runwayData, sortOption]);
+  }, [activeTags, continentFilter, curiousCities, maxMonthlyCost, runwayData, searchTerm, sortOption]);
 
   const highlightCity = useMemo(() => {
     return filteredAndSortedData.reduce(
@@ -507,6 +531,15 @@ function Planner() {
 
           <div className="mt-6 flex flex-col gap-4">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
+              <input
+                type="text"
+                placeholder="Search city or country"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                className="flex-grow rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-teal focus:border-teal"
+                aria-label="Search city"
+              />
+
               <select
                 value={continentFilter}
                 onChange={(event) => setContinentFilter(event.target.value)}
@@ -533,6 +566,29 @@ function Planner() {
                 <option value="safety">Safest</option>
                 <option value="fun">Most fun</option>
               </select>
+            </div>
+
+            <div className="rounded-3xl border border-dashed border-teal/40 bg-turquoise/10 px-4 py-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-teal">Monthly cost range</p>
+                  <p className="text-xs text-charcoal/60">
+                    Cap results to destinations under {budgetFormatter.format(maxMonthlyCost)} per month.
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min={300}
+                    max={4000}
+                    step={50}
+                    value={maxMonthlyCost}
+                    onChange={(event) => setMaxMonthlyCost(Number(event.target.value))}
+                    className="h-2 w-48 flex-1 cursor-pointer appearance-none rounded-full bg-teal/20 accent-teal"
+                  />
+                  <span className="text-sm font-semibold text-teal">{budgetFormatter.format(maxMonthlyCost)}</span>
+                </div>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
