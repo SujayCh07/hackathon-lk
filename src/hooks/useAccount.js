@@ -13,6 +13,10 @@ export function useAccount() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    setCustomerId(user?.user_metadata?.nessieCustomerId ?? null);
+  }, [user?.id, user?.user_metadata?.nessieCustomerId]);
+
+  useEffect(() => {
     let active = true;
     if (!userId) {
       setAccounts([]);
@@ -46,15 +50,19 @@ export function useAccount() {
     };
   }, [userId]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async ({ forceRefresh = false } = {}) => {
     if (!userId || !user) {
       return [];
     }
 
     setIsRefreshing(true);
     try {
-      const { customerId: ensuredId } = await ensureNessieCustomer(user);
-      setCustomerId(ensuredId);
+      let ensuredId = customerId ?? null;
+      if (!ensuredId || forceRefresh) {
+        const ensured = await ensureNessieCustomer(user, { forceRefresh });
+        ensuredId = ensured.customerId;
+        setCustomerId(ensuredId);
+      }
 
       const rows = await syncAccountsFromNessie({ userId, customerId: ensuredId });
       const mapped = rows.map((row) => mapAccountRow(row)).filter(Boolean);
@@ -79,7 +87,7 @@ export function useAccount() {
       setIsRefreshing(false);
       setIsLoading(false);
     }
-  }, [user, userId]);
+  }, [customerId, user, userId]);
 
   const balanceUSD = useMemo(() => {
     return accounts.reduce((total, account) => {
