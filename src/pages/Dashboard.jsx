@@ -8,8 +8,6 @@ import SavingsRunwayPanel from '../components/dashboard/SavingsRunwayPanel.jsx';
 import NotificationsWidget from '../components/dashboard/NotificationsWidget.jsx';
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
-import usePersonalization from '../hooks/usePersonalization.js';
-import OnboardingModal from '../components/onboarding/OnboardingModal.jsx';
 import { supabase } from '../lib/supabase.js';
 
 const ACCT_LS_KEY = 'parity:selectedAccountId';
@@ -51,28 +49,6 @@ export default function Dashboard() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const { profile } = useUserProfile(userId);
-  const { data: personalization, loading: personalizationLoading, completeOnboarding } = usePersonalization(userId);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
-  useEffect(() => {
-    if (personalizationLoading) return;
-    const shouldOpen = Boolean(userId) && !personalization?.onboardingComplete;
-    setShowOnboarding(shouldOpen);
-  }, [personalization?.onboardingComplete, personalizationLoading, userId]);
-
-  const handleOnboardingComplete = useCallback(
-    async (payload) => {
-      await completeOnboarding({ ...(personalization ?? {}), ...payload, onboardingComplete: true });
-      setShowOnboarding(false);
-    },
-    [completeOnboarding, personalization]
-  );
-
-  const handleOnboardingSkip = useCallback(async () => {
-    await completeOnboarding({ ...(personalization ?? {}), onboardingComplete: true });
-    setShowOnboarding(false);
-  }, [completeOnboarding, personalization]);
-
   // identity/budget
   const identityFallback = useMemo(() => {
     if (!user) return '';
@@ -83,10 +59,9 @@ export default function Dashboard() {
   }, [user]);
   const displayName = profile?.name ?? identityFallback;
   const baseMonthlyBudget = useMemo(() => {
-    if (personalization?.monthlyBudget) return personalization.monthlyBudget;
     if (profile?.monthly_budget) return profile.monthly_budget;
     return 2500;
-  }, [personalization?.monthlyBudget, profile?.monthly_budget]);
+  }, [profile?.monthly_budget]);
 
   // ── Accounts & selection ───────────────────────────────────────────────────
   const [accounts, setAccounts] = useState([]); // [{ id, type, balance, nickname, snapshot_ts }]
@@ -376,14 +351,6 @@ export default function Dashboard() {
   // Render
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-      <OnboardingModal
-        isOpen={showOnboarding}
-        defaultValues={personalization ?? {}}
-        displayName={displayName}
-        onComplete={handleOnboardingComplete}
-        onSkip={handleOnboardingSkip}
-      />
-
       {/* Hero / Accounts */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <Card className="col-span-1 bg-white/90">
