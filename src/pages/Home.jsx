@@ -17,7 +17,7 @@ export function Home() {
           <div className="space-y-4">
             <h2 className="font-poppins text-3xl font-semibold text-navy">Why PPP?</h2>
             <p className="text-base text-charcoal/80">
-              Purchasing power parity reframes your Capital One balance as a travel compass. Instantly see how familiar dollars
+              Purchasing power parity reframes your Capital One™ balance as a travel compass. Instantly see how familiar dollars
               unlock premium experiences around the world.
             </p>
           </div>
