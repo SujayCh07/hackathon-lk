@@ -588,7 +588,7 @@ export default function Dashboard() {
   }, [trendTx, baseMonthlyBudget]);
 
   // UI labels
-  const heroLabel = displayName ? `${displayName.split(' ')[0]}'s budget` : 'Your budget';
+  const heroLabel = displayName ? `${displayName.split(' ')[0]}'s Balance` : 'Your Balance';
   const heroSubtitle = baseMonthlyBudget
     ? `Here's how $${Number(baseMonthlyBudget).toLocaleString()}/month stretches across the globe.`
     : "Let's see how your money travels.";
