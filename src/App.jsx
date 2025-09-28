@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import NavBar from './components/layout/NavBar.jsx';
 import Footer from './components/layout/Footer.jsx';
@@ -16,6 +17,14 @@ import DemoAdminStatus from './pages/DemoAdminStatus.jsx';
 
 function App() {
   const location = useLocation();
+  const { refreshSession } = useAuth();
+
+  useEffect(() => {
+    if (!refreshSession) return;
+    refreshSession().catch((error) => {
+      console.warn('Failed to refresh auth session on navigation', error);
+    });
+  }, [location.key, refreshSession]);
 
   return (
     <div className="relative min-h-screen overflow-hidden text-charcoal">

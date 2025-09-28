@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase.js";
 import { upsertUserProfileName, upsertUserRow } from "../lib/userIdentity.js";
 import Button from "../components/ui/Button.jsx";
 import Barcelona from "../assets/cities/barcelona.jpg"; // background image
+import OnboardingModal from "../components/onboarding/OnboardingModal.jsx";
+import usePersonalization from "../hooks/usePersonalization.js";
 
 export function SignupPage() {
   const navigate = useNavigate();
@@ -15,6 +17,36 @@ export function SignupPage() {
   const [formError, setFormError] = useState(null);
   const [message, setMessage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdUser, setCreatedUser] = useState(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [shouldRedirectAfterOnboarding, setShouldRedirectAfterOnboarding] = useState(false);
+
+  const createdUserId = createdUser?.id ?? null;
+  const { data: personalization, completeOnboarding, loading: personalizationLoading } = usePersonalization(createdUserId);
+
+  useEffect(() => {
+    if (!createdUserId) return;
+    if (personalizationLoading) return;
+    if (!personalization?.onboardingComplete) {
+      setShowOnboarding(true);
+    }
+  }, [createdUserId, personalization?.onboardingComplete, personalizationLoading]);
+
+  const handleOnboardingFinished = async (payload = null) => {
+    if (!createdUserId) return;
+    const base = personalization ?? {};
+    if (payload) {
+      await completeOnboarding({ ...base, ...payload, onboardingComplete: true });
+    } else {
+      await completeOnboarding({ ...base, onboardingComplete: true });
+    }
+    setShowOnboarding(false);
+    setCreatedUser(null);
+    if (shouldRedirectAfterOnboarding) {
+      setShouldRedirectAfterOnboarding(false);
+      navigate(redirectTo, { replace: true });
+    }
+  };
 
   const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
 
@@ -53,10 +85,13 @@ export function SignupPage() {
 
     if (data.user) {
       await persistUserIdentity(data.user, displayName.trim());
+      setCreatedUser(data.user);
     }
 
-    if (data.session) {
-      navigate(redirectTo, { replace: true });
+    if (data.session && data.user) {
+      setShouldRedirectAfterOnboarding(true);
+      setShowOnboarding(true);
+      setIsSubmitting(false);
       return;
     }
 
@@ -160,6 +195,13 @@ export function SignupPage() {
           </p>
         </div>
       </div>
+      <OnboardingModal
+        isOpen={showOnboarding && !personalizationLoading}
+        defaultValues={personalization ?? {}}
+        displayName={displayName}
+        onComplete={handleOnboardingFinished}
+        onSkip={() => handleOnboardingFinished(null)}
+      />
     </section>
   );
 }

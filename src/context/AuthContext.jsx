@@ -33,11 +33,7 @@ const initialNessieState = {
 
 const AuthContext = createContext(null);
 
-function getCachedSession() {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
+function getSupabaseStorageKey() {
   try {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     if (!supabaseUrl) {
@@ -49,7 +45,42 @@ function getCachedSession() {
       return null;
     }
 
-    const stored = window.localStorage.getItem(`sb-${projectRef}-auth-token`);
+    return `sb-${projectRef}-auth-token`;
+  } catch (error) {
+    console.warn('Failed to resolve Supabase auth storage key', error);
+    return null;
+  }
+}
+
+function clearCachedSession() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const storageKey = getSupabaseStorageKey();
+  if (!storageKey) {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(storageKey);
+  } catch (error) {
+    console.warn('Failed to clear cached Supabase session', error);
+  }
+}
+
+function getCachedSession() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const storageKey = getSupabaseStorageKey();
+    if (!storageKey) {
+      return null;
+    }
+
+    const stored = window.localStorage.getItem(storageKey);
     if (!stored) {
       return null;
     }
@@ -233,17 +264,52 @@ export function AuthProvider({ children }) {
     setUser(null);
     setNessieState(initialNessieState);
     activeSessionRef.current = null;
+    clearCachedSession();
     try {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
       if (error) {
         setAuthError(error);
         console.error('Failed to sign out from Supabase', error);
       }
     } catch (error) {
-      setAuthError(error);
+      setAuthError(error instanceof Error ? error : new Error('Unexpected error during sign out'));
       console.error('Unexpected error during sign out', error);
     }
   }, []);
+
+  const refreshSession = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        throw error;
+      }
+
+      const nextSession = data?.session ?? null;
+      activeSessionRef.current = nextSession;
+      setSession(nextSession);
+      const nextUser = nextSession?.user ?? null;
+      setUser(nextUser);
+      setAuthError(null);
+
+      if (nextUser) {
+        await syncNessie(nextUser);
+      } else {
+        setNessieState(initialNessieState);
+      }
+
+      return nextSession;
+    } catch (error) {
+      const normalisedError = error instanceof Error ? error : new Error('Unable to refresh session');
+      setAuthError(normalisedError);
+      console.warn('Failed to refresh Supabase session', error);
+      if (!activeSessionRef.current) {
+        setSession(null);
+        setUser(null);
+        setNessieState(initialNessieState);
+      }
+      return null;
+    }
+  }, [syncNessie]);
 
   const value = useMemo(
     () => ({
@@ -254,9 +320,20 @@ export function AuthProvider({ children }) {
       nessie: nessieState,
       isSyncingNessie,
       refreshNessie: () => (user ? syncNessie(user) : undefined),
+      refreshSession,
       signOut
     }),
-    [authError, isLoading, isSyncingNessie, nessieState, session, signOut, syncNessie, user]
+    [
+      authError,
+      isLoading,
+      isSyncingNessie,
+      nessieState,
+      refreshSession,
+      session,
+      signOut,
+      syncNessie,
+      user
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
