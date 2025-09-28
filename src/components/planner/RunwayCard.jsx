@@ -62,7 +62,7 @@ export function RunwayCard({
 <p className="mt-1 text-xs text-charcoal/60">
   {(() => {
     const capital = capitals[country?.toLowerCase()];
-    var countryLocal = capitalizeFirstLetter(country);
+    var countryLocal = capitalizeWords(country);
     if (capital) {
       return `Estimated cost of living in ${capital}, ${countryLocal}`;
     } else {
