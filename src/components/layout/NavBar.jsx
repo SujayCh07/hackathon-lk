@@ -69,7 +69,7 @@ export function NavBar() {
             </span>
             {/* Tagline */}
             <span
-              className="text-xs italic text-gray-700 ml-1"
+              className="text- italic text-gray-700 ml-5"
               style={{ fontStyle: 'italic' }}
             >
               FDIC-Insured - Backed by the full faith and credit of the U.S. Government
