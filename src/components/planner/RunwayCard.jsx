@@ -20,11 +20,13 @@ function formatCurrency(amount, currency) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 }
 
-function capitalizeFirstLetter(str) {
+function capitalizeWords(str) {
   if (!str) return "";
-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+  return str
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }
-
 
 export function RunwayCard({
   city,
@@ -60,7 +62,7 @@ export function RunwayCard({
 <p className="mt-1 text-xs text-charcoal/60">
   {(() => {
     const capital = capitals[country?.toLowerCase()];
-    var countryLocal = capitalizeFirstLetter(country);
+    var countryLocal = capitalizeWords(country);
     if (capital) {
       return `Estimated cost of living in ${capital}, ${countryLocal}`;
     } else {
