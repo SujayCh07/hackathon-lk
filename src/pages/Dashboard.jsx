@@ -232,7 +232,6 @@ function Dashboard() {
     (async () => {
       let rows = null;
       let error = null;
-
       // Try with nickname present
       ({ data: rows, error } = await supabase
         .from('accounts')
