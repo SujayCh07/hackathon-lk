@@ -1,5 +1,7 @@
 import { supabase } from './supabase.js';
 
+export const ONBOARDING_SESSION_FLAG = 'ppp_show_onboarding';
+
 const LOCAL_STORAGE_KEY = 'ppp_personalization';
 
 function readLocalFallback(userId) {

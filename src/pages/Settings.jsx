@@ -90,7 +90,7 @@ export default function Settings() {
   const [countriesError, setCountriesError] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const disableProfileInputs = false;
+  const disableProfileInputs = savingProfile || profileLoading;
 
   const showToast = useCallback((t) => setToast({ id: Date.now(), ...t }), []);
   const dismissToast = useCallback(() => setToast(null), []);
@@ -258,6 +258,9 @@ export default function Settings() {
       state: addressState,
     });
 
+    setSavingProfile(true);
+    setProfileActionState('saving');
+    setProfileStatus(null);
 
     try {
       const updates = {

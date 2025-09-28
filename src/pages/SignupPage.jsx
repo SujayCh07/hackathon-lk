@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase.js";
+import { ONBOARDING_SESSION_FLAG } from "../lib/personalization.js";
 import { upsertUserProfileName, upsertUserRow } from "../lib/userIdentity.js";
 import { ensureNessieCustomer, persistNessieCustomerId } from "../lib/nessie.js"; // 🔥 Nessie helpers
 import Button from "../components/ui/Button.jsx";
@@ -72,6 +73,9 @@ export function SignupPage() {
     }
 
     if (data.session) {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(ONBOARDING_SESSION_FLAG, "1");
+      }
       navigate(redirectTo, { replace: true });
       return;
     }
