@@ -47,12 +47,12 @@ export function NavBar() {
   }, [user]);
 
   async function handleSignOut() {
+    setIsSigningOut(true);
     try {
-      setIsSigningOut(true);
       await signOut();
-      navigate('/', { replace: true });
     } finally {
       setIsSigningOut(false);
+      navigate('/', { replace: true });
     }
   }
 
