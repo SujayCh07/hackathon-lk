@@ -10,6 +10,8 @@ import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import usePersonalization from '../hooks/usePersonalization.js';
 import OnboardingModal from '../components/onboarding/OnboardingModal.jsx';
+import { useAccount } from '../hooks/useAccount.js';
+import { useTransactions } from '../hooks/useTransactions.js';
 import { supabase } from '../lib/supabase.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -94,7 +96,9 @@ export function Dashboard() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const { profile } = useUserProfile(userId);
-  const { data: personalization, loading: personalizationLoading, completeOnboarding } = usePersonalization(userId);
+  const { data: personalization, loading: personalizationLoading, completeOnboarding } =
+    usePersonalization(userId);
+  const { balanceUSD } = useAccount();
 
   // Identity & budget display
   const identityFallback = useMemo(() => {
@@ -107,83 +111,23 @@ export function Dashboard() {
 
   const displayName = profile?.name ?? identityFallback;
   const baseMonthlyBudget = useMemo(() => {
-    if (personalization?.monthlyBudget) return personalization.monthlyBudget;
-    if (profile?.monthly_budget) return profile.monthly_budget;
+    if (typeof personalization?.monthlyBudget === 'number' && Number.isFinite(personalization.monthlyBudget)) {
+      return personalization.monthlyBudget;
+    }
+    if (typeof profile?.monthlyBudget === 'number' && Number.isFinite(profile.monthlyBudget)) {
+      return profile.monthlyBudget;
+    }
     return 2500;
-  }, [personalization?.monthlyBudget, profile?.monthly_budget]);
+  }, [personalization?.monthlyBudget, profile?.monthlyBudget]);
 
-  // ── Supabase-backed account & transactions ────────────────────────────────
-  const [balanceUSD, setBalanceUSD] = useState(0);
-  const [recent, setRecent] = useState([]);           // last ~10 transactions
-  const [allTxForTrends, setAllTxForTrends] = useState([]); // last 90 days for charts
-
-  useEffect(() => {
-    let alive = true;
-    if (!userId) return;
-
-    (async () => {
-      // Balance: latest snapshot in accounts table
-      const { data: acctRows, error: acctErr } = await supabase
-        .from('accounts')
-        .select('balance, currency_code, snapshot_ts')
-        .eq('user_id', userId)
-        .order('snapshot_ts', { ascending: false })
-        .limit(1);
-
-      if (!acctErr && acctRows?.length > 0 && alive) {
-        setBalanceUSD(Number(acctRows[0].balance ?? 0));
-      }
-
-      // Recent transactions (10)
-      const { data: txRows, error: txErr } = await supabase
-        .from('transactions')
-        .select('id, merchant, amount, category, ts')
-        .eq('user_id', userId)
-        .order('ts', { ascending: false })
-        .limit(10);
-
-      if (!txErr && Array.isArray(txRows) && alive) {
-        setRecent(
-          txRows.map((t) => ({
-            id: t.id,
-            merchant: t.merchant ?? 'Unknown merchant',
-            amount: Number(t.amount ?? 0),
-            category: t.category ?? 'General',
-            timestamp: t.ts,
-          }))
-        );
-      }
-
-      // Transactions for last 90 days (for trend chart & budget math)
-      const since = new Date();
-      since.setDate(since.getDate() - 90);
-      const { data: tx90, error: tx90Err } = await supabase
-        .from('transactions')
-        .select('id, merchant, amount, category, ts')
-        .eq('user_id', userId)
-        .gte('ts', since.toISOString())
-        .order('ts', { ascending: true });
-
-      if (!tx90Err && Array.isArray(tx90) && alive) {
-        setAllTxForTrends(
-          tx90.map((t) => ({
-            id: t.id,
-            merchant: t.merchant ?? 'Unknown merchant',
-            amount: Number(t.amount ?? 0),
-            category: t.category ?? 'General',
-            timestamp: t.ts,
-          }))
-        );
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [userId]);
+  const { transactions, recent, spendingMetrics } = useTransactions({
+    limit: 10,
+    monthlyBudget: baseMonthlyBudget,
+    balanceUSD,
+  });
 
   // Trend data (weekly sums)
-  const trendData = useMemo(() => groupTransactionsByWeek(allTxForTrends), [allTxForTrends]);
+  const trendData = useMemo(() => groupTransactionsByWeek(transactions), [transactions]);
 
   // Weekly change % (last week vs prior)
   const weeklyChange = useMemo(() => {
@@ -197,13 +141,16 @@ export function Dashboard() {
 
   // Budget delta (last 30 days spend vs baseMonthlyBudget)
   const budgetDelta = useMemo(() => {
+    if (typeof spendingMetrics?.budgetDelta === 'number' && Number.isFinite(spendingMetrics.budgetDelta)) {
+      return spendingMetrics.budgetDelta;
+    }
+    if (!baseMonthlyBudget) return null;
     const cut = new Date();
     cut.setDate(cut.getDate() - 30);
-    const last30 = allTxForTrends.filter((t) => new Date(t.timestamp) >= cut);
+    const last30 = transactions.filter((t) => new Date(t.timestamp ?? t.date ?? Date.now()) >= cut);
     const spent = last30.reduce((s, t) => s + Math.max(0, Number(t.amount ?? 0)), 0);
-    if (!baseMonthlyBudget) return null;
-    return Number(baseMonthlyBudget) - spent; // positive = under budget
-  }, [allTxForTrends, baseMonthlyBudget]);
+    return Number(baseMonthlyBudget) - spent;
+  }, [transactions, baseMonthlyBudget, spendingMetrics?.budgetDelta]);
 
   // ── PPP from Supabase ppp_country (country-level) ─────────────────────────
   const [pppTop, setPppTop] = useState([]);
@@ -215,13 +162,11 @@ export function Dashboard() {
     if (!userId) return;
 
     (async () => {
-      const { data: prof } = await supabase
-        .from('user_profile')
-        .select('current_country_code')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      const currentCode = (prof?.current_country_code || 'USA').toUpperCase();
+      const currentCode = (
+        profile?.currentCountryCode ||
+        profile?.currentCountry?.code ||
+        'USA'
+      ).toUpperCase();
 
       const { data: rows } = await supabase
         .from('ppp_country')
@@ -293,7 +238,7 @@ export function Dashboard() {
     };
     // include coordsCache so markers update as we fetch coords
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, coordsCache]);
+  }, [userId, coordsCache, profile?.currentCountryCode, profile?.currentCountry?.code]);
 
   // Notifications based on PPP + spend
   const notifications = useMemo(
@@ -321,6 +266,10 @@ export function Dashboard() {
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
       <OnboardingModal
+        isOpen={showOnboarding}
+        defaultValues={personalization}
+        displayName={displayName}
+        onComplete={handleOnboardingComplete}
         onSkip={() => completeOnboarding({ ...personalization, onboardingComplete: true })}
       />
 

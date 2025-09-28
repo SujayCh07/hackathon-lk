@@ -34,30 +34,85 @@ function normalizeAddress(parts = EMPTY_ADDRESS) {
 function parsePersistedAddress(value) {
   if (!value) return { ...EMPTY_ADDRESS };
 
+  const fromObject = (input) => ({
+    houseNumber:
+      typeof input.houseNumber === 'string'
+        ? input.houseNumber.trim()
+        : typeof input.house_number === 'string'
+        ? input.house_number.trim()
+        : '',
+    street: typeof input.street === 'string' ? input.street.trim() : '',
+    city: typeof input.city === 'string' ? input.city.trim() : '',
+    state:
+      typeof input.state === 'string'
+        ? input.state.trim().toUpperCase()
+        : typeof input.region === 'string'
+        ? input.region.trim().toUpperCase()
+        : '',
+  });
+
   if (typeof value === 'string') {
+    const cleaned = value.replace(/\r/g, '').trim();
+    if (!cleaned) return { ...EMPTY_ADDRESS };
+
     try {
-      const parsed = JSON.parse(value);
+      const parsed = JSON.parse(cleaned);
       if (parsed && typeof parsed === 'object') {
-        return {
-          houseNumber: parsed.houseNumber ?? parsed.house_number ?? '',
-          street: parsed.street ?? '',
-          city: parsed.city ?? '',
-          state: parsed.state ?? '',
-        };
+        return fromObject(parsed);
       }
     } catch (error) {
-      // fall through to object parsing below
+      // fall through to parsing as a formatted string
     }
-    return { ...EMPTY_ADDRESS };
+
+    const lines = cleaned
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    let lineOne = lines[0] ?? '';
+    let remainder = lines.slice(1).join(', ');
+
+    if (!remainder && lineOne.includes(',')) {
+      const [first, ...rest] = lineOne
+        .split(',')
+        .map((segment) => segment.trim())
+        .filter(Boolean);
+      lineOne = first ?? '';
+      remainder = rest.join(', ');
+    }
+
+    const parts = { ...EMPTY_ADDRESS };
+
+    const numberMatch = lineOne.match(/^(?<number>[\dA-Za-z-]+)\s+(?<street>.*)$/);
+    if (numberMatch?.groups) {
+      parts.houseNumber = numberMatch.groups.number ?? '';
+      parts.street = numberMatch.groups.street ?? '';
+    } else {
+      parts.street = lineOne ?? '';
+    }
+
+    const locality = remainder || lines[1] || '';
+    const localityParts = locality
+      .split(',')
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+
+    if (localityParts.length === 1) {
+      if (localityParts[0].length <= 3) {
+        parts.state = localityParts[0].toUpperCase();
+      } else {
+        parts.city = localityParts[0];
+      }
+    } else if (localityParts.length > 1) {
+      parts.city = localityParts[0];
+      parts.state = localityParts[1]?.toUpperCase() ?? '';
+    }
+
+    return parts;
   }
 
   if (typeof value === 'object') {
-    return {
-      houseNumber: value.houseNumber ?? value.house_number ?? '',
-      street: value.street ?? '',
-      city: value.city ?? '',
-      state: value.state ?? '',
-    };
+    return fromObject(value);
   }
 
   return { ...EMPTY_ADDRESS };
@@ -73,8 +128,8 @@ function formatAddressPreview(parts) {
 function serialiseAddress(parts) {
   const normalised = normalizeAddress(parts);
   const formatted = formatAddressPreview(normalised);
-  const hasAny = Object.values(normalised).some(v => v.length > 0);
-  return hasAny ? JSON.stringify({ ...normalised, formatted }) : null;
+  const hasAny = Object.values(normalised).some((v) => v.length > 0);
+  return hasAny ? formatted : null;
 }
 
 /* ---------- page ---------- */
@@ -122,7 +177,7 @@ export default function Settings() {
   const [countriesError, setCountriesError] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const disableProfileInputs = savingProfile;
+  const disableProfileInputs = savingProfile || profileLoading;
 
   const identityFallback = useMemo(() => {
     if (!user) return '';
@@ -226,7 +281,7 @@ export default function Settings() {
   // countries list
   useEffect(() => {
     let active = true;
-    setCountriesLoading(false);
+    setCountriesLoading(true);
     setCountriesError(null);
 
     supabase
@@ -254,7 +309,11 @@ export default function Settings() {
         );
         setCountries([]);
       })
-      .finally(() => active && setCountriesLoading(false));
+      .finally(() => {
+        if (active) {
+          setCountriesLoading(false);
+        }
+      });
 
     return () => {
       active = false;

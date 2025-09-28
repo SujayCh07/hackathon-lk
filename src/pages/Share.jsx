@@ -18,6 +18,16 @@ export function Share() {
   const { data: personalization } = usePersonalization(userId);
   const summaryRef = useRef(null);
 
+  const monthlyBudget = useMemo(() => {
+    if (typeof personalization?.monthlyBudget === 'number' && Number.isFinite(personalization.monthlyBudget)) {
+      return personalization.monthlyBudget;
+    }
+    if (typeof profile?.monthlyBudget === 'number' && Number.isFinite(profile.monthlyBudget)) {
+      return profile.monthlyBudget;
+    }
+    return null;
+  }, [personalization?.monthlyBudget, profile?.monthlyBudget]);
+
   const baselineCountry = useMemo(() => {
     if (profile?.homeCountry?.name) return profile.homeCountry.name;
     return 'PPP Passport';
@@ -26,15 +36,15 @@ export function Share() {
   const bestCity = useMemo(() => {
     if (!rankedBySavings.length) return { city: 'Lisbon', savings: 28, runwayLabel: '2.4 years' };
     const [top] = rankedBySavings;
-    const runwayLabel = top.monthlyCost && personalization?.monthlyBudget
-      ? `${(personalization.monthlyBudget / top.monthlyCost).toFixed(1)} months`
+    const runwayLabel = top.monthlyCost && monthlyBudget
+      ? `${(monthlyBudget / top.monthlyCost).toFixed(1)} months`
       : 'Ready when you are';
     return {
       ...top,
       runwayLabel,
       countryCode: top.countryCode ?? top.code ?? '',
     };
-  }, [personalization?.monthlyBudget, rankedBySavings]);
+  }, [monthlyBudget, rankedBySavings]);
 
   const score = useMemo(() => {
     if (!rankedBySavings.length) return 72;
