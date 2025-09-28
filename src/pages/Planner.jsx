@@ -618,7 +618,7 @@ function Planner() {
               </select>
             </div>
 
-            <div className="rounded-3xl border border-dashed border-teal/40 bg-turquoise/10 px-4 py-4">
+            {/* <div className="rounded-3xl border border-dashed border-teal/40 bg-turquoise/10 px-4 py-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-teal">Monthly cost range</p>
@@ -639,7 +639,7 @@ function Planner() {
                   <span className="text-sm font-semibold text-teal">{budgetFormatter.format(maxMonthlyCost)}</span>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             <div className="flex flex-wrap items-center gap-3">
               <button
@@ -665,7 +665,7 @@ function Planner() {
         </CardContent>
       </Card>
 
-      {highlightCity.city !== 'No data' && (
+      {/* {highlightCity.city !== 'No data' && (
         <div className="rounded-3xl border border-teal/30 bg-turquoise/10 px-6 py-5 text-sm text-teal shadow-inner">
           <p>
             With a <strong>{budgetFormatter.format(budget)}</strong> monthly budget,{' '}
@@ -680,7 +680,7 @@ function Planner() {
             )}.
           </p>
         </div>
-      )}
+      )} */}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredAndSortedData.map((entry) => (
