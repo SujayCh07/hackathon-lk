@@ -227,12 +227,6 @@ function Dashboard() {
       return;
     }
 
-    if (isSyncingNessie) {
-      return () => {
-        alive = false;
-      };
-    }
-
     setAccountsLoading(true);
 
     (async () => {
@@ -292,8 +286,8 @@ function Dashboard() {
             setBalanceUSD(0);
             setSelectedType(null);
           }
-          setAccountsLoading(false);
         }
+        setAccountsLoading(false);
         return;
       }
 
@@ -343,12 +337,11 @@ function Dashboard() {
         console.warn('Failed to hydrate accounts for dashboard', error);
       })
       .finally(() => {
-        if (alive) {
-          setAccountsLoading(false);
-        }
+        setAccountsLoading(false);
       });
 
     return () => {
+      setAccountsLoading(false);
       alive = false;
     };
   }, [nessie?.accounts, userId, isSyncingNessie]);
@@ -365,12 +358,6 @@ function Dashboard() {
     if (!userId || !selectedId) {
       setTransactionsLoading(false);
       return;
-    }
-
-    if (isSyncingNessie) {
-      return () => {
-        alive = false;
-      };
     }
 
     setTransactionsLoading(true);
@@ -513,12 +500,11 @@ function Dashboard() {
         console.warn('Failed to hydrate transactions for dashboard', error);
       })
       .finally(() => {
-        if (alive) {
-          setTransactionsLoading(false);
-        }
+        setTransactionsLoading(false);
       });
 
     return () => {
+      setTransactionsLoading(false);
       alive = false;
     };
   }, [
@@ -667,11 +653,12 @@ function Dashboard() {
     ? `Here's how ${Number(baseMonthlyBudget).toLocaleString()}/month stretches across the globe.`
     : 'Let\'s see how your money travels.';
 
+  const hasCachedAccounts =
+    accounts.length > 0 || (Array.isArray(nessie?.accounts) && nessie.accounts.length > 0);
   const showDashboardLoader =
     authLoading ||
-    (userId &&
-      (isSyncingNessie || accountsLoading || (transactionsLoading && recent.length === 0)) &&
-      accounts.length === 0);
+    (userId && !hasCachedAccounts && (accountsLoading || isSyncingNessie || transactionsLoading));
+  const showSyncingIndicator = Boolean(userId && isSyncingNessie && hasCachedAccounts);
 
   if (showDashboardLoader) {
     return <DashboardLoader message="Loading your latest balances" />;
@@ -680,6 +667,11 @@ function Dashboard() {
   // Render
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+      {showSyncingIndicator && (
+        <div className="flex justify-end text-xs text-teal/70">
+          <InlineLoader label="Syncing latest balances" />
+        </div>
+      )}
       {/* Hero / Accounts */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <Card className="col-span-1 bg-white/90">
