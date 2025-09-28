@@ -2,15 +2,14 @@
 # nessie_flow.sh (macOS-safe)
 set -Eeo pipefail
 
-# ── CONFIG (edit if needed) ───────────────────────────────────────────────
-: "${NESSIE_BASE:=http://api.nessieisreal.com}"   # use HTTP directly
+# ── CONFIG ────────────────────────────────────────────────────────────────────
+: "${NESSIE_BASE:=http://api.nessieisreal.com}"   # HTTP works reliably for Nessie
 : "${NESSIE_KEY:=300d851e1a417899f2e58238ad42ecf6}"
 
 : "${SUPABASE_URL:=https://ukjadbtyhovuebzqrwbf.supabase.co}"
 : "${SYNC_URL:=$SUPABASE_URL/functions/v1/nessie-sync}"
-: "${TEST_USER_ID:=9f656bff-c599-4f7f-9f7c-c3483e8f0a0d}"
+: "${TEST_USER_ID:=cab47ad0-d209-4935-8d79-dc1d6b3f9d36}"
 
-# temp files
 TMP_DIR="$(mktemp -d -t nessie_flow_XXXXXX)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -20,7 +19,7 @@ to_lower(){ printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 hr(){ printf '%*s\n' 80 '' | tr ' ' '─'; }
 today(){ date -u +%Y-%m-%d; }
 
-# POST once (no retry), fail loudly but keep response body
+# ── HTTP helpers ──────────────────────────────────────────────────────────────
 nessie_post() {
   local path="$1" json="$2" outfile="$3"
   : > "$outfile"
@@ -40,43 +39,54 @@ ask_count() {
   if [[ -z "$ans" || "$ans" == "none" ]]; then echo 0; else echo "$ans"; fi
 }
 
-# Globals to hold created IDs
+# ── In-memory IDs from this run ───────────────────────────────────────────────
 ACCOUNT_IDS=()
 MERCHANT_IDS=()
 
+# print menus to STDERR; echo only the selection to STDOUT
 choose_account() {
   if (( ${#ACCOUNT_IDS[@]} == 0 )); then
     echo ""
-  elif (( ${#ACCOUNT_IDS[@]} == 1 )); then
-    echo "${ACCOUNT_IDS[0]}"
-  else
-    echo "Available accounts:"
-    local i
-    for i in "${!ACCOUNT_IDS[@]}"; do
-      echo "  [$i] ${ACCOUNT_IDS[$i]}"
-    done
-    local sel; read -r -p "Pick account index [0]: " sel; sel="${sel:-0}"
-    echo "${ACCOUNT_IDS[$sel]}"
+    return
   fi
+  if (( ${#ACCOUNT_IDS[@]} == 1 )); then
+    echo "${ACCOUNT_IDS[0]}"
+    return
+  fi
+  >&2 echo "Available accounts:"
+  local i
+  for i in "${!ACCOUNT_IDS[@]}"; do
+    >&2 echo "  [$i] ${ACCOUNT_IDS[$i]}"
+  done
+  local sel
+  read -r -p "Pick account index [0]: " sel </dev/tty || sel=0
+  [[ "$sel" =~ ^[0-9]+$ ]] || sel=0
+  (( sel >= 0 && sel < ${#ACCOUNT_IDS[@]} )) || sel=0
+  echo "${ACCOUNT_IDS[$sel]}"
 }
 
 choose_merchant() {
   if (( ${#MERCHANT_IDS[@]} == 0 )); then
     echo ""
-  elif (( ${#MERCHANT_IDS[@]} == 1 )); then
-    echo "${MERCHANT_IDS[0]}"
-  else
-    echo "Available merchants:"
-    local i
-    for i in "${!MERCHANT_IDS[@]}"; do
-      echo "  [$i] ${MERCHANT_IDS[$i]}"
-    done
-    local sel; read -r -p "Pick merchant index [0]: " sel; sel="${sel:-0}"
-    echo "${MERCHANT_IDS[$sel]}"
+    return
   fi
+  if (( ${#MERCHANT_IDS[@]} == 1 )); then
+    echo "${MERCHANT_IDS[0]}"
+    return
+  fi
+  >&2 echo "Available merchants:"
+  local i
+  for i in "${!MERCHANT_IDS[@]}"; do
+    >&2 echo "  [$i] ${MERCHANT_IDS[$i]}"
+  done
+  local sel
+  read -r -p "Pick merchant index [0]: " sel </dev/tty || sel=0
+  [[ "$sel" =~ ^[0-9]+$ ]] || sel=0
+  (( sel >= 0 && sel < ${#MERCHANT_IDS[@]} )) || sel=0
+  echo "${MERCHANT_IDS[$sel]}"
 }
 
-# ── 1) CUSTOMER ───────────────────────────────────────────────────────────
+# ── 1) CUSTOMER ───────────────────────────────────────────────────────────────
 echo
 hr
 echo "Create ONE customer (per run)."
@@ -106,7 +116,7 @@ nessie_post "/customers" "$(cat <<JSON
 JSON
 )" "$TMP_DIR/nessie_customer.json"
 
-cat "$TMP_DIR/nessie_customer.json" | jq .
+jq . < "$TMP_DIR/nessie_customer.json"
 CUSTOMER_ID="$(jq -r '.objectCreated?._id // ._id // .id // empty' "$TMP_DIR/nessie_customer.json")"
 if [[ -z "${CUSTOMER_ID:-}" ]]; then
   echo "FATAL: Could not extract CUSTOMER_ID." >&2
@@ -114,7 +124,7 @@ if [[ -z "${CUSTOMER_ID:-}" ]]; then
 fi
 echo "CUSTOMER_ID=$CUSTOMER_ID"
 
-# ── 2) ACCOUNTS ───────────────────────────────────────────────────────────
+# ── 2) ACCOUNTS ───────────────────────────────────────────────────────────────
 echo
 hr
 ACC_N="$(ask_count "How many accounts to create for this customer")"
@@ -136,7 +146,7 @@ for ((i=1; i<=ACC_N; i++)); do
 JSON
 )" "$TMP_DIR/nessie_account_$i.json"
 
-  cat "$TMP_DIR/nessie_account_$i.json" | jq .
+  jq . < "$TMP_DIR/nessie_account_$i.json"
   ACC_ID="$(jq -r '.objectCreated?._id // ._id // .id // empty' "$TMP_DIR/nessie_account_$i.json")"
   if [[ -z "${ACC_ID:-}" ]]; then
     echo "FATAL: Could not extract account id." >&2
@@ -146,7 +156,7 @@ JSON
   ACCOUNT_IDS+=("$ACC_ID")
 done
 
-# ── 3) MERCHANTS ──────────────────────────────────────────────────────────
+# ── 3) MERCHANTS ──────────────────────────────────────────────────────────────
 echo
 hr
 MRC_N="$(ask_count "How many merchants to create")"
@@ -174,7 +184,7 @@ for ((i=1; i<=MRC_N; i++)); do
 JSON
 )" "$TMP_DIR/nessie_merchant_$i.json"
 
-  cat "$TMP_DIR/nessie_merchant_$i.json" | jq .
+  jq . < "$TMP_DIR/nessie_merchant_$i.json"
   MRC_ID="$(jq -r '.objectCreated?._id // ._id // .id // empty' "$TMP_DIR/nessie_merchant_$i.json")"
   if [[ -z "${MRC_ID:-}" ]]; then
     echo "FATAL: Could not extract merchant id." >&2
@@ -184,7 +194,7 @@ JSON
   MERCHANT_IDS+=("$MRC_ID")
 done
 
-# ── 4) TRANSACTIONS ───────────────────────────────────────────────────────
+# ── 4) TRANSACTIONS ───────────────────────────────────────────────────────────
 echo
 hr
 TX_N="$(ask_count "How many transactions to create")"
@@ -197,6 +207,7 @@ for ((i=1; i<=TX_N; i++)); do
     echo "No accounts exist; skipping transactions."
     break
   fi
+
   SEL_ACC="$(choose_account)"
   if [[ -z "$SEL_ACC" ]]; then echo "No account selected; skipping."; break; fi
 
@@ -207,10 +218,11 @@ for ((i=1; i<=TX_N; i++)); do
       "address":{"street_number":"10","street_name":"Tech Pkwy NW","city":"Atlanta","state":"GA","zip":"30313"},
       "geocode":{"lat":33.7765,"lng":-84.3980}
     }' "$TMP_DIR/nessie_merchant_autocreated.json"
-    cat "$TMP_DIR/nessie_merchant_autocreated.json" | jq .
+    jq . < "$TMP_DIR/nessie_merchant_autocreated.json"
     DEF_MID="$(jq -r '.objectCreated?._id // ._id // .id // empty' "$TMP_DIR/nessie_merchant_autocreated.json")"
     [[ -n "$DEF_MID" ]] && MERCHANT_IDS+=("$DEF_MID")
   fi
+
   SEL_MRC="$(choose_merchant)"
   if [[ -z "$SEL_MRC" ]]; then echo "No merchant selected; skipping."; break; fi
 
@@ -232,7 +244,7 @@ for ((i=1; i<=TX_N; i++)); do
 JSON
 )" "$TMP_DIR/nessie_purchase_$i.json"
 
-  cat "$TMP_DIR/nessie_purchase_$i.json" | jq .
+  jq . < "$TMP_DIR/nessie_purchase_$i.json"
   TX_ID="$(jq -r '.objectCreated?._id // ._id // .id // empty' "$TMP_DIR/nessie_purchase_$i.json")"
   if [[ -z "${TX_ID:-}" ]]; then
     echo "FATAL: Could not extract transaction id." >&2
@@ -241,7 +253,7 @@ JSON
   echo "TX_ID[$i]=$TX_ID"
 done
 
-# ── 5) SYNC TO SUPABASE ───────────────────────────────────────────────────
+# ── 5) SYNC TO SUPABASE ───────────────────────────────────────────────────────
 echo
 hr
 echo "→ Triggering Supabase nessie-sync (copy from Nessie into your DB)…"
