@@ -171,8 +171,9 @@ function Planner() {
         data = data.slice().sort((a, b) => (b.monthlyCost ?? 0) - (a.monthlyCost ?? 0));
         break;
       default:
-        data = data.slice().sort((a, b) => b.runway - a.runway);
+        data = data.slice().sort((a, b) => a.city.localeCompare(b.city));
         break;
+
     }
 
     return data;
