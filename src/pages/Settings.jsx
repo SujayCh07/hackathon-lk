@@ -31,6 +31,38 @@ function normalizeAddress(parts = EMPTY_ADDRESS) {
   };
 }
 
+function parsePersistedAddress(value) {
+  if (!value) return { ...EMPTY_ADDRESS };
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          houseNumber: parsed.houseNumber ?? parsed.house_number ?? '',
+          street: parsed.street ?? '',
+          city: parsed.city ?? '',
+          state: parsed.state ?? '',
+        };
+      }
+    } catch (error) {
+      // fall through to object parsing below
+    }
+    return { ...EMPTY_ADDRESS };
+  }
+
+  if (typeof value === 'object') {
+    return {
+      houseNumber: value.houseNumber ?? value.house_number ?? '',
+      street: value.street ?? '',
+      city: value.city ?? '',
+      state: value.state ?? '',
+    };
+  }
+
+  return { ...EMPTY_ADDRESS };
+}
+
 function formatAddressPreview(parts) {
   const a = normalizeAddress(parts);
   const l1 = [a.houseNumber, a.street].filter(Boolean).join(' ').trim();
@@ -133,7 +165,8 @@ export default function Settings() {
           ? normalizeAddress(sourceProfile.streetAddress)
           : normalizeAddress();
 
-      const selectedCode = sourceProfile?.currentCountry?.code ?? '';
+      const selectedCode =
+        sourceProfile?.currentCountry?.code ?? sourceProfile?.currentCountryCode ?? '';
       const normalisedCode =
         typeof selectedCode === 'string' ? selectedCode.trim().toUpperCase() : '';
 
@@ -317,9 +350,22 @@ export default function Settings() {
         street_address,
       };
 
-      const { error } = await supabase
+      const { data: persistedProfile, error } = await supabase
         .from('user_profile')
-        .upsert(updates, { onConflict: 'user_id' });
+        .upsert(updates, { onConflict: 'user_id' })
+        .select(
+          `
+          name,
+          monthly_budget,
+          street_address,
+          current_country_code,
+          home_country_code,
+          current_city_code,
+          home_city_code,
+          current_country:country_ref!user_profile_current_country_fkey(code, country)
+        `
+        )
+        .maybeSingle();
       if (error) throw error;
 
       if (trimmedName) {
@@ -329,9 +375,40 @@ export default function Settings() {
         if (mdErr) throw mdErr;
       }
 
-      const refreshedProfile = await refreshProfile();
-      if (refreshedProfile) {
-        applyFormSeed(buildFormSeed(refreshedProfile));
+      if (persistedProfile) {
+        const persistedAddress = normalizeAddress(
+          parsePersistedAddress(persistedProfile.street_address)
+        );
+        const rawBudget = persistedProfile.monthly_budget;
+        const numericBudget =
+          typeof rawBudget === 'number'
+            ? rawBudget
+            : typeof rawBudget === 'string' && rawBudget.trim()
+            ? Number(rawBudget)
+            : null;
+
+        const persistedSeed = {
+          displayName:
+            typeof persistedProfile.name === 'string'
+              ? persistedProfile.name.trim()
+              : '',
+          monthlyBudget:
+            numericBudget != null && Number.isFinite(numericBudget) ? String(numericBudget) : '',
+          addressHouseNumber: persistedAddress.houseNumber ?? '',
+          addressStreet: persistedAddress.street ?? '',
+          addressCity: persistedAddress.city ?? '',
+          addressState: persistedAddress.state ?? '',
+          currentCountryCode:
+            typeof persistedProfile.current_country_code === 'string'
+              ? persistedProfile.current_country_code.trim().toUpperCase()
+              : '',
+        };
+        applyFormSeed(persistedSeed);
+      }
+
+      const latestProfile = await refreshProfile();
+      if (latestProfile) {
+        applyFormSeed(buildFormSeed(latestProfile));
       }
 
       showToast({
