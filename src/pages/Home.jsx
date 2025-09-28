@@ -1,6 +1,5 @@
 import HeroCarousel from '../components/hero/HeroCarousel.jsx';
 import ParallaxSection from '../components/hero/ParallaxSection.jsx';
-
 export function Home() {
   return (
     <div className="flex flex-col bg-offwhite text-charcoal">
