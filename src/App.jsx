@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import NavBar from './components/layout/NavBar.jsx';
 import Footer from './components/layout/Footer.jsx';
@@ -18,12 +18,25 @@ import DemoAdminStatus from './pages/DemoAdminStatus.jsx';
 function App() {
   const location = useLocation();
   const { refreshSession } = useAuth();
+  const [isRefreshingRoute, setIsRefreshingRoute] = useState(false);
 
   useEffect(() => {
     if (!refreshSession) return;
-    refreshSession().catch((error) => {
-      console.warn('Failed to refresh auth session on navigation', error);
-    });
+    let isCurrent = true;
+    setIsRefreshingRoute(true);
+    refreshSession()
+      .catch((error) => {
+        console.warn('Failed to refresh auth session on navigation', error);
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsRefreshingRoute(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
   }, [location.key, refreshSession]);
 
   return (
@@ -36,74 +49,72 @@ function App() {
       </div>
       <NavBar />
       <RouteTransitions key={location.pathname}>
-        <Routes location={location}>
-          <Route path="/" element={<HomeRoute />} />
-          <Route
-            path="/login"
-            element={
-              <PublicRoute>
-                <LoginPage />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/signup"
-            element={
-              <PublicRoute>
-                <SignupPage />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/planner"
-            element={
-              <ProtectedRoute>
-                <Planner />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/insights"
-            element={
-              <ProtectedRoute>
-                <Insights />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/share"
-            element={
-              <ProtectedRoute>
-                <Share />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute>
-                <Settings />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/demo/nessie"
-            element={<DemoConsole />}
-          />
-          <Route
-            path="/demo/admin"
-            element={<DemoAdminStatus />}
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        {isRefreshingRoute ? (
+          <FullPageLoader message="Refreshing your experience" />
+        ) : (
+          <Routes location={location}>
+            <Route path="/" element={<HomeRoute />} />
+            <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <LoginPage />
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/signup"
+              element={
+                <PublicRoute>
+                  <SignupPage />
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/planner"
+              element={
+                <ProtectedRoute>
+                  <Planner />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/insights"
+              element={
+                <ProtectedRoute>
+                  <Insights />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/share"
+              element={
+                <ProtectedRoute>
+                  <Share />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/demo/nessie" element={<DemoConsole />} />
+            <Route path="/demo/admin" element={<DemoAdminStatus />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        )}
       </RouteTransitions>
       <Footer />
     </div>
