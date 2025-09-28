@@ -21,7 +21,7 @@ const RECENT_DAYS = 30;
 const WEEKLY_DAYS = 7;
 const MIN_NUDGE_AMOUNT = 20;
 const MAX_NUDGES = 3;
-const MAX_DESTINATIONS = 3;
+const MAX_DESTINATIONS = 5;
 const COST_SIMILARITY_THRESHOLD = 0.4;
 const MIN_TRANSACTION_DAYS = 2;
 const WEEKLY_AFFORDABILITY_THRESHOLD = 0.5;
@@ -214,12 +214,15 @@ function getSimilarCostDestinations(currentCountryCost, costDict) {
   if (!currentCountryCost) return [];
   
   return Object.entries(costDict)
-    .map(([country, costs]) => ({
-      country: toTitleCase(country.replace(/[_-]/g, ' ')),
-      monthlyCost: costs.cost_of_living,
-      difference: Math.abs(costs.cost_of_living - currentCountryCost) / currentCountryCost
-    }))
-    .filter(dest => dest.difference <= COST_SIMILARITY_THRESHOLD && dest.monthlyCost !== currentCountryCost)
+    .map(([country, costs]) => {
+      const diff = Math.abs(costs.cost_of_living - currentCountryCost) / currentCountryCost;
+      return {
+        country: toTitleCase(country.replace(/[_-]/g, ' ')),
+        monthlyCost: costs.cost_of_living,
+        difference: diff
+      };
+    })
+    .filter(dest => dest.difference >= 0.10 && dest.difference <= 0.30) // ✅ 15%–30%
     .sort((a, b) => a.difference - b.difference)
     .slice(0, MAX_DESTINATIONS);
 }
@@ -759,51 +762,44 @@ export default function Dashboard() {
       )}
 
       {/* PPP map + picks */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="bg-white/90">
-          <CardHeader>
-            <CardTitle>PPP score heatmap</CardTitle>
-            <p className="text-sm text-charcoal/70">
-              Hover the globe to see how your purchasing power compares. 
-              {similarDestinations.length > 0 && " Blue markers show similar-cost destinations."}
-            </p>
-          </CardHeader>
-          <CardContent>
-            <WorldMap markers={enhancedMarkers} />
-          </CardContent>
-        </Card>
+      {/* PPP map + picks */} 
+<div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+  <Card className="bg-white/90">
+    <CardHeader>
+      <CardTitle>PPP score heatmap</CardTitle>
+      <p className="text-sm text-charcoal/70">
+        Hover the globe to see how your purchasing power compares. 
+        {similarDestinations.length > 0 && " Blue markers show similar-cost destinations."}
+      </p>
+    </CardHeader>
+    <CardContent>
+      <WorldMap markers={enhancedMarkers} />
+    </CardContent>
+  </Card>
 
-        <div className="grid grid-cols-1 gap-4">
-          <SavingsRunwayPanel
-            destinations={[
-              ...pppTop.map((d) => ({ city: d.city, monthlyCost: d.ppp, ppp: d.ppp, savings: d.savingsPct })),
-              ...similarDestinations.slice(0, MAX_DESTINATIONS).map((d) => ({ 
-                city: d.country, 
-                monthlyCost: d.monthlyCost, 
-                ppp: d.monthlyCost, 
-                savings: -d.difference // Convert difference to savings format
-              }))
-            ].slice(0, 6)}
-            stayLengthMonths={6}
-          />
-          <Card className="bg-white/90">
-            <CardHeader>
-              <CardTitle>Top PPP picks</CardTitle>
-              <p className="text-sm text-charcoal/70">GeoBudget = personalized travel & budget forecasting.</p>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              {pppTop.map((d) => (
-                <CityCard key={d.city} city={d.city} ppp={d.ppp} savingsPct={d.savingsPct} />
-              ))}
-              {pppTop.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-sm text-charcoal/60">
-                  {MESSAGES.FETCH_PPP}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+  <div className="grid grid-cols-1 gap-4">
+    <SavingsRunwayPanel
+      destinations={[
+        ...pppTop.map((d) => ({ 
+          city: d.city, 
+          monthlyCost: d.ppp, 
+          ppp: d.ppp, 
+          savings: d.savingsPct 
+        })),
+        ...similarDestinations
+          .slice(0, MAX_DESTINATIONS)
+          .map((d) => ({ 
+            city: d.country, 
+            monthlyCost: d.monthlyCost, 
+            ppp: d.monthlyCost, 
+            savings: -d.difference 
+          }))
+      ].slice(0, 5)}   // ✅ now limited to 5
+      stayLengthMonths={6}
+    />
+  </div>
+</div>
+
 
       {/* Transaction-Based Destination Insights */}
 
