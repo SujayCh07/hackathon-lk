@@ -20,11 +20,13 @@ function formatCurrency(amount, currency) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 }
 
-function capitalizeFirstLetter(str) {
+function capitalizeWords(str) {
   if (!str) return "";
-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+  return str
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }
-
 
 export function RunwayCard({
   city,
