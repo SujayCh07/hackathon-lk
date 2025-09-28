@@ -10,15 +10,49 @@ const CATEGORY_LABELS = {
   leisure: 'Leisure',
 };
 
+function toNumber(value) {
+  if (value == null) return NaN;
+  if (typeof value === 'number') return value;
+  const s = String(value).trim().replace(',', '.');
+  // keep digits, dot, minus; remove other characters (e.g. " months")
+  const cleaned = s.replace(/[^\d.-]/g, '');
+  return Number(cleaned);
+}
+
 function formatRunway(runway) {
-  const num = Number(runway);
+  const num = toNumber(runway);
   if (!Number.isFinite(num) || num <= 0) return '0.0 months';
-  if (num < 12) return `${num.toFixed(1)} months`;
+
+  // If less than 1 month, display in days (approx 30 days per month)
+  if (num < 1) {
+    const days = Math.max(1, Math.round(num * 30));
+    return `${days} day${days === 1 ? '' : 's'}`;
+  }
+
+  // If between 1 and 12 months, show months (use single/plural nicely)
+  if (num < 12) {
+    const isInteger = Math.abs(num - Math.round(num)) < 1e-9;
+    if (isInteger) {
+      const intMonths = Math.round(num);
+      return `${intMonths} month${intMonths === 1 ? '' : 's'}`;
+    }
+    return `${num.toFixed(1)} month${Math.abs(num - 1) < 1e-9 ? '' : 's'}`;
+  }
+
+  // 12 months or more: show years and leftover months (months shown with one decimal if fractional)
   const years = Math.floor(num / 12);
-  const months = Math.round((num % 12) * 10) / 10;
+  const monthsPartRaw = (num % 12);
+  const monthsPart = Math.round(monthsPartRaw * 10) / 10; // one decimal precision
   const parts = [];
   if (years > 0) parts.push(`${years} year${years > 1 ? 's' : ''}`);
-  if (months > 0) parts.push(`${months.toFixed(1)} month${months !== 1 ? 's' : ''}`);
+  if (monthsPart > 0) {
+    const isIntMonths = Math.abs(monthsPart - Math.round(monthsPart)) < 1e-9;
+    parts.push(
+      isIntMonths
+        ? `${Math.round(monthsPart)} month${Math.round(monthsPart) === 1 ? '' : 's'}`
+        : `${monthsPart.toFixed(1)} months`
+    );
+  }
   return parts.join(' ');
 }
 
@@ -49,8 +83,18 @@ export function RunwayCard({
   isHighlighted = false,
   badgeLabel = null,
 }) {
-  const percent = Math.min(100, (Number(runway) / stayDurationMonths) * 100);
-  const stayCost = Number(monthlyCost) * stayDurationMonths;
+  const runwayNum = toNumber(runway);
+  const durationNum = toNumber(stayDurationMonths);
+  const percent =
+    Number.isFinite(runwayNum) && Number.isFinite(durationNum) && durationNum > 0
+      ? Math.min(100, (runwayNum / durationNum) * 100)
+      : 0;
+
+  const monthCostNum = toNumber(monthlyCost);
+  const stayCost = Number.isFinite(monthCostNum) && Number.isFinite(durationNum)
+    ? monthCostNum * durationNum
+    : NaN;
+
   const segments = Object.entries(breakdown);
   const normalizedCountry = country?.toLowerCase?.() ?? '';
   const capital = capitals[normalizedCountry];
@@ -80,12 +124,14 @@ export function RunwayCard({
             <p className="mt-1 text-xs text-charcoal/60">{infoLine}</p>
           </div>
           <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide text-charcoal/60">
-            {continent && <span className="rounded-full bg-turquoise/20 px-2 py-1 text-teal">{continent}</span>}
+            {continent && (
+              <span className="rounded-full bg-turquoise/20 px-2 py-1 text-teal">{continent}</span>
+            )}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 text-right">
           <span className="rounded-full bg-turquoise/20 px-3 py-1 text-xs font-semibold text-teal">
-            {formatRunway(runway)}
+            {formatRunway(runwayNum)}
           </span>
           <div className="flex flex-col items-end text-[11px] font-semibold text-charcoal/60">
           </div>
@@ -93,8 +139,8 @@ export function RunwayCard({
       </div>
 
       <p className="mt-3 text-sm text-charcoal/70">
-        {formatCurrency(monthlyCost, currency)} /mo · {formatCurrency(stayCost, currency)} for{' '}
-        {stayDurationMonths} month{stayDurationMonths === 1 ? '' : 's'}
+        {formatCurrency(monthCostNum, currency)} /mo · {formatCurrency(stayCost, currency)} total for{' '}
+        {formatRunway(durationNum)}
       </p>
 
       <Progress value={percent} className="mt-4" />

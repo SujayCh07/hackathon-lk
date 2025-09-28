@@ -1,5 +1,5 @@
+import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useLocation } from 'react-router-dom';
 
 const variants = {
   initial: { opacity: 0, y: 24 },
@@ -7,13 +7,18 @@ const variants = {
   exit: { opacity: 0, y: -24 }
 };
 
-export function RouteTransitions({ children }) {
-  const location = useLocation();
+export function RouteTransitions({ children, transitionKey }) {
+  const effectiveKey = transitionKey ?? 'route-transition';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [effectiveKey]);
 
   return (
     <AnimatePresence mode="wait">
       <motion.main
-        key={location.pathname}
+        key={effectiveKey}
         role="main"
         variants={variants}
         initial="initial"

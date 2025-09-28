@@ -297,14 +297,7 @@ export default function Settings() {
     fetchBalances();
   }, [fetchBalances]);
 
-  useEffect(() => {
-    if (accountsError && !balancesLoading) {
-      setAccountsStatus({
-        type: 'error',
-        message: 'Unable to reach Nessie right now. Showing cached balances.',
-      });
-    }
-  }, [accountsError, balancesLoading]);
+
 
   useEffect(() => {
     if (profileActionState !== 'success') return undefined;
@@ -806,7 +799,7 @@ export default function Settings() {
                 ) : balancesLoading ? (
                   <p className="text-sm text-slate/60">Loading account details...</p>
                 ) : (
-                  <p className="text-sm text-slate/60">Connect an account to see balances here.</p>
+                  <p className="text-sm text-slate/60">Account connected.</p>
                 )}
               </div>
 
