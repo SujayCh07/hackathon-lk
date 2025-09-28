@@ -54,7 +54,7 @@ function Planner() {
   const [searchTerm, setSearchTerm] = useState('');
   const [continentFilter, setContinentFilter] = useState('All');
   const [maxMonthlyCost, setMaxMonthlyCost] = useState(null);
-  const [sortOption, setSortOption] = useState('runway');
+  const [sortOption, setSortOption] = useState('cost-asc');
   const [stayDuration, setStayDuration] = useState(6);
   const [timeUnit, setTimeUnit] = useState('months'); // 'months' or 'days'
 
