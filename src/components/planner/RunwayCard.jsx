@@ -134,6 +134,12 @@ export function RunwayCard({
             {formatRunway(runwayNum)}
           </span>
           <div className="flex flex-col items-end text-[11px] font-semibold text-charcoal/60">
+            <span className="rounded-full bg-white px-2 py-1 shadow-sm">
+              Safety score: {safetyScore ?? 0}
+            </span>
+            <span className="rounded-full bg-white px-2 py-1 shadow-sm">
+              Leisure score: {funScore ?? 0}
+            </span>
           </div>
         </div>
       </div>
