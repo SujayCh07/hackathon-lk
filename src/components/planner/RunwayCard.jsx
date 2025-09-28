@@ -4,10 +4,10 @@ import Progress from '../ui/Progress.jsx';
 import capitals from './capitals.js';
 
 const CATEGORY_META = {
-  rent: { label: 'Rent', icon: '🏠' },
-  food: { label: 'Food', icon: '🍔' },
-  transport: { label: 'Transport', icon: '🚇' },
-  leisure: { label: 'Leisure', icon: '🎉' },
+  rent: { label: 'Rent' },
+  food: { label: 'Food' },
+  transport: { label: 'Transport' },
+  leisure: { label: 'Leisure' },
 };
 
 function formatRunway(runway) {
@@ -61,6 +61,9 @@ export function RunwayCard({
     : `Estimated cost of living in ${countryName}`;
 
   const sortedSegments = segments.slice().sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
+  const totalShare = sortedSegments.reduce((sum, [, value]) => sum + (value ?? 0), 0);
+  const normalizedMonthlyCost = Number(monthlyCost);
+  const hasMonthlyCost = Number.isFinite(normalizedMonthlyCost) && normalizedMonthlyCost > 0;
   const tagList = lifestyleTags.slice(0, 3);
 
   return (
@@ -95,8 +98,8 @@ export function RunwayCard({
             {formatRunway(runway)}
           </span>
           <div className="flex items-center gap-2 text-[11px] font-semibold text-charcoal/60">
-            <span className="rounded-full bg-white px-2 py-1 shadow-sm">🛡️ {safetyScore ?? 0}</span>
-            <span className="rounded-full bg-white px-2 py-1 shadow-sm">🎈 {funScore ?? 0}</span>
+            <span className="rounded-full bg-white px-2 py-1 shadow-sm">Safety {safetyScore ?? 0}</span>
+            <span className="rounded-full bg-white px-2 py-1 shadow-sm">Leisure {funScore ?? 0}</span>
           </div>
         </div>
       </div>
@@ -117,19 +120,20 @@ export function RunwayCard({
                 const key = String(label).toLowerCase();
                 const meta = CATEGORY_META[key] ?? {
                   label,
-                  icon: '•',
                 };
+                const share = totalShare > 0 ? Math.max(value ?? 0, 0) / totalShare : 0;
+                const portion = hasMonthlyCost ? share * normalizedMonthlyCost : NaN;
 
                 return (
                   <li
                     key={label}
                     className="flex items-center justify-between rounded-xl bg-turquoise/15 px-3 py-2 font-semibold text-charcoal"
                   >
-                    <span className="flex items-center gap-2">
-                      <span className="text-base">{meta.icon}</span>
-                      {meta.label}
+                    <span className="flex items-center gap-2">{meta.label}</span>
+                    <span className="text-teal">
+                      {formatCurrency(portion, currency)}
+                      {share > 0 ? ` · ${(share * 100).toFixed(0)}%` : ''}
                     </span>
-                    <span className="text-teal">{Math.round((value ?? 0) * 100)}%</span>
                   </li>
                 );
               })}
