@@ -149,14 +149,39 @@ function normaliseStreetAddress(value) {
 
 function mapProfile(row) {
   if (!row) return null;
+
+  const monthlyBudget = normaliseNumber(row.monthly_budget);
+  const streetAddress = normaliseStreetAddress(row.street_address);
+  const currentCountryCode =
+    typeof row.current_country_code === "string"
+      ? row.current_country_code.trim().toUpperCase()
+      : "";
+  const homeCountryCode =
+    typeof row.home_country_code === "string"
+      ? row.home_country_code.trim().toUpperCase()
+      : "";
+  const currentCityCode =
+    typeof row.current_city_code === "string"
+      ? row.current_city_code.trim().toUpperCase()
+      : "";
+  const homeCityCode =
+    typeof row.home_city_code === "string"
+      ? row.home_city_code.trim().toUpperCase()
+      : "";
+
   return {
-    name: row.name ?? '',
-    monthlyBudget: row.monthly_budget ?? null,
-    streetAddress: row.street_address ?? null,
-    currentCountryCode: row.current_country_code ?? '',
-    homeCountryCode: row.home_country_code ?? '',
-    currentCityCode: row.current_city_code ?? '',
-    homeCityCode: row.home_city_code ?? '',
+    name: typeof row.name === "string" ? row.name : "",
+    monthlyBudget,
+    streetAddress,
+    streetAddressRaw: row.street_address ?? null,
+    currentCountryCode,
+    homeCountryCode,
+    currentCityCode,
+    homeCityCode,
+    currentCity: normaliseCity(row.current_city),
+    homeCity: normaliseCity(row.home_city),
+    currentCountry: normaliseCountry(row.current_country),
+    homeCountry: normaliseCountry(row.home_country),
   };
 }
 
