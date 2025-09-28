@@ -1,17 +1,28 @@
-import { Card } from '../ui/Card.jsx';
+import React from 'react';
 
-export function CategoryTile({ title, description, delta, recommendation }) {
-  const deltaLabel = delta >= 0 ? `Save ${delta.toFixed(0)}%` : `Spend ${Math.abs(delta).toFixed(0)}% more`;
-  const deltaColor = delta >= 0 ? 'text-teal' : 'text-coral';
+export default function CategoryTile({ title, description, delta }) {
+  const isCheaper = delta >= 0; // positive delta = cheaper abroad
+  const isSimilar = Math.abs(delta) < 1; // within ~1% treated as "same"
 
   return (
-    <Card className="bg-white/85">
-      <h4 className="font-poppins text-lg font-semibold text-charcoal">{title}</h4>
-      <p className="mt-2 text-sm text-charcoal/70">{description}</p>
-      <p className={`mt-3 text-sm font-semibold ${deltaColor}`}>{deltaLabel}</p>
-      {recommendation && <p className="mt-3 text-xs text-charcoal/60">{recommendation}</p>}
-    </Card>
+    <div className="p-4 rounded-lg bg-white shadow-sm border hover:shadow-md transition">
+      <h3 className="font-semibold text-lg mb-2">{title}</h3>
+      <p className="whitespace-pre-line text-sm text-gray-700 mb-3">{description}</p>
+
+      {isSimilar ? (
+        <p className="text-gray-500 font-medium">≈ Same Cost</p>
+      ) : isCheaper ? (
+        <p className="text-green-600 font-medium flex items-center gap-1">
+          ▼ Cheaper ({Math.abs(delta).toFixed(1)}%)
+        </p>
+      ) : (
+        <>
+          <p className="text-red-600 font-medium flex items-center gap-1">
+            ▲ More Expensive ({Math.abs(delta).toFixed(1)}%)
+          </p>
+          {/* <p className="text-red-600 text-sm">No Savings</p> */}
+        </>
+      )}
+    </div>
   );
 }
-
-export default CategoryTile;
