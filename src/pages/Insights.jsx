@@ -266,23 +266,7 @@ function CityComparisonRow({ id, baselineSpends, baselineCity, baselineCountry }
             ))}
           </div>
 
-          {monthlyCost && (
-            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md space-y-1 text-sm">
-              <p><strong>Monthly Cost:</strong> ${monthlyCost?.toLocaleString()}</p>
-              {runway && (
-                <p><strong>Budget Runway:</strong> {runway} months</p>
-              )}
-              {savingsPercent !== null && (
-                <p>
-                  <strong>Savings vs {baselineCity}:</strong>{" "}
-                  <span className={savingsPercent >= 0 ? "text-green-600" : "text-red-600"}>
-                    {savingsPercent > 0 ? "▼ " : "▲ "}
-                    {savingsPercent.toFixed(1)}%
-                  </span>
-                </p>
-              )}
-            </div>
-          )}
+         
         </div>
       )}
     </div>
