@@ -9,6 +9,7 @@ import NotificationsWidget from '../components/dashboard/NotificationsWidget.jsx
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import { supabase } from '../lib/supabase.js';
+import Dictionary from './Dictionary.js';
 
 const ACCT_LS_KEY = 'parity:selectedAccountId';
 const fmtUSD = (n) =>
@@ -34,6 +35,94 @@ function groupByWeek(transactions) {
   return [...map.values()].sort((a, b) => a.date - b.date);
 }
 
+// Enhanced notification builder with transaction-based personalization
+function buildPersonalizedNotifications({ bestCity, runnerUp, weeklyChange, budgetDelta, weeklySpending, recentTransactions, userCountry }) {
+  const notes = [];
+
+  // Existing PPP and budget notifications
+  if (bestCity && runnerUp) {
+    const monthlyDiff = Math.max(0, Number(runnerUp.monthlyCost ?? 0) - Number(bestCity.monthlyCost ?? 0));
+    if (monthlyDiff > 0) {
+      notes.push(
+        `Choosing ${bestCity.city} over ${runnerUp.city} saves about ${Math.round(monthlyDiff).toLocaleString()} each month.`
+      );
+    }
+  }
+
+  if (Number.isFinite(weeklyChange)) {
+    const label = weeklyChange > 0 ? 'up' : 'down';
+    notes.push(`Your weekly spending is ${label} ${Math.abs(Math.round(weeklyChange))}% vs. last week.`);
+  }
+
+  if (Number.isFinite(budgetDelta)) {
+    if (budgetDelta > 0) {
+    notes.push(`You're pacing ${Math.round(budgetDelta).toLocaleString()} under budget — bank the surplus for travel.`);
+    } else if (budgetDelta < 0) {
+      notes.push(`You're trending ${Math.abs(Math.round(budgetDelta)).toLocaleString()} over budget — adjust for your next trip.`);
+    }
+  }
+
+  // NEW: Transaction-based travel nudges
+  if (weeklySpending && weeklySpending > 0) {
+    // Find countries where this weekly spending equals 1-7 days of living
+    const affordableDays = Object.entries(Dictionary)
+      .map(([country, data]) => {
+        const dailyCost = data.cost_of_living / 30;
+        const daysAffordable = Math.floor(weeklySpending / dailyCost);
+        return {
+          country: toTitleCase(country),
+          dailyCost,
+          daysAffordable,
+          monthlyCost: data.cost_of_living
+        };
+      })
+      .filter(item => item.daysAffordable >= 1 && item.daysAffordable <= 7)
+      .sort((a, b) => b.daysAffordable - a.daysAffordable);
+
+    if (affordableDays.length > 0) {
+      const best = affordableDays[0];
+      if (best.daysAffordable === 1) {
+        notes.push(`This week's spending (${fmtUSD(weeklySpending)}) covers a full day in ${best.country} at ${fmtUSD(best.dailyCost)}/day.`);
+      } else {
+        notes.push(`This week's spending (${fmtUSD(weeklySpending)}) covers ${best.daysAffordable} days in ${best.country} at ${fmtUSD(best.dailyCost)}/day.`);
+      }
+    }
+  }
+
+  // Category-based travel suggestions
+  if (recentTransactions && recentTransactions.length > 0) {
+    const categorySpending = recentTransactions.reduce((acc, txn) => {
+      const category = txn.category || 'General';
+      acc[category] = (acc[category] || 0) + Math.abs(txn.amount);
+      return acc;
+    }, {});
+
+    const totalRecent = Object.values(categorySpending).reduce((sum, amt) => sum + amt, 0);
+    
+    // High dining spending
+    if (categorySpending['Dining'] > totalRecent * 0.2) {
+      notes.push(`With ${Math.round(categorySpending['Dining'] / totalRecent * 100)}% on dining, consider Thailand or Vietnam where street food costs $2-5 per meal.`);
+    }
+    
+    // High entertainment spending
+    if (categorySpending['Entertainment'] > totalRecent * 0.15) {
+      notes.push(`Your entertainment budget could fund amazing experiences in Prague or Budapest where cultural activities cost 60% less.`);
+    }
+  }
+
+  return notes;
+}
+
+// Filter destinations by COL similarity (within 40%)
+function filterSimilarCOL(destinations, userMonthlyCost, maxDifference = 0.4) {
+  if (!userMonthlyCost || userMonthlyCost <= 0) return destinations;
+  
+  return destinations.filter(dest => {
+    const difference = Math.abs(dest.monthlyCost - userMonthlyCost) / userMonthlyCost;
+    return difference <= maxDifference;
+  });
+}
+
 async function getCountryCoords(countryName) {
   try {
     const r = await fetch(
@@ -45,10 +134,11 @@ async function getCountryCoords(countryName) {
   return null;
 }
 
-export default function Dashboard() {
-  const { user, isLoading: authLoading, isSyncingNessie, refreshNessie, nessie } = useAuth();
+function Dashboard() {
+  const { user } = useAuth();
   const userId = user?.id ?? null;
   const { profile } = useUserProfile(userId);
+  
   // identity/budget
   const identityFallback = useMemo(() => {
     if (!user) return '';
@@ -63,8 +153,28 @@ export default function Dashboard() {
     return 2500;
   }, [profile?.monthly_budget]);
 
+  // Get user's current country for COL comparison
+  const userCountryData = useMemo(() => {
+    const countryCode = profile?.current_country_code?.toLowerCase();
+    if (!countryCode) return null;
+    
+    // Map country codes to dictionary keys
+    const countryMap = {
+      'us': 'united states',
+      'usa': 'united states',
+      'uk': 'united kingdom',
+      'gb': 'united kingdom',
+      'de': 'germany',
+      'fr': 'france',
+      // Add more mappings as needed
+    };
+    
+    const countryKey = countryMap[countryCode] || countryCode;
+    return Dictionary[countryKey] || Dictionary['united states']; // fallback to US
+  }, [profile?.current_country_code]);
+
   // ── Accounts & selection ───────────────────────────────────────────────────
-  const [accounts, setAccounts] = useState([]); // [{ id, type, balance, nickname, snapshot_ts }]
+  const [accounts, setAccounts] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   const [balanceUSD, setBalanceUSD] = useState(0);
@@ -115,12 +225,6 @@ export default function Dashboard() {
       setBalanceUSD(0);
       setAccountsLoading(false);
       return;
-    }
-
-    if (isSyncingNessie) {
-      return () => {
-        alive = false;
-      };
     }
 
     setAccountsLoading(true);
@@ -182,8 +286,8 @@ export default function Dashboard() {
             setBalanceUSD(0);
             setSelectedType(null);
           }
-          setAccountsLoading(false);
         }
+        setAccountsLoading(false);
         return;
       }
 
@@ -233,12 +337,11 @@ export default function Dashboard() {
         console.warn('Failed to hydrate accounts for dashboard', error);
       })
       .finally(() => {
-        if (alive) {
-          setAccountsLoading(false);
-        }
+        setAccountsLoading(false);
       });
 
     return () => {
+      setAccountsLoading(false);
       alive = false;
     };
   }, [nessie?.accounts, userId, isSyncingNessie]);
@@ -255,12 +358,6 @@ export default function Dashboard() {
     if (!userId || !selectedId) {
       setTransactionsLoading(false);
       return;
-    }
-
-    if (isSyncingNessie) {
-      return () => {
-        alive = false;
-      };
     }
 
     setTransactionsLoading(true);
@@ -284,7 +381,6 @@ export default function Dashboard() {
       }
 
       // Recent transactions for this account (10)
-      // Try nessie_account_id first, then fallback to account_id
       let txResp = await supabase
         .from('transactions')
         .select('id, merchant, amount, category, ts, nessie_account_id, status')
@@ -404,12 +500,11 @@ export default function Dashboard() {
         console.warn('Failed to hydrate transactions for dashboard', error);
       })
       .finally(() => {
-        if (alive) {
-          setTransactionsLoading(false);
-        }
+        setTransactionsLoading(false);
       });
 
     return () => {
+      setTransactionsLoading(false);
       alive = false;
     };
   }, [
@@ -419,7 +514,7 @@ export default function Dashboard() {
     userId
   ]);
 
-  // PPP (unchanged)
+  // PPP (enhanced with COL filtering)
   const [pppTop, setPppTop] = useState([]);
   const [pppMarkers, setPppMarkers] = useState([]);
   const [coordsCache, setCoordsCache] = useState({});
@@ -464,10 +559,24 @@ export default function Dashboard() {
           const s = [...items].sort((a, b) => a.p - b.p);
           return s[Math.floor(s.length / 2)]?.p ?? 100;
         })();
-      const top = items
-        .map((r) => ({ city: toTitleCase(r.name), country: toTitleCase(r.name), ppp: r.p, savingsPct: (basePPP - r.p) / basePPP }))
-        .sort((a, b) => b.savingsPct - a.savingsPct)
-        .slice(0, 6);
+      
+      let top = items
+        .map((r) => ({ 
+          city: toTitleCase(r.name), 
+          country: toTitleCase(r.name), 
+          ppp: r.p, 
+          savingsPct: (basePPP - r.p) / basePPP,
+          monthlyCost: r.p * (baseMonthlyBudget / basePPP) // Approximate monthly cost
+        }))
+        .sort((a, b) => b.savingsPct - a.savingsPct);
+
+      // Filter by COL similarity if user country data is available
+      if (userCountryData) {
+        top = filterSimilarCOL(top, userCountryData.cost_of_living);
+      }
+      
+      top = top.slice(0, 6);
+
       const updates = {};
       for (const d of top) {
         const k = (d.country ?? d.city)?.toLowerCase();
@@ -500,9 +609,9 @@ export default function Dashboard() {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, coordsCache]);
+  }, [userId, coordsCache, baseMonthlyBudget, userCountryData]);
 
-  // Trends/notifications
+  // Enhanced trends/notifications with transaction analysis
   const trendData = useMemo(() => groupByWeek(trendTx), [trendTx]);
   const weeklyChange = useMemo(() => {
     if (trendData.length < 2) return null;
@@ -511,6 +620,7 @@ export default function Dashboard() {
     const d = ((last - prev) / prev) * 100;
     return Number.isFinite(d) ? d : null;
   }, [trendData]);
+  
   const budgetDelta = useMemo(() => {
     const cut = new Date(); cut.setDate(cut.getDate() - 30);
     const last30 = trendTx.filter((t) => new Date(t.timestamp) >= cut);
@@ -518,17 +628,37 @@ export default function Dashboard() {
     return (baseMonthlyBudget || 0) - spent;
   }, [trendTx, baseMonthlyBudget]);
 
+  // Calculate weekly spending for personalized nudges
+  const weeklySpending = useMemo(() => {
+    if (trendData.length === 0) return 0;
+    return trendData.at(-1)?.amount || 0;
+  }, [trendData]);
+
+  // Enhanced notifications with transaction-based personalization
+  const personalizedNotifications = useMemo(() => 
+    buildPersonalizedNotifications({
+      bestCity: pppTop[0],
+      runnerUp: pppTop[1],
+      weeklyChange,
+      budgetDelta,
+      weeklySpending,
+      recentTransactions: recent,
+      userCountry: userCountryData
+    }), [pppTop, weeklyChange, budgetDelta, weeklySpending, recent, userCountryData]
+  );
+
   // UI labels
   const heroLabel = displayName ? `${displayName.split(' ')[0]}'s budget` : 'Your budget';
   const heroSubtitle = baseMonthlyBudget
-    ? `Here’s how $${Number(baseMonthlyBudget).toLocaleString()}/month stretches across the globe.`
-    : 'Let’s see how your money travels.';
+    ? `Here's how ${Number(baseMonthlyBudget).toLocaleString()}/month stretches across the globe.`
+    : 'Let\'s see how your money travels.';
 
+  const hasCachedAccounts =
+    accounts.length > 0 || (Array.isArray(nessie?.accounts) && nessie.accounts.length > 0);
   const showDashboardLoader =
     authLoading ||
-    (userId &&
-      (isSyncingNessie || accountsLoading || (transactionsLoading && recent.length === 0)) &&
-      accounts.length === 0);
+    (userId && !hasCachedAccounts && (accountsLoading || isSyncingNessie || transactionsLoading));
+  const showSyncingIndicator = Boolean(userId && isSyncingNessie && hasCachedAccounts);
 
   if (showDashboardLoader) {
     return <DashboardLoader message="Loading your latest balances" />;
@@ -537,6 +667,11 @@ export default function Dashboard() {
   // Render
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+      {showSyncingIndicator && (
+        <div className="flex justify-end text-xs text-teal/70">
+          <InlineLoader label="Syncing latest balances" />
+        </div>
+      )}
       {/* Hero / Accounts */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <Card className="col-span-1 bg-white/90">
@@ -564,8 +699,7 @@ export default function Dashboard() {
                   }
                 }}
               >
-                {accountsLoading && <option value="">Loading accounts…</option>}
-                {!accountsLoading && accounts.length === 0 && <option value="">No accounts</option>}
+              {accounts.length === 0 && <option value="">No accounts</option>}
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.nickname?.trim() || `${a.type || 'Account'} • ${a.id.slice(-4)}`}
@@ -600,7 +734,7 @@ export default function Dashboard() {
               )}
               {!transactionsLoading && recent.length === 0 && (
                 <li className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-center text-sm text-charcoal/60">
-                  We’ll populate this once your transactions sync.
+                  We'll populate this once your transactions sync.
                 </li>
               )}
               {recent.map((t) => (
@@ -634,14 +768,13 @@ export default function Dashboard() {
             <CardTitle>Trends & insights</CardTitle>
             <p className="text-sm text-charcoal/70">
               {(() => {
-                if (transactionsLoading) return <InlineLoader label="Loading weekly trends" />;
-                if (trendData.length < 2) return 'We’ll track spend trends once we have two weeks of data.';
+                if (trendData.length < 2) return 'We\'ll track spend trends once we have two weeks of data.';
                 const last = trendData.at(-1).amount;
                 const prev = trendData.at(-2).amount || 1;
                 const wc = Number.isFinite((last - prev) / prev) ? (((last - prev) / prev) * 100).toFixed(1) : null;
                 return wc != null
                   ? `Your spending is ${wc >= 0 ? 'up' : 'down'} ${Math.abs(wc)}% from last week.`
-                  : 'We’ll track spend trends once we have two weeks of data.';
+                  : 'We\'ll track spend trends once we have two weeks of data.';
               })()}
             </p>
           </CardHeader>
@@ -656,24 +789,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <NotificationsWidget
-          items={(() => {
-            const notes = [];
-            const last = trendData.at(-1)?.amount ?? null;
-            const prev = trendData.at(-2)?.amount ?? null;
-            if (last != null && prev != null && prev !== 0) {
-              const wc = ((last - prev) / prev) * 100;
-              if (Number.isFinite(wc)) {
-                notes.push(`Your weekly spending is ${wc > 0 ? 'up' : 'down'} ${Math.abs(Math.round(wc))}% vs. last week.`);
-              }
-            }
-            if (Number.isFinite(budgetDelta)) {
-              if (budgetDelta > 0) notes.push(`You’re pacing $${Math.round(budgetDelta).toLocaleString()} under budget — bank the surplus for travel.`);
-              else if (budgetDelta < 0) notes.push(`You’re trending $${Math.abs(Math.round(budgetDelta)).toLocaleString()} over budget — adjust for your next trip.`);
-            }
-            return notes;
-          })()}
-        />
+        <NotificationsWidget items={personalizedNotifications} />
       </div>
 
       {/* PPP map + picks */}
@@ -696,13 +812,27 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 gap-4">
           <SavingsRunwayPanel
-            destinations={pppTop.map((d) => ({ city: d.city, monthlyCost: d.ppp, ppp: d.ppp, savings: d.savingsPct }))}
+            destinations={pppTop.map((d) => ({ 
+              city: d.city, 
+              monthlyCost: d.monthlyCost || d.ppp, 
+              ppp: d.ppp, 
+              savings: d.savingsPct 
+            }))}
             stayLengthMonths={6}
+            userCountryCOL={userCountryData?.cost_of_living}
+            maxCOLDifference={0.4}
           />
           <Card className="bg-white/90">
             <CardHeader>
               <CardTitle>Top PPP picks</CardTitle>
-              <p className="text-sm text-charcoal/70">GeoBudget = personalized travel & budget forecasting.</p>
+              <p className="text-sm text-charcoal/70">
+                GeoBudget = personalized travel & budget forecasting.
+                {userCountryData && (
+                  <span className="block mt-1 text-xs text-charcoal/50">
+                    Showing destinations within 40% of your current cost of living.
+                  </span>
+                )}
+              </p>
             </CardHeader>
             <CardContent className="grid gap-3">
               {pppTop.map((d) => (
@@ -710,7 +840,7 @@ export default function Dashboard() {
               ))}
               {pppTop.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-sm text-charcoal/60">
-                  {pppLoading ? <InlineLoader label="Collecting PPP insights" /> : 'We’ll surface PPP picks once data syncs.'}
+                  We're fetching PPP insights — check back shortly.
                 </div>
               )}
             </CardContent>
@@ -721,20 +851,4 @@ export default function Dashboard() {
   );
 }
 
-function DashboardLoader({ message }) {
-  return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-sm text-charcoal/70" role="status">
-      <span className="h-8 w-8 animate-spin rounded-full border-2 border-teal/30 border-t-teal" aria-hidden="true" />
-      <span>{message ?? 'Loading dashboard…'}</span>
-    </div>
-  );
-}
-
-function InlineLoader({ label }) {
-  return (
-    <span className="inline-flex items-center gap-2 text-sm text-charcoal/70" role="status">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-teal/30 border-t-teal" aria-hidden="true" />
-      <span>{label ?? 'Loading…'}</span>
-    </span>
-  );
-}
+export default Dashboard;

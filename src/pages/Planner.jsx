@@ -337,6 +337,8 @@ function Planner() {
     const saved = profile?.monthlyBudget;
     if (!profileLoading && typeof saved === 'number' && Number.isFinite(saved)) {
       setBudget(saved);
+      const clamped = Math.min(4000, Math.max(300, saved));
+      setMaxMonthlyCost(clamped);
     }
   }, [profile, profileLoading]);
 
