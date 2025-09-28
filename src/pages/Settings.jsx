@@ -45,9 +45,7 @@ function parsePersistedAddress(value) {
           state: parsed.state ?? '',
         };
       }
-    } catch (_) {
-      // ignore
-    }
+    } catch (_) { /* ignore */ }
     return { ...EMPTY_ADDRESS };
   }
 
@@ -101,7 +99,6 @@ export default function Settings() {
   const monthlyBudgetNumber =
     typeof profile?.monthlyBudget === 'number' ? profile.monthlyBudget : null;
 
-  // keep the same hook signature you already use; it helps keep other parts unchanged
   const { isRefreshing: transactionsRefreshing, refresh: refreshTransactions } =
     useTransactions({ limit: 5, monthlyBudget: monthlyBudgetNumber, balanceUSD: 0 });
 
@@ -124,10 +121,15 @@ export default function Settings() {
   const [countriesError, setCountriesError] = useState(null);
   const [toast, setToast] = useState(null);
 
-  // NEW: State for fetched balances from Supabase
+  // NEW: fetched balances
   const [balances, setBalances] = useState({ checking: 0, savings: 0 });
   const [balancesLoading, setBalancesLoading] = useState(true);
   const [balancesError, setBalancesError] = useState(null);
+
+  // NEW (Personalization): state for the free-form paragraph
+  const [personalizationText, setPersonalizationText] = useState('');
+  const [personalizationLoading, setPersonalizationLoading] = useState(true);
+  const [personalizationSaving, setPersonalizationSaving] = useState(false);
 
   // for debounced localStorage writes
   const saveTimer = useRef(null);
@@ -188,13 +190,13 @@ export default function Settings() {
     [identityFallback]
   );
 
-  // seed from profile (saved values)
+  // seed from profile
   const profileSeed = useMemo(() => {
     if (profileLoading) return null;
     return buildFormSeed(profile ?? null);
   }, [buildFormSeed, profile, profileLoading]);
 
-  // local draft -> form (only once per user session / userId change)
+  // local draft -> form
   useEffect(() => {
     if (!DRAFT_KEY) return;
     try {
@@ -207,13 +209,13 @@ export default function Settings() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [DRAFT_KEY]);
 
-  // saved profile -> form (overwrites draft)
+  // saved profile -> form
   useEffect(() => {
     if (!profileSeed) return;
     applyFormSeed(profileSeed);
   }, [applyFormSeed, profileSeed]);
 
-  // persist draft to localStorage (debounced)
+  // persist draft (profile fields only)
   useEffect(() => {
     if (!DRAFT_KEY) return;
     window.clearTimeout(saveTimer.current);
@@ -253,36 +255,28 @@ export default function Settings() {
 
   const isSyncingNessie = accountsRefreshing || transactionsRefreshing;
 
-  // NEW: Fetch balances directly from Supabase
+  // NEW: Fetch balances
   const fetchBalances = useCallback(async () => {
     if (!userId) return;
-    
     setBalancesLoading(true);
     setBalancesError(null);
-    
     try {
       const { data: accountsData, error } = await supabase
         .from('accounts')
         .select('account_type, balance')
         .eq('user_id', userId);
-        
+
       if (error) throw error;
-      
+
       const totals = { checking: 0, savings: 0 };
-      
       if (Array.isArray(accountsData)) {
         for (const account of accountsData) {
           const accountType = String(account.account_type || '').toLowerCase();
           const balance = Number(account.balance || 0);
-          
-          if (accountType === 'savings') {
-            totals.savings += balance;
-          } else if (accountType === 'checking') {
-            totals.checking += balance;
-          }
+          if (accountType === 'savings') totals.savings += balance;
+          else if (accountType === 'checking') totals.checking += balance;
         }
       }
-      
       setBalances(totals);
     } catch (err) {
       console.error('Error fetching balances:', err);
@@ -292,10 +286,7 @@ export default function Settings() {
     }
   }, [userId]);
 
-  // Fetch balances on component mount and when userId changes
-  useEffect(() => {
-    fetchBalances();
-  }, [fetchBalances]);
+  useEffect(() => { fetchBalances(); }, [fetchBalances]);
 
 
 
@@ -338,29 +329,24 @@ export default function Settings() {
       })
       .finally(() => active && setCountriesLoading(false));
 
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
   const countryOptions = useMemo(() => {
     const map = new Map();
     const put = (entry) => {
       if (!entry?.code) return;
-      const code = String(entry.code).trim();
-      const normalizedCode = code.toUpperCase();
+      const code = String(entry.code).trim().toUpperCase();
       const name = (entry.name ?? entry.country ?? code).trim?.() ?? code;
-      if (!map.has(normalizedCode)) map.set(normalizedCode, { code: normalizedCode, name });
+      if (!map.has(code)) map.set(code, { code, name });
     };
     countries.forEach(put);
     if (profile?.currentCountry) put(profile.currentCountry);
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [countries, profile?.currentCountry]);
 
-  // headline currency & totals - now using fetched balances
   const headlineCurrency = accounts?.[0]?.currencyCode ?? accounts?.[0]?.currency_code ?? 'USD';
-
-  const totals = balances; // Use the fetched balances instead of calculating from accounts hook
+  const totals = balances;
 
   const addressPreview = useMemo(
     () =>
@@ -373,7 +359,7 @@ export default function Settings() {
     [addressHouseNumber, addressStreet, addressCity, addressState]
   );
 
-  // Live updates: when rows in `accounts` for this user change, refresh
+  // Realtime for accounts
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
@@ -386,20 +372,106 @@ export default function Settings() {
         }
       )
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [userId, refreshAccounts, fetchBalances]);
 
-  /* ---------- actions ---------- */
+  /* ---------- NEW: personalization fetch/save/realtime ---------- */
+
+  const fetchPersonalization = useCallback(async () => {
+    if (!userId) return;
+    setPersonalizationLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('user_personalization')
+        .select('personalization_text')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) throw error;
+      setPersonalizationText(data?.personalization_text ?? '');
+    } catch (err) {
+      console.error('Error fetching personalization:', err);
+      // keep text as-is on error
+    } finally {
+      setPersonalizationLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    fetchPersonalization();
+  }, [fetchPersonalization]);
+
+  // optional realtime so other tabs stay in sync
+  useEffect(() => {
+    if (!userId) return;
+    const ch = supabase
+      .channel(`realtime-user_personalization-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_personalization', filter: `user_id=eq.${userId}` },
+        async () => { await fetchPersonalization(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [userId, fetchPersonalization]);
+
+  async function handleSavePersonalization(e) {
+    e.preventDefault();
+    if (!userId) return;
+  
+    setPersonalizationSaving(true);
+  
+    try {
+      const payload = {
+        user_id: userId,
+        personalization_text: personalizationText ?? '',
+        updated_at: new Date().toISOString(),
+      };
+  
+      // Build the upsert promise (force the API to return a row)
+      const upsertPromise = supabase
+        .from('user_personalization')
+        .upsert(payload, {
+          onConflict: 'user_id',
+          returning: 'representation', // ensures a body is returned
+        })
+        .select('user_id')
+        .maybeSingle(); // don't hang if empty
+  
+      // Add a timeout guard so the UI never gets stuck
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Save timed out after 6 seconds')), 6000)
+      );
+  
+      const { error } = await Promise.race([upsertPromise, timeoutPromise]);
+  
+      if (error) throw error;
+  
+      showToast({
+        type: 'success',
+        title: 'Personalization saved',
+        description: 'Your note was updated.',
+        duration: 4000,
+      });
+    } catch (err) {
+      console.error('Save personalization failed:', err);
+      showToast({
+        type: 'error',
+        title: 'Save failed',
+        description: err?.message ?? 'Unable to save your note.',
+        duration: 5000,
+      });
+    } finally {
+      setPersonalizationSaving(false);
+    }
+  }
+  
+
+  /* ---------- existing actions ---------- */
 
   async function handleSaveProfile(e) {
     e.preventDefault();
     if (!userId) return;
-
-    console.log('=== SAVE STARTED ===');
-    console.log('User ID:', userId);
 
     setSavingProfile(true);
     setProfileActionState('saving');
@@ -408,7 +480,6 @@ export default function Settings() {
       const trimmedName = displayName.trim();
       const budgetStr = monthlyBudget.trim();
       const parsedBudget = budgetStr === '' ? null : Number(budgetStr);
-      
       const currentCode = currentCountryCode?.trim() ? currentCountryCode.trim().toUpperCase() : null;
       const normalisedAddress = normalizeAddress({
         houseNumber: addressHouseNumber,
@@ -418,31 +489,14 @@ export default function Settings() {
       });
       const streetAddressPayload = serialiseAddress(normalisedAddress);
 
-      console.log('Data to save:', {
-        name: trimmedName,
-        monthly_budget: parsedBudget,
-        current_country_code: currentCode,
-        street_address: streetAddressPayload
-      });
-
-      console.log('About to execute Supabase update...');
-
-      // First, let's test if we can read the current row
-      console.log('Testing read access...');
-      const { data: currentRow, error: readError } = await supabase
+      const { error: readError } = await supabase
         .from('user_profile')
         .select('*')
         .eq('user_id', userId)
         .single();
-      
-      console.log('Read test result:', { currentRow, readError });
 
-      if (readError) {
-        throw new Error(`Cannot read user profile: ${readError.message}`);
-      }
+      if (readError) throw new Error(`Cannot read user profile: ${readError.message}`);
 
-      // Now try the update with a shorter timeout
-      console.log('Attempting update...');
       const updatePromise = supabase
         .from('user_profile')
         .update({
@@ -454,22 +508,12 @@ export default function Settings() {
         .eq('user_id', userId)
         .select();
 
-      console.log('Update promise created, waiting for response...');
-
-      // Shorter timeout for testing
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Update timed out after 5 seconds')), 5000)
       );
 
       const { data, error } = await Promise.race([updatePromise, timeoutPromise]);
-
-      console.log('Update response:', { data, error });
-
-      if (error) {
-        throw error;
-      }
-
-      console.log('=== SAVE SUCCESSFUL ===');
+      if (error) throw error;
 
       setProfileActionState('success');
       showToast({
@@ -480,9 +524,6 @@ export default function Settings() {
       });
 
     } catch (error) {
-      console.error('=== SAVE FAILED ===');
-      console.error('Error:', error);
-      
       setProfileActionState('idle');
       showToast({
         type: 'error',
@@ -491,7 +532,6 @@ export default function Settings() {
         duration: 5000,
       });
     } finally {
-      console.log('=== SETTING SAVING TO FALSE ===');
       setSavingProfile(false);
     }
   }
@@ -572,12 +612,7 @@ export default function Settings() {
                     <span>Saved ✅</span>
                   </div>
                 ) : (
-                  <Button type="submit" form="profile-form" className="px-5 py-2 text-sm" disabled={disableProfileInputs}
-                    onClick={(e) => {
-                      console.log('Save button clicked!');
-                      // Don't prevent default here - let the form submission handle it
-                    }}
-                  >
+                  <Button type="submit" form="profile-form" className="px-5 py-2 text-sm" disabled={disableProfileInputs}>
                     {profileActionState === 'saving' ? 'Saving…' : 'Save changes'}
                   </Button>
                 )
@@ -593,10 +628,7 @@ export default function Settings() {
                     name="display-name"
                     type="text"
                     value={displayName}
-                    onChange={(e) => {
-                      console.log('Display name changed to:', e.target.value);
-                      setDisplayName(e.target.value);
-                    }}
+                    onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="How should we greet you?"
                     className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner focus:border-red focus:ring-2 focus:ring-red/20 disabled:cursor-not-allowed disabled:bg-slate/10"
                     disabled={disableProfileInputs}
@@ -614,10 +646,7 @@ export default function Settings() {
                     min="0"
                     step="50"
                     value={monthlyBudget}
-                    onChange={(e) => {
-                      console.log('Monthly budget changed to:', e.target.value);
-                      setMonthlyBudget(e.target.value);
-                    }}
+                    onChange={(e) => setMonthlyBudget(e.target.value)}
                     placeholder="e.g. 2500"
                     className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner focus:border-red focus:ring-2 focus:ring-red/20 disabled:cursor-not-allowed disabled:bg-slate/10"
                     disabled={disableProfileInputs}
@@ -628,9 +657,7 @@ export default function Settings() {
                   <legend className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">Mailing address</legend>
                   <div className="grid gap-4 sm:grid-cols-[0.75fr_1.25fr]">
                     <div className="grid gap-1.5">
-                      <label htmlFor="address-house-number" className="text-xs font-medium text-slate/70">
-                        House number
-                      </label>
+                      <label htmlFor="address-house-number" className="text-xs font-medium text-slate/70">House number</label>
                       <input
                         id="address-house-number"
                         type="text"
@@ -643,9 +670,7 @@ export default function Settings() {
                       />
                     </div>
                     <div className="grid gap-1.5">
-                      <label htmlFor="address-street" className="text-xs font-medium text-slate/70">
-                        Street
-                      </label>
+                      <label htmlFor="address-street" className="text-xs font-medium text-slate/70">Street</label>
                       <input
                         id="address-street"
                         type="text"
@@ -659,9 +684,7 @@ export default function Settings() {
                   </div>
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="grid gap-1.5">
-                      <label htmlFor="address-city" className="text-xs font-medium text-slate/70">
-                        City
-                      </label>
+                      <label htmlFor="address-city" className="text-xs font-medium text-slate/70">City</label>
                       <input
                         id="address-city"
                         type="text"
@@ -673,9 +696,7 @@ export default function Settings() {
                       />
                     </div>
                     <div className="grid gap-1.5">
-                      <label htmlFor="address-state" className="text-xs font-medium text-slate/70">
-                        State / region
-                      </label>
+                      <label htmlFor="address-state" className="text-xs font-medium text-slate/70">State / region</label>
                       <input
                         id="address-state"
                         type="text"
@@ -687,9 +708,7 @@ export default function Settings() {
                       />
                     </div>
                     <div className="grid gap-1.5">
-                      <label htmlFor="current-country" className="text-xs font-medium text-slate/70">
-                        Country
-                      </label>
+                      <label htmlFor="current-country" className="text-xs font-medium text-slate/70">Country</label>
                       <div className="relative">
                         <select
                           id="current-country"
@@ -702,9 +721,7 @@ export default function Settings() {
                           <option value="">Select a country</option>
                           {countriesLoading && <option disabled>Loading…</option>}
                           {countryOptions.map((c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.name}
-                            </option>
+                            <option key={c.code} value={c.code}>{c.name}</option>
                           ))}
                         </select>
                         <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate/40">
@@ -766,7 +783,6 @@ export default function Settings() {
                     </p>
                   </div>
                 </div>
-
               </div>
 
               <div className="space-y-3">
@@ -816,6 +832,45 @@ export default function Settings() {
               )}
             </SettingsSection>
           </div>
+
+          {/* ---------- NEW: Personalization section (bottom of Settings) ---------- */}
+          <SettingsSection
+            title="Personalization"
+            description="Add any context you want—financial goals, risk tolerance, interests, constraints. We'll use this to tailor insights."
+            actions={
+              <Button
+                type="button"
+                className="px-5 py-2 text-sm"
+                onClick={handleSavePersonalization}
+                disabled={personalizationSaving || personalizationLoading || !userId}
+              >
+                {personalizationSaving ? 'Saving…' : 'Save personalization'}
+              </Button>
+            }
+            contentClassName="space-y-3"
+          >
+            <div className="grid gap-2">
+              <label htmlFor="personalization-text" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
+                Your personalization note
+              </label>
+              <textarea
+                id="personalization-text"
+                value={personalizationText}
+                onChange={(e) => setPersonalizationText(e.target.value)}
+                placeholder="e.g., I’m saving for a 3-month Europe trip in 2026, prefer low-fee ETFs, have a high risk tolerance for 10% of my portfolio, and never want to hold airlines."
+                className="min-h-[160px] w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner focus:border-red focus:ring-2 focus:ring-red/20 disabled:cursor-not-allowed disabled:bg-slate/10"
+                disabled={personalizationLoading || !userId}
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-slate/60">
+                  {personalizationLoading ? 'Loading…' : `${personalizationText.length} characters`}
+                </p>
+                <p className="text-[11px] text-slate/50">
+                  Stored separately from your profile. You can update this anytime.
+                </p>
+              </div>
+            </div>
+          </SettingsSection>
         </div>
       </main>
     </>
