@@ -82,12 +82,15 @@ export default function Settings() {
 
   // ui + toast state
   const [savingProfile, setSavingProfile] = useState(false);
+  const [profileActionState, setProfileActionState] = useState('idle');
   const [profileStatus, setProfileStatus] = useState(null);
   const [accountsStatus, setAccountsStatus] = useState(null);
   const [countries, setCountries] = useState([]);
   const [countriesLoading, setCountriesLoading] = useState(false);
   const [countriesError, setCountriesError] = useState(null);
   const [toast, setToast] = useState(null);
+
+  const disableProfileInputs = savingProfile || profileLoading;
 
   const showToast = useCallback((t) => setToast({ id: Date.now(), ...t }), []);
   const dismissToast = useCallback(() => setToast(null), []);
@@ -137,8 +140,17 @@ export default function Settings() {
       setAddressCity('');
       setAddressState('');
     }
-    setCurrentCountryCode(profile?.currentCountry?.code ?? '');
+    const selectedCode = profile?.currentCountry?.code ?? '';
+    setCurrentCountryCode(
+      typeof selectedCode === 'string' ? selectedCode.trim().toUpperCase() : ''
+    );
   }, [profile, profileLoading, identityFallback]);
+
+  useEffect(() => {
+    if (profileActionState !== 'success') return undefined;
+    const timer = setTimeout(() => setProfileActionState('idle'), 3200);
+    return () => clearTimeout(timer);
+  }, [profileActionState]);
 
   // countries list
   useEffect(() => {
@@ -183,8 +195,9 @@ export default function Settings() {
     const put = (entry) => {
       if (!entry?.code) return;
       const code = String(entry.code).trim();
+      const normalizedCode = code.toUpperCase();
       const name = (entry.name ?? entry.country ?? code).trim?.() ?? code;
-      if (!map.has(code.toUpperCase())) map.set(code.toUpperCase(), { code, name });
+      if (!map.has(normalizedCode)) map.set(normalizedCode, { code: normalizedCode, name });
     };
     countries.forEach(put);
     if (profile?.currentCountry) put(profile.currentCountry);
@@ -246,6 +259,7 @@ export default function Settings() {
     });
 
     setSavingProfile(true);
+    setProfileActionState('saving');
     setProfileStatus(null);
 
     try {
@@ -283,6 +297,7 @@ export default function Settings() {
           : 'Your profile preferences are up to date.',
         duration: 4500,
       });
+      setProfileActionState('success');
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : 'Failed to update profile settings.';
@@ -293,6 +308,7 @@ export default function Settings() {
         description: msg,
         duration: 5000,
       });
+      setProfileActionState('idle');
     } finally {
       setSavingProfile(false);
     }
@@ -366,14 +382,30 @@ export default function Settings() {
               title="Profile"
               description="Control how your name appears across PPP Pocket and track your monthly travel savings target."
               actions={
-                <Button
-                  type="submit"
-                  form="profile-form"
-                  className="px-5 py-2 text-sm"
-                  disabled={savingProfile}
-                >
-                  {savingProfile ? 'Saving…' : 'Save changes'}
-                </Button>
+                profileActionState === 'success' ? (
+                  <div
+                    className="flex items-center gap-2 rounded-2xl border border-emerald-400/70 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 shadow-inner shadow-emerald-200"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 text-emerald-500">
+                      <path
+                        d="M16.704 5.29a1 1 0 0 1 0 1.414l-7.424 7.425a1 1 0 0 1-1.414 0L3.296 9.56a1 1 0 0 1 1.414-1.414l3.156 3.156 6.717-6.717a1 1 0 0 1 1.414 0z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                    <span>Saved</span>
+                  </div>
+                ) : (
+                  <Button
+                    type="submit"
+                    form="profile-form"
+                    className="px-5 py-2 text-sm"
+                    disabled={disableProfileInputs}
+                  >
+                    {profileActionState === 'saving' ? 'Saving…' : 'Save changes'}
+                  </Button>
+                )
               }
             >
               <form id="profile-form" onSubmit={handleSaveProfile} className="grid gap-6">
@@ -390,8 +422,8 @@ export default function Settings() {
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="How should we greet you?"
-                    className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner focus:border-red focus:ring-2 focus:ring-red/20"
-                    disabled={savingProfile}
+                    className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner focus:border-red focus:ring-2 focus:ring-red/20 disabled:cursor-not-allowed disabled:bg-slate/10"
+                    disabled={disableProfileInputs}
                   />
                 </div>
 
@@ -410,8 +442,8 @@ export default function Settings() {
                     value={monthlyBudget}
                     onChange={(e) => setMonthlyBudget(e.target.value)}
                     placeholder="e.g. 2500"
-                    className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner focus:border-red focus:ring-2 focus:ring-red/20"
-                    disabled={savingProfile}
+                    className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner focus:border-red focus:ring-2 focus:ring-red/20 disabled:cursor-not-allowed disabled:bg-slate/10"
+                    disabled={disableProfileInputs}
                   />
                 </div>
 
@@ -431,8 +463,8 @@ export default function Settings() {
                         value={addressHouseNumber}
                         onChange={(e) => setAddressHouseNumber(e.target.value)}
                         placeholder="123"
-                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm"
-                        disabled={savingProfile}
+                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate/10"
+                        disabled={disableProfileInputs}
                       />
                     </div>
                     <div className="grid gap-1.5">
@@ -445,8 +477,8 @@ export default function Settings() {
                         value={addressStreet}
                         onChange={(e) => setAddressStreet(e.target.value)}
                         placeholder="Market Street"
-                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm"
-                        disabled={savingProfile}
+                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate/10"
+                        disabled={disableProfileInputs}
                       />
                     </div>
                   </div>
@@ -461,8 +493,8 @@ export default function Settings() {
                         value={addressCity}
                         onChange={(e) => setAddressCity(e.target.value)}
                         placeholder="San Francisco"
-                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm"
-                        disabled={savingProfile}
+                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate/10"
+                        disabled={disableProfileInputs}
                       />
                     </div>
                     <div className="grid gap-1.5">
@@ -475,29 +507,46 @@ export default function Settings() {
                         value={addressState}
                         onChange={(e) => setAddressState(e.target.value.toUpperCase())}
                         placeholder="CA"
-                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm"
-                        disabled={savingProfile}
+                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate/10"
+                        disabled={disableProfileInputs}
                       />
                     </div>
                     <div className="grid gap-1.5">
                       <label htmlFor="current-country" className="text-xs font-medium text-slate/70">
                         Country
                       </label>
-                      <select
-                        id="current-country"
-                        value={currentCountryCode}
-                        onChange={(e) => setCurrentCountryCode(e.target.value)}
-                        className="w-full rounded-2xl border border-slate/20 bg-white/80 px-3 py-2 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
-                        disabled={savingProfile || countriesLoading}
-                      >
-                        <option value="">Select a country</option>
-                        {countriesLoading && <option disabled>Loading…</option>}
-                        {countryOptions.map((c) => (
-                          <option key={c.code} value={c.code}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <select
+                          id="current-country"
+                          value={currentCountryCode}
+                          onChange={(e) =>
+                            setCurrentCountryCode(e.target.value.trim().toUpperCase())
+                          }
+                          className="w-full appearance-none rounded-2xl border border-slate/20 bg-white/90 px-3 py-2 pr-10 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20 disabled:cursor-not-allowed disabled:bg-slate/10"
+                          disabled={disableProfileInputs || countriesLoading}
+                          aria-busy={countriesLoading}
+                        >
+                          <option value="">Select a country</option>
+                          {countriesLoading && <option disabled>Loading…</option>}
+                          {countryOptions.map((c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate/40">
+                          <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4">
+                            <path
+                              d="M5.5 7.5 10 12l4.5-4.5"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="1.5"
+                            />
+                          </svg>
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <div className="rounded-3xl border border-slate/15 bg-white/80 px-4 py-3">
