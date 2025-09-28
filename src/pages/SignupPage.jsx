@@ -6,10 +6,12 @@ import Button from "../components/ui/Button.jsx";
 import Barcelona from "../assets/cities/barcelona.jpg"; // background image
 import OnboardingModal from "../components/onboarding/OnboardingModal.jsx";
 import usePersonalization from "../hooks/usePersonalization.js";
+import { useAuth } from "../hooks/useAuth.js";
 
 export function SignupPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { signOut: authSignOut } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,10 +21,12 @@ export function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdUser, setCreatedUser] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [shouldRedirectAfterOnboarding, setShouldRedirectAfterOnboarding] = useState(false);
 
   const createdUserId = createdUser?.id ?? null;
   const { data: personalization, completeOnboarding, loading: personalizationLoading } = usePersonalization(createdUserId);
+
+  const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+  const loginDestination = `/login?redirectTo=${encodeURIComponent(redirectTo)}`;
 
   useEffect(() => {
     if (!createdUserId) return;
@@ -42,13 +46,19 @@ export function SignupPage() {
     }
     setShowOnboarding(false);
     setCreatedUser(null);
-    if (shouldRedirectAfterOnboarding) {
-      setShouldRedirectAfterOnboarding(false);
-      navigate(redirectTo, { replace: true });
-    }
-  };
 
-  const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
+    try {
+      if (typeof authSignOut === "function") {
+        await authSignOut();
+      } else {
+        await supabase.auth.signOut({ scope: "global" });
+      }
+    } catch (error) {
+      console.warn("Failed to end onboarding session", error);
+    }
+
+    navigate(loginDestination, { replace: true });
+  };
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -89,7 +99,6 @@ export function SignupPage() {
     }
 
     if (data.session && data.user) {
-      setShouldRedirectAfterOnboarding(true);
       setShowOnboarding(true);
       setIsSubmitting(false);
       return;
