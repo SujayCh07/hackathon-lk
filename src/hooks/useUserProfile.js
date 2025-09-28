@@ -203,8 +203,11 @@ function mapProfile(row) {
       ? row.home_city_code.trim().toUpperCase()
       : "";
 
+  const name = typeof row.name === "string" ? row.name : "";
+
   return {
-    name: typeof row.name === "string" ? row.name : "",
+    name,
+    displayName: name,
     monthlyBudget,
     streetAddress,
     streetAddressRaw,
@@ -225,7 +228,7 @@ function mapProfile(row) {
 // --------------------
 export function useUserProfile(userId) {
   const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(Boolean(userId));
   const [error, setError] = useState(null);
 
   const loadProfile = useCallback(async () => {
