@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
 import WorldMap from '../components/score/WorldMap.jsx';
 import CityCard from '../components/score/CityCard.jsx';
@@ -11,6 +11,7 @@ import { usePPP } from '../hooks/usePPP.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import usePersonalization from '../hooks/usePersonalization.js';
+import { ONBOARDING_SESSION_FLAG } from '../lib/personalization.js';
 import OnboardingModal from '../components/onboarding/OnboardingModal.jsx';
 
 // --- Helpers ---
@@ -106,6 +107,28 @@ export function Dashboard() {
   const displayName = profile?.name ?? identityFallback;
 
   const { data: personalization, loading: personalizationLoading, completeOnboarding } = usePersonalization(userId);
+  const [shouldShowOnboarding, setShouldShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const flag = window.sessionStorage.getItem(ONBOARDING_SESSION_FLAG);
+    if (flag === '1') {
+      setShouldShowOnboarding(true);
+    }
+  }, []);
+
+  const finishOnboarding = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(ONBOARDING_SESSION_FLAG);
+    }
+    setShouldShowOnboarding(false);
+  }, []);
+
+  useEffect(() => {
+    if (personalization?.onboardingComplete) {
+      finishOnboarding();
+    }
+  }, [personalization?.onboardingComplete, finishOnboarding]);
 
   const { balanceUSD = 0 } = useAccount();
   const baseMonthlyBudget = useMemo(() => {
@@ -207,10 +230,21 @@ export function Dashboard() {
     ? `Here’s how $${Number(baseMonthlyBudget).toLocaleString()}/month stretches across the globe.`
     : 'Let’s see how your money travels.';
 
-  const showOnboarding = !personalizationLoading && !personalization?.onboardingComplete;
-  const handleOnboardingComplete = async (payload) => {
-    await completeOnboarding(payload);
-  };
+  const showOnboarding =
+    shouldShowOnboarding && !personalizationLoading && !personalization?.onboardingComplete;
+
+  const handleOnboardingComplete = useCallback(
+    async (payload) => {
+      await completeOnboarding(payload);
+      finishOnboarding();
+    },
+    [completeOnboarding, finishOnboarding]
+  );
+
+  const handleOnboardingSkip = useCallback(async () => {
+    await completeOnboarding({});
+    finishOnboarding();
+  }, [completeOnboarding, finishOnboarding]);
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -218,7 +252,7 @@ export function Dashboard() {
         isOpen={showOnboarding}
         defaultValues={personalization}
         onComplete={handleOnboardingComplete}
-        onSkip={() => completeOnboarding({ ...personalization, onboardingComplete: true })}
+        onSkip={handleOnboardingSkip}
         displayName={displayName}
       />
 
