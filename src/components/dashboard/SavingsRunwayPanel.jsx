@@ -1,53 +1,101 @@
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card.jsx';
+// src/components/dashboard/SavingsRunwayPanel.jsx
+import { Card, CardHeader, CardTitle, CardContent } from "../ui/Card.jsx";
+import Dictionary from "../../pages/Dictionary.js"; // ✅ adjust path if needed
 
-function formatRunway(months) {
-  if (!Number.isFinite(months) || months <= 0) return 'N/A';
-  const years = Math.floor(months / 12);
-  const remainingMonths = Math.round((months % 12) * 10) / 10;
-  if (years <= 0) return `${months.toFixed(1)} months`;
-  const parts = [];
-  if (years > 0) parts.push(`${years} year${years > 1 ? 's' : ''}`);
-  if (remainingMonths > 0) parts.push(`${remainingMonths.toFixed(1)} month${remainingMonths !== 1 ? 's' : ''}`);
-  return parts.join(' ');
+function formatUSD(n) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(Number(n) ?? 0);
 }
 
-export function SavingsRunwayPanel({ destinations = [], stayLengthMonths = 6 }) {
-  const topThree = destinations.slice(0, 3);
+function capitalizeFirstLetter(str) {
+  if (!str) return "";
+  return str
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+/**
+ * Show how long your savings can last in different destinations
+ * using monthly cost-of-living data from Dictionary.js.
+ * Also compare against the cost of living in the current country.
+ */
+export default function SavingsRunwayPanel({
+  destinations = [],
+  stayLengthMonths = 6,
+  currentCountry = "united states", // default fallback
+}) {
+  if (!Array.isArray(destinations) || destinations.length === 0) {
+    return (
+      <Card className="bg-white/90">
+        <CardHeader>
+          <CardTitle>Savings runway</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-charcoal/60">
+            We’ll calculate how long your money lasts once we have more data.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // get current country monthly cost from dictionary
+  const currentMonthlyCost =
+    Dictionary[currentCountry.toLowerCase()]?.cost_of_living ?? null;
 
   return (
-    <Card className="bg-white/85">
+    <Card className="bg-white/90">
       <CardHeader>
         <CardTitle>Savings runway</CardTitle>
-        <p className="text-sm text-charcoal/70">
-          At your budget you could sustain this lifestyle for <strong>{stayLengthMonths}</strong> month
-          {stayLengthMonths === 1 ? '' : 's'}.
-        </p>
       </CardHeader>
-      <CardContent>
-        <ul className="space-y-4">
-          {topThree.map((destination) => (
-            <li key={destination.city} className="flex items-start justify-between rounded-2xl bg-offwhite/70 px-4 py-3 shadow-sm">
-              <div>
-                <p className="font-semibold text-teal">{destination.city}</p>
-                <p className="text-xs text-charcoal/60">
-                  PPP score {destination.ppp?.toFixed?.(0) ?? '—'} · {destination.context ?? 'Balanced cost breakdown'}
+      <CardContent className="grid gap-4">
+        {destinations.map((dest) => {
+          const monthly = dest.monthlyCost ?? 0;
+          const daily = monthly > 0 ? Math.round(monthly / 30) : null;
+
+          // comparison vs current country COA
+          let comparison = null;
+          if (currentMonthlyCost && monthly > 0) {
+            const diffPct =
+              ((currentMonthlyCost - monthly) / currentMonthlyCost) * 100;
+            comparison =
+              diffPct > 0
+                ? `~${diffPct.toFixed(0)}% cheaper than ${capitalizeFirstLetter(currentCountry)}`
+                : `~${Math.abs(diffPct).toFixed(0)}% more expensive than ${capitalizeFirstLetter(currentCountry)}`;
+          }
+
+          return (
+            <div
+              key={dest.city}
+              className="flex flex-col rounded-xl border border-navy/10 bg-offwhite/60 p-4"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-charcoal">{dest.city}</h3>
+                <p className="text-sm text-green-600">
+                  {monthly ? `${formatUSD(monthly)}/month` : "—"}
                 </p>
               </div>
-              <div className="text-right text-sm">
-                <p className="font-semibold text-charcoal">{formatRunway(destination.runwayMonths)}</p>
-                <p className="text-xs text-charcoal/60">${Number(destination.monthlyCost ?? 0).toLocaleString()}/mo</p>
-              </div>
-            </li>
-          ))}
-          {topThree.length === 0 && (
-            <li className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-center text-sm text-charcoal/60">
-              We’ll surface destinations once your PPP feed is ready.
-            </li>
-          )}
-        </ul>
+              {daily && (
+                <p className="text-xs text-charcoal/60 mt-1">
+                  ≈ {formatUSD(daily)}/day
+                </p>
+              )}
+              {typeof dest.savings === "number" && (
+                <p className="text-xs text-charcoal/50 mt-1">
+                  Savings vs. your budget: {(dest.savings * 100).toFixed(0)}%
+                </p>
+              )}
+              {comparison && (
+                <p className="text-xs text-blue-600 mt-1">{comparison}</p>
+              )}
+            </div>
+          );
+        })}
       </CardContent>
     </Card>
   );
 }
-
-export default SavingsRunwayPanel;

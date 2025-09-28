@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import CategoryTile from '../components/insights/CategoryTile.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
+import { useAuth } from '../hooks/useAuth.js';
+import { useUserProfile } from '../hooks/useUserProfile.js';
 import Dictionary from './Dictionary.js';
 
 // Title-case helper (keeps acronyms like USA)
@@ -76,7 +78,7 @@ function useDebounce(value, delay) {
   return debouncedValue;
 }
 
-function CityComparisonRow({ id, totals }) {
+function CityComparisonRow({ id, baselineSpends, baselineCity, baselineCountry }) {
   const [input, setInput] = useState('');
   const [country, setCountry] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -88,15 +90,6 @@ function CityComparisonRow({ id, totals }) {
 
   const debouncedInput = useDebounce(input, 1000);
   const abortControllerRef = useRef(null);
-
-  const atlantaSpends = useMemo(
-    () => ({
-      Groceries: totals['Groceries'] ?? 350,
-      Rent: totals['Rent'] ?? 1400,
-      Transport: totals['Transport'] ?? 120,
-    }),
-    [totals]
-  );
 
   // Location resolution
   const resolveLocation = useCallback(async (inputValue) => {
@@ -184,7 +177,7 @@ function CityComparisonRow({ id, totals }) {
     }
 
     try {
-      const adjusted = Object.entries(atlantaSpends).map(([category, amount]) => {
+      const adjusted = Object.entries(baselineSpends).map(([category, amount]) => {
         let foreignAmount = 0;
         if (category === 'Groceries') foreignAmount = countryData.groceries;
         if (category === 'Rent') foreignAmount = countryData.rent;
@@ -198,7 +191,7 @@ function CityComparisonRow({ id, totals }) {
 
         return {
           title: category,
-          description: `Atlanta: ${new Intl.NumberFormat('en-US', {
+          description: `${baselineCity}: ${new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: 'USD',
           }).format(amount)}\n${formattedCity}, ${formattedCountry}: ${new Intl.NumberFormat('en-US', {
@@ -218,7 +211,7 @@ function CityComparisonRow({ id, totals }) {
       const r = Math.max(1, Math.floor(budget / equivalent));
       setRunway(r);
 
-      const baseCostUSD = 2000;
+      const baseCostUSD = baselineSpends.Groceries + baselineSpends.Rent + baselineSpends.Transport;
       const savings = ((baseCostUSD - equivalent) / baseCostUSD) * 100;
       setSavingsPercent(applyRandomization(savings, 0.15));
 
@@ -230,7 +223,7 @@ function CityComparisonRow({ id, totals }) {
       setStatus('error');
       setErrorMessage('Failed to calculate costs');
     }
-  }, [country, input, atlantaSpends, status]);
+  }, [country, input, baselineSpends, baselineCity, status]);
 
   return (
     <div className="mb-8 p-4 border rounded-lg bg-white/70 shadow-sm">
@@ -281,7 +274,7 @@ function CityComparisonRow({ id, totals }) {
               )}
               {savingsPercent !== null && (
                 <p>
-                  <strong>Savings vs Atlanta:</strong>{" "}
+                  <strong>Savings vs {baselineCity}:</strong>{" "}
                   <span className={savingsPercent >= 0 ? "text-green-600" : "text-red-600"}>
                     {savingsPercent > 0 ? "▼ " : "▲ "}
                     {savingsPercent.toFixed(1)}%
@@ -297,8 +290,81 @@ function CityComparisonRow({ id, totals }) {
 }
 
 export function Insights() {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const { profile } = useUserProfile(userId);
   const [rows, setRows] = useState([0]);
-  const totals = {};
+
+  // Get user's baseline location from profile
+  const { baselineCity, baselineCountry, baselineSpends } = useMemo(() => {
+    // Default to Atlanta if no profile data
+    let city = 'Atlanta';
+    let country = 'united states';
+    
+    // Try to get user's current location from profile
+    if (profile?.streetAddress?.city) {
+      city = profile.streetAddress.city;
+    }
+    
+    if (profile?.currentCountryCode) {
+      // Map country code to country name that exists in Dictionary
+      const countryCode = profile.currentCountryCode.toLowerCase();
+      
+      // Common mappings - you might want to expand this based on your Dictionary keys
+      const countryCodeToName = {
+        'us': 'united states',
+        'usa': 'united states',
+        'uk': 'united kingdom',
+        'gb': 'united kingdom',
+        'de': 'germany',
+        'fr': 'france',
+        'it': 'italy',
+        'es': 'spain',
+        'ca': 'canada',
+        'au': 'australia',
+        'jp': 'japan',
+        'cn': 'china',
+        'in': 'india',
+        'br': 'brazil',
+        'mx': 'mexico',
+        // Add more mappings as needed based on your Dictionary
+      };
+      
+      if (countryCodeToName[countryCode]) {
+        country = countryCodeToName[countryCode];
+      } else {
+        // Try to find the country directly in Dictionary using the code
+        const directMatch = Object.keys(Dictionary).find(key => 
+          key.toLowerCase() === countryCode
+        );
+        if (directMatch) {
+          country = directMatch;
+        }
+      }
+    }
+
+    // Get baseline spending data from Dictionary or use defaults
+    let spends = {
+      Groceries: 350,
+      Rent: 1400,
+      Transport: 120,
+    };
+
+    const countryData = Dictionary[country.toLowerCase()];
+    if (countryData) {
+      spends = {
+        Groceries: countryData.groceries || 350,
+        Rent: countryData.rent || 1400,
+        Transport: countryData.transportation || 120,
+      };
+    }
+
+    return {
+      baselineCity: toTitleCase(city),
+      baselineCountry: country.toLowerCase(),
+      baselineSpends: spends
+    };
+  }, [profile]);
 
   const addRow = () => {
     if (rows.length < 5) {
@@ -309,16 +375,29 @@ export function Insights() {
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-12">
       <Card className="bg-white/85">
-        <CardHeader>
-          <CardTitle>Smart-Spend Insights</CardTitle>
-          <p className="text-sm text-charcoal/70">
-            Compare your spending with global cost-of-living data. You can search up to <strong>5 cities or countries</strong>.
-          </p>
-          <p className="mt-1 text-xs text-charcoal/60">Smart-Spend = see exactly where your money goes globally.</p>
-        </CardHeader>
+       <CardHeader>
+  <CardTitle className="block w-full whitespace-normal break-words text-xl font-semibold mb-2">
+    Smart-Spend Insights
+  </CardTitle>
+
+  <p className="text-sm text-charcoal/70">
+    Compare your spending with global cost-of-living data. Comparisons are based on your location: <strong>{baselineCity}</strong>. You can search up to <strong>5 cities or countries</strong>.
+  </p>
+
+  <p className="mt-1 text-xs text-charcoal/60">
+    Smart-Spend = see exactly where your money goes globally. Update your location in Settings to personalize comparisons.
+  </p>
+</CardHeader>
+
         <CardContent>
           {rows.map((id) => (
-            <CityComparisonRow key={id} id={id} totals={totals} />
+            <CityComparisonRow 
+              key={id} 
+              id={id} 
+              baselineSpends={baselineSpends}
+              baselineCity={baselineCity}
+              baselineCountry={baselineCountry}
+            />
           ))}
           {rows.length < 5 && (
             <button

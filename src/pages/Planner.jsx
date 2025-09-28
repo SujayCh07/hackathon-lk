@@ -20,6 +20,14 @@ function useDebounce(value, delay = 300) {
   return debounced;
 }
 
+function capitalizeFirstWord(str) {
+  if (!str) return "";
+  return str
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 function Planner() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
