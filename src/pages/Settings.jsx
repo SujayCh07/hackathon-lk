@@ -1,5 +1,5 @@
 // src/pages/Settings.jsx
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Button from '../components/ui/Button.jsx';
 import { SettingsSection } from '../components/settings/SettingsSection.jsx';
@@ -14,7 +14,7 @@ import { supabase } from '../lib/supabase.js';
 
 function formatCurrency(amount, currency = 'USD') {
   try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format(amount);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format(Number(amount ?? 0));
   } catch {
     return `$${Number(amount ?? 0).toFixed(2)}`;
   }
@@ -45,8 +45,8 @@ function parsePersistedAddress(value) {
           state: parsed.state ?? '',
         };
       }
-    } catch (error) {
-      // fall through to object parsing below
+    } catch (_) {
+      // ignore
     }
     return { ...EMPTY_ADDRESS };
   }
@@ -73,7 +73,7 @@ function formatAddressPreview(parts) {
 function serialiseAddress(parts) {
   const normalised = normalizeAddress(parts);
   const formatted = formatAddressPreview(normalised);
-  const hasAny = Object.values(normalised).some(v => v.length > 0);
+  const hasAny = Object.values(normalised).some((v) => v.length > 0);
   return hasAny ? JSON.stringify({ ...normalised, formatted }) : null;
 }
 
@@ -82,6 +82,7 @@ function serialiseAddress(parts) {
 export default function Settings() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const DRAFT_KEY = userId ? `settings:draft:${userId}` : null;
 
   const {
     profile,
@@ -92,7 +93,6 @@ export default function Settings() {
 
   const {
     accounts,
-    balanceUSD,
     isRefreshing: accountsRefreshing,
     error: accountsError,
     refresh: refreshAccounts,
@@ -100,10 +100,12 @@ export default function Settings() {
 
   const monthlyBudgetNumber =
     typeof profile?.monthlyBudget === 'number' ? profile.monthlyBudget : null;
-  const { isRefreshing: transactionsRefreshing, refresh: refreshTransactions } =
-    useTransactions({ limit: 5, monthlyBudget: monthlyBudgetNumber, balanceUSD });
 
-  // form state
+  // keep the same hook signature you already use; it helps keep other parts unchanged
+  const { isRefreshing: transactionsRefreshing, refresh: refreshTransactions } =
+    useTransactions({ limit: 5, monthlyBudget: monthlyBudgetNumber, balanceUSD: 0 });
+
+  // form state (persisted as a local draft and overwritten by saved profile)
   const [displayName, setDisplayName] = useState('');
   const [monthlyBudget, setMonthlyBudget] = useState('');
   const [addressHouseNumber, setAddressHouseNumber] = useState('');
@@ -122,6 +124,14 @@ export default function Settings() {
   const [countriesError, setCountriesError] = useState(null);
   const [toast, setToast] = useState(null);
 
+  // NEW: State for fetched balances from Supabase
+  const [balances, setBalances] = useState({ checking: 0, savings: 0 });
+  const [balancesLoading, setBalancesLoading] = useState(true);
+  const [balancesError, setBalancesError] = useState(null);
+
+  // for debounced localStorage writes
+  const saveTimer = useRef(null);
+
   const disableProfileInputs = savingProfile;
 
   const identityFallback = useMemo(() => {
@@ -134,18 +144,13 @@ export default function Settings() {
 
   const applyFormSeed = useCallback((seed) => {
     if (!seed) return;
-
     setDisplayName((prev) => (prev === (seed.displayName ?? '') ? prev : seed.displayName ?? ''));
     setMonthlyBudget((prev) => (prev === (seed.monthlyBudget ?? '') ? prev : seed.monthlyBudget ?? ''));
-    setAddressHouseNumber((prev) =>
-      prev === (seed.addressHouseNumber ?? '') ? prev : seed.addressHouseNumber ?? ''
-    );
+    setAddressHouseNumber((prev) => (prev === (seed.addressHouseNumber ?? '') ? prev : seed.addressHouseNumber ?? ''));
     setAddressStreet((prev) => (prev === (seed.addressStreet ?? '') ? prev : seed.addressStreet ?? ''));
     setAddressCity((prev) => (prev === (seed.addressCity ?? '') ? prev : seed.addressCity ?? ''));
     setAddressState((prev) => (prev === (seed.addressState ?? '') ? prev : seed.addressState ?? ''));
-    setCurrentCountryCode((prev) =>
-      prev === (seed.currentCountryCode ?? '') ? prev : seed.currentCountryCode ?? ''
-    );
+    setCurrentCountryCode((prev) => (prev === (seed.currentCountryCode ?? '') ? prev : seed.currentCountryCode ?? ''));
   }, []);
 
   const buildFormSeed = useCallback(
@@ -164,15 +169,11 @@ export default function Settings() {
       if (sourceProfile?.streetAddress && typeof sourceProfile.streetAddress === 'object') {
         normalisedAddress = normalizeAddress(sourceProfile.streetAddress);
       } else if (sourceProfile?.streetAddressRaw) {
-        normalisedAddress = normalizeAddress(
-          parsePersistedAddress(sourceProfile.streetAddressRaw)
-        );
+        normalisedAddress = normalizeAddress(parsePersistedAddress(sourceProfile.streetAddressRaw));
       }
 
-      const selectedCode =
-        sourceProfile?.currentCountry?.code ?? sourceProfile?.currentCountryCode ?? '';
-      const normalisedCode =
-        typeof selectedCode === 'string' ? selectedCode.trim().toUpperCase() : '';
+      const selectedCode = sourceProfile?.currentCountry?.code ?? sourceProfile?.currentCountryCode ?? '';
+      const normalisedCode = typeof selectedCode === 'string' ? selectedCode.trim().toUpperCase() : '';
 
       return {
         displayName: resolvedName,
@@ -187,10 +188,60 @@ export default function Settings() {
     [identityFallback]
   );
 
+  // seed from profile (saved values)
   const profileSeed = useMemo(() => {
     if (profileLoading) return null;
     return buildFormSeed(profile ?? null);
   }, [buildFormSeed, profile, profileLoading]);
+
+  // local draft -> form (only once per user session / userId change)
+  useEffect(() => {
+    if (!DRAFT_KEY) return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        applyFormSeed(draft);
+      }
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [DRAFT_KEY]);
+
+  // saved profile -> form (overwrites draft)
+  useEffect(() => {
+    if (!profileSeed) return;
+    applyFormSeed(profileSeed);
+  }, [applyFormSeed, profileSeed]);
+
+  // persist draft to localStorage (debounced)
+  useEffect(() => {
+    if (!DRAFT_KEY) return;
+    window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => {
+      const draft = {
+        displayName,
+        monthlyBudget,
+        addressHouseNumber,
+        addressStreet,
+        addressCity,
+        addressState,
+        currentCountryCode,
+      };
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      } catch (_) {}
+    }, 300);
+    return () => window.clearTimeout(saveTimer.current);
+  }, [
+    DRAFT_KEY,
+    displayName,
+    monthlyBudget,
+    addressHouseNumber,
+    addressStreet,
+    addressCity,
+    addressState,
+    currentCountryCode,
+  ]);
 
   const showToast = useCallback((t) => setToast({ id: Date.now(), ...t }), []);
   const dismissToast = useCallback(() => setToast(null), []);
@@ -202,20 +253,51 @@ export default function Settings() {
 
   const isSyncingNessie = accountsRefreshing || transactionsRefreshing;
 
-  useEffect(() => {
-    if (accountsError) {
-      setAccountsStatus({
-        type: 'error',
-        message: 'Unable to reach Nessie right now. Showing cached balances.',
-      });
+  // NEW: Fetch balances directly from Supabase
+  const fetchBalances = useCallback(async () => {
+    if (!userId) return;
+    
+    setBalancesLoading(true);
+    setBalancesError(null);
+    
+    try {
+      const { data: accountsData, error } = await supabase
+        .from('accounts')
+        .select('account_type, balance')
+        .eq('user_id', userId);
+        
+      if (error) throw error;
+      
+      const totals = { checking: 0, savings: 0 };
+      
+      if (Array.isArray(accountsData)) {
+        for (const account of accountsData) {
+          const accountType = String(account.account_type || '').toLowerCase();
+          const balance = Number(account.balance || 0);
+          
+          if (accountType === 'savings') {
+            totals.savings += balance;
+          } else if (accountType === 'checking') {
+            totals.checking += balance;
+          }
+        }
+      }
+      
+      setBalances(totals);
+    } catch (err) {
+      console.error('Error fetching balances:', err);
+      setBalancesError(err instanceof Error ? err.message : 'Failed to fetch balances');
+    } finally {
+      setBalancesLoading(false);
     }
-  }, [accountsError]);
+  }, [userId]);
 
-  // load profile -> seed form
+  // Fetch balances on component mount and when userId changes
   useEffect(() => {
-    if (!profileSeed) return;
-    applyFormSeed(profileSeed);
-  }, [applyFormSeed, profileSeed]);
+    fetchBalances();
+  }, [fetchBalances]);
+
+
 
   useEffect(() => {
     if (profileActionState !== 'success') return undefined;
@@ -243,15 +325,15 @@ export default function Settings() {
             name:
               typeof c.country === 'string' && c.country.trim().length > 0
                 ? c.country.trim()
-                : (typeof c.code === 'string' ? c.code.trim() : 'Unnamed country'),
+                : typeof c.code === 'string'
+                ? c.code.trim()
+                : 'Unnamed country',
           }))
         );
       })
       .catch((e) => {
         if (!active) return;
-        setCountriesError(
-          e instanceof Error ? e.message : 'Unable to load countries right now.'
-        );
+        setCountriesError(e instanceof Error ? e.message : 'Unable to load countries right now.');
         setCountries([]);
       })
       .finally(() => active && setCountriesLoading(false));
@@ -275,15 +357,10 @@ export default function Settings() {
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [countries, profile?.currentCountry]);
 
-  const totalBalance = useMemo(() => {
-    if (!Array.isArray(accounts)) return 0;
-    return accounts.reduce(
-      (sum, account) =>
-        sum + (typeof account?.balance === 'number' ? account.balance : 0),
-      0
-    );
-  }, [accounts]);
-  const headlineCurrency = accounts?.[0]?.currencyCode ?? 'USD';
+  // headline currency & totals - now using fetched balances
+  const headlineCurrency = accounts?.[0]?.currencyCode ?? accounts?.[0]?.currency_code ?? 'USD';
+
+  const totals = balances; // Use the fetched balances instead of calculating from accounts hook
 
   const addressPreview = useMemo(
     () =>
@@ -296,147 +373,125 @@ export default function Settings() {
     [addressHouseNumber, addressStreet, addressCity, addressState]
   );
 
+  // Live updates: when rows in `accounts` for this user change, refresh
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`realtime-accounts-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'accounts', filter: `user_id=eq.${userId}` },
+        async () => {
+          await Promise.all([refreshAccounts(), fetchBalances()]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, refreshAccounts, fetchBalances]);
+
   /* ---------- actions ---------- */
 
   async function handleSaveProfile(e) {
     e.preventDefault();
     if (!userId) return;
 
-    const trimmedName = displayName.trim();
-    const budgetStr = monthlyBudget.trim();
-    const parsedBudget = budgetStr === '' ? null : Number(budgetStr);
-    if (parsedBudget != null && Number.isNaN(parsedBudget)) {
-      setProfileStatus({
-        type: 'error',
-        message: 'Monthly budget must be a valid number.',
-      });
-      showToast({
-        type: 'error',
-        title: 'Check your monthly budget',
-        description: 'Please enter a valid number.',
-        duration: 4200,
-      });
-      return;
-    }
+    console.log('=== SAVE STARTED ===');
+    console.log('User ID:', userId);
 
-    const currentCode = currentCountryCode?.trim()
-      ? currentCountryCode.trim().toUpperCase()
-      : null;
-    const normalisedAddress = normalizeAddress({
-      houseNumber: addressHouseNumber,
-      street: addressStreet,
-      city: addressCity,
-      state: addressState,
-    });
-    const streetAddressPayload = serialiseAddress(normalisedAddress);
-
-    const optimisticSeed = {
-      displayName: trimmedName,
-      monthlyBudget: budgetStr,
-      addressHouseNumber: normalisedAddress.houseNumber,
-      addressStreet: normalisedAddress.street,
-      addressCity: normalisedAddress.city,
-      addressState: normalisedAddress.state,
-      currentCountryCode: currentCode ?? '',
-    };
-    applyFormSeed(optimisticSeed);
-
-    setProfileStatus(null);
     setSavingProfile(true);
     setProfileActionState('saving');
 
     try {
-      const updates = {
-        user_id: userId,
-        name: trimmedName || null,
+      const trimmedName = displayName.trim();
+      const budgetStr = monthlyBudget.trim();
+      const parsedBudget = budgetStr === '' ? null : Number(budgetStr);
+      
+      const currentCode = currentCountryCode?.trim() ? currentCountryCode.trim().toUpperCase() : null;
+      const normalisedAddress = normalizeAddress({
+        houseNumber: addressHouseNumber,
+        street: addressStreet,
+        city: addressCity,
+        state: addressState,
+      });
+      const streetAddressPayload = serialiseAddress(normalisedAddress);
+
+      console.log('Data to save:', {
+        name: trimmedName,
         monthly_budget: parsedBudget,
         current_country_code: currentCode,
-        street_address: streetAddressPayload,
-      };
+        street_address: streetAddressPayload
+      });
 
-      const { data: persistedProfile, error } = await supabase
+      console.log('About to execute Supabase update...');
+
+      // First, let's test if we can read the current row
+      console.log('Testing read access...');
+      const { data: currentRow, error: readError } = await supabase
         .from('user_profile')
-        .upsert(updates, { onConflict: 'user_id' })
-        .select(
-          `
-          name,
-          monthly_budget,
-          street_address,
-          current_country_code,
-          home_country_code,
-          current_city_code,
-          home_city_code,
-          current_country:country_ref!user_profile_current_country_fkey(code, country)
-        `
-        )
-        .maybeSingle();
-      if (error) throw error;
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      
+      console.log('Read test result:', { currentRow, readError });
 
-      if (trimmedName) {
-        const { error: mdErr } = await supabase.auth.updateUser({
-          data: { ...(user?.user_metadata ?? {}), displayName: trimmedName },
-        });
-        if (mdErr) throw mdErr;
+      if (readError) {
+        throw new Error(`Cannot read user profile: ${readError.message}`);
       }
 
-      if (persistedProfile) {
-        const persistedAddress = normalizeAddress(
-          parsePersistedAddress(persistedProfile.street_address)
-        );
-        const rawBudget = persistedProfile.monthly_budget;
-        const numericBudget =
-          typeof rawBudget === 'number'
-            ? rawBudget
-            : typeof rawBudget === 'string' && rawBudget.trim()
-            ? Number(rawBudget)
-            : null;
+      // Now try the update with a shorter timeout
+      console.log('Attempting update...');
+      const updatePromise = supabase
+        .from('user_profile')
+        .update({
+          name: trimmedName,
+          monthly_budget: parsedBudget,
+          current_country_code: currentCode,
+          street_address: streetAddressPayload
+        })
+        .eq('user_id', userId)
+        .select();
 
-        const persistedSeed = {
-          displayName:
-            typeof persistedProfile.name === 'string'
-              ? persistedProfile.name.trim()
-              : '',
-          monthlyBudget:
-            numericBudget != null && Number.isFinite(numericBudget) ? String(numericBudget) : '',
-          addressHouseNumber: persistedAddress.houseNumber ?? '',
-          addressStreet: persistedAddress.street ?? '',
-          addressCity: persistedAddress.city ?? '',
-          addressState: persistedAddress.state ?? '',
-          currentCountryCode:
-            typeof persistedProfile.current_country_code === 'string'
-              ? persistedProfile.current_country_code.trim().toUpperCase()
-              : '',
-        };
-        applyFormSeed(persistedSeed);
+      console.log('Update promise created, waiting for response...');
+
+      // Shorter timeout for testing
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Update timed out after 5 seconds')), 5000)
+      );
+
+      const { data, error } = await Promise.race([updatePromise, timeoutPromise]);
+
+      console.log('Update response:', { data, error });
+
+      if (error) {
+        throw error;
       }
 
-      const latestProfile = await refreshProfile();
-      if (latestProfile) {
-        applyFormSeed(buildFormSeed(latestProfile));
-      }
+      console.log('=== SAVE SUCCESSFUL ===');
 
+      setProfileActionState('success');
       showToast({
         type: 'success',
         title: 'Settings saved',
-        description: streetAddressPayload
-          ? `Mailing address saved. ${addressPreview.replace(/\n/g, ', ')}`
-          : 'Your profile preferences are up to date.',
+        description: 'Your profile has been updated.',
         duration: 4500,
       });
-      setProfileStatus(null);
-      setProfileActionState('success');
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : 'Failed to update profile settings.';
-      setProfileStatus({ type: 'error', message: msg });
+
+    } catch (error) {
+      console.error('=== SAVE FAILED ===');
+      console.error('Error:', error);
+      
+      setProfileActionState('idle');
       showToast({
         type: 'error',
-        title: 'Could not save settings',
-        description: msg,
+        title: 'Save failed',
+        description: error.message || 'Unknown error',
         duration: 5000,
       });
-      setProfileActionState('idle');
     } finally {
+      console.log('=== SETTING SAVING TO FALSE ===');
       setSavingProfile(false);
     }
   }
@@ -444,11 +499,10 @@ export default function Settings() {
   async function handleRefreshAccounts() {
     setAccountsStatus(null);
     try {
-      await Promise.all([refreshAccounts(), refreshTransactions()]);
+      await Promise.all([refreshAccounts(), refreshTransactions(), fetchBalances()]);
       setAccountsStatus({ type: 'success', message: 'Account balances refreshed.' });
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : 'Unable to refresh accounts right now.';
+      const msg = err instanceof Error ? err.message : 'Unable to refresh accounts right now.';
       setAccountsStatus({ type: 'error', message: msg });
     }
   }
@@ -480,26 +534,20 @@ export default function Settings() {
 
       <main className="mx-auto w-full max-w-6xl px-6 py-12">
         <header className="mb-10 space-y-2">
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-red/80">
-            Account
-          </p>
+          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-red/80">Account</p>
           <h1 className="text-4xl font-bold tracking-tight text-navy">Settings</h1>
           <p className="max-w-2xl text-base text-slate/80">
-            Update your personal details, budgeting preferences, and refresh your
-            linked Capital One™ data.
+            Update your personal details, budgeting preferences, and refresh your linked Capital One™ data.
           </p>
         </header>
 
         <div className="space-y-6">
           {profileStatus?.type === 'error' && (
-            <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-sm text-red">
-              {profileStatus.message}
-            </div>
+            <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-sm text-red">{profileStatus.message}</div>
           )}
           {profileError && (
             <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-sm text-red">
-              {profileError.message ||
-                'We were unable to load your profile information.'}
+              {profileError.message || 'We were unable to load your profile information.'}
             </div>
           )}
 
@@ -524,11 +572,11 @@ export default function Settings() {
                     <span>Saved ✅</span>
                   </div>
                 ) : (
-                  <Button
-                    type="submit"
-                    form="profile-form"
-                    className="px-5 py-2 text-sm"
-                    disabled={disableProfileInputs}
+                  <Button type="submit" form="profile-form" className="px-5 py-2 text-sm" disabled={disableProfileInputs}
+                    onClick={(e) => {
+                      console.log('Save button clicked!');
+                      // Don't prevent default here - let the form submission handle it
+                    }}
                   >
                     {profileActionState === 'saving' ? 'Saving…' : 'Save changes'}
                   </Button>
@@ -537,17 +585,18 @@ export default function Settings() {
             >
               <form id="profile-form" onSubmit={handleSaveProfile} className="grid gap-6">
                 <div className="grid gap-2">
-                  <label
-                    htmlFor="display-name"
-                    className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60"
-                  >
+                  <label htmlFor="display-name" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
                     Display name
                   </label>
                   <input
                     id="display-name"
+                    name="display-name"
                     type="text"
                     value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
+                    onChange={(e) => {
+                      console.log('Display name changed to:', e.target.value);
+                      setDisplayName(e.target.value);
+                    }}
                     placeholder="How should we greet you?"
                     className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner focus:border-red focus:ring-2 focus:ring-red/20 disabled:cursor-not-allowed disabled:bg-slate/10"
                     disabled={disableProfileInputs}
@@ -555,19 +604,20 @@ export default function Settings() {
                 </div>
 
                 <div className="grid gap-2">
-                  <label
-                    htmlFor="monthly-budget"
-                    className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60"
-                  >
+                  <label htmlFor="monthly-budget" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
                     Monthly travel budget (USD)
                   </label>
                   <input
                     id="monthly-budget"
+                    name="monthly-budget"
                     type="number"
                     min="0"
                     step="50"
                     value={monthlyBudget}
-                    onChange={(e) => setMonthlyBudget(e.target.value)}
+                    onChange={(e) => {
+                      console.log('Monthly budget changed to:', e.target.value);
+                      setMonthlyBudget(e.target.value);
+                    }}
                     placeholder="e.g. 2500"
                     className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner focus:border-red focus:ring-2 focus:ring-red/20 disabled:cursor-not-allowed disabled:bg-slate/10"
                     disabled={disableProfileInputs}
@@ -575,9 +625,7 @@ export default function Settings() {
                 </div>
 
                 <fieldset className="grid gap-3">
-                  <legend className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
-                    Mailing address
-                  </legend>
+                  <legend className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">Mailing address</legend>
                   <div className="grid gap-4 sm:grid-cols-[0.75fr_1.25fr]">
                     <div className="grid gap-1.5">
                       <label htmlFor="address-house-number" className="text-xs font-medium text-slate/70">
@@ -646,9 +694,7 @@ export default function Settings() {
                         <select
                           id="current-country"
                           value={currentCountryCode}
-                          onChange={(e) =>
-                            setCurrentCountryCode(e.target.value.trim().toUpperCase())
-                          }
+                          onChange={(e) => setCurrentCountryCode(e.target.value.trim().toUpperCase())}
                           className="w-full appearance-none rounded-2xl border border-slate/20 bg-white/90 px-3 py-2 pr-10 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20 disabled:cursor-not-allowed disabled:bg-slate/10"
                           disabled={disableProfileInputs || countriesLoading}
                           aria-busy={countriesLoading}
@@ -663,14 +709,7 @@ export default function Settings() {
                         </select>
                         <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate/40">
                           <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4">
-                            <path
-                              d="M5.5 7.5 10 12l4.5-4.5"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="1.5"
-                            />
+                            <path d="M5.5 7.5 10 12l4.5-4.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
                           </svg>
                         </span>
                       </div>
@@ -679,65 +718,88 @@ export default function Settings() {
                   <div className="rounded-3xl border border-slate/15 bg-white/80 px-4 py-3">
                     {addressPreview ? (
                       <div className="space-y-1">
-                        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate/60">
-                          Preview
-                        </p>
-                        <p className="whitespace-pre-wrap text-xs font-mono text-slate/70">
-                          {addressPreview}
-                        </p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate/60">Preview</p>
+                        <p className="whitespace-pre-wrap text-xs font-mono text-slate/70">{addressPreview}</p>
                       </div>
                     ) : (
-                      <p className="text-xs text-slate/60">
-                        We'll format your address automatically as you type.
-                      </p>
+                      <p className="text-xs text-slate/60">We'll format your address automatically as you type.</p>
                     )}
                   </div>
                 </fieldset>
 
                 {countriesError && (
-                  <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-xs text-red">
-                    {countriesError}
-                  </div>
+                  <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-xs text-red">{countriesError}</div>
                 )}
               </form>
             </SettingsSection>
 
-            {/* Capital One section */}
+            {/* Balances section */}
             <SettingsSection
               title="Capital One™ Account Balance:"
               description="See the latest balances pulled from your demo Capital One™ account and refresh whenever you need."
-              footer="Balances are simulated for the hackathon environment and reset frequently."
+              actions={
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="px-4 py-2 text-sm"
+                  onClick={handleRefreshAccounts}
+                  disabled={isSyncingNessie || balancesLoading}
+                >
+                  {isSyncingNessie || balancesLoading ? 'Refreshing…' : 'Refresh balances'}
+                </Button>
+              }
               contentClassName="space-y-4"
             >
               <div className="rounded-2xl border border-white/60 bg-gradient-to-br from-white/80 to-white/30 px-4 py-3 shadow-inner">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
-                  Total balance
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-navy">
-                  {formatCurrency(totalBalance, headlineCurrency)}
-                </p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">Totals</p>
+                <div className="mt-2 grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.15em] text-slate/60">Checking</p>
+                    <p className="text-xl font-semibold text-navy">
+                      {balancesLoading ? 'Loading...' : formatCurrency(totals.checking, headlineCurrency)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.15em] text-slate/60">Savings</p>
+                    <p className="text-xl font-semibold text-navy">
+                      {balancesLoading ? 'Loading...' : formatCurrency(totals.savings, headlineCurrency)}
+                    </p>
+                  </div>
+                </div>
+
               </div>
 
               <div className="space-y-3">
                 {Array.isArray(accounts) && accounts.length > 0 ? (
-                  accounts.map((a) => (
-                    <div
-                      key={a.id}
-                      className="flex items-center justify-between rounded-2xl border border-slate/15 bg-white/70 px-4 py-3 shadow-sm"
-                    >
-                      <div>
-                        <p className="text-sm font-semibold text-navy">{a.name ?? 'Account'}</p>
-                        <p className="text-xs text-slate/60">•••• {a.mask ?? '0000'}</p>
+                  accounts.map((a) => {
+                    const type = a.account_type ?? a.type ?? 'Account';
+                    const name = a.nickname ?? a.name ?? type;
+                    const mask = a.account_number_masked ?? a.mask ?? '0000';
+                    const currency = a.currencyCode ?? a.currency_code ?? 'USD';
+                    return (
+                      <div
+                        key={a.id ?? a.nessie_account_id ?? name}
+                        className="flex items-center justify-between rounded-2xl border border-slate/15 bg-white/70 px-4 py-3 shadow-sm"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-navy">
+                            {name}{' '}
+                            <span className="ml-1 rounded-full border border-slate/20 px-2 py-[2px] text-[11px] uppercase tracking-wide text-slate/60">
+                              {type}
+                            </span>
+                          </p>
+                          <p className="text-xs text-slate/60">•••• {mask}</p>
+                        </div>
+                        <p className="text-sm font-semibold text-slate/80">
+                          {formatCurrency(a.balance ?? 0, currency)}
+                        </p>
                       </div>
-                      <p className="text-sm font-semibold text-slate/80">
-                        {formatCurrency(a.balance ?? 0, a.currencyCode ?? 'USD')}
-                      </p>
-                    </div>
-                  ))
+                    );
+                  })
+                ) : balancesLoading ? (
+                  <p className="text-sm text-slate/60">Loading account details...</p>
                 ) : (
-                  <p className="text-sm text-slate/60">
-                    Connect an account to see balances here.
-                  </p>
+                  <p className="text-sm text-slate/60">Account connected.</p>
                 )}
               </div>
 

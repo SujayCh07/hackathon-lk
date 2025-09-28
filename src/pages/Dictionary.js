@@ -110,7 +110,6 @@ const Dictionary = {
   "bosnia and herzegovina": { cost_of_living: 650, groceries: 100, transportation: 22, rent: 190 },
   "bulgaria": { cost_of_living: 900, groceries: 130, transportation: 28, rent: 270 },
   "croatia": { cost_of_living: 1100, groceries: 180, transportation: 30, rent: 370 },
-  "cyprus": { cost_of_living: 1350, groceries: 285, transportation: 65, rent: 630 },
   "czech republic": { cost_of_living: 1300, groceries: 200, transportation: 38, rent: 480 },
   "denmark": { cost_of_living: 2200, groceries: 400, transportation: 90, rent: 1200 },
   "estonia": { cost_of_living: 1250, groceries: 170, transportation: 28, rent: 400 },

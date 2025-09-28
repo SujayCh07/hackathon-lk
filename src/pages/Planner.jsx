@@ -581,8 +581,8 @@ function Planner() {
                 <option value="runway">Longest runway</option>
                 <option value="alpha-asc">Alphabetical (A–Z)</option>
                 <option value="alpha-desc">Alphabetical (Z–A)</option>
-                <option value="cost-asc">Monthly cost (low to high)</option>
-                <option value="cost-desc">Monthly cost (high to low)</option>
+                <option value="cost-asc">Monthly cost (low/high)</option>
+                <option value="cost-desc">Monthly cost (high/low)</option>
               </select>
             </div>
 
