@@ -3,6 +3,37 @@ import { supabase } from './supabase.js';
 const NESSIE_BASE_URL = import.meta.env.VITE_NESSIE_BASE_URL ?? 'https://api.nessieisreal.com';
 const NESSIE_API_KEY = import.meta.env.VITE_NESSIE_API_KEY;
 
+const ENSURE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const ensureCache = new Map();
+
+function readEnsureCache(userId) {
+  if (!userId) return null;
+  const cached = ensureCache.get(userId);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    ensureCache.delete(userId);
+    return null;
+  }
+  return cached;
+}
+
+function writeEnsureCache(userId, payload) {
+  if (!userId || !payload) return;
+  ensureCache.set(userId, {
+    customerId: payload.customerId ?? null,
+    user: payload.user ?? null,
+    expiresAt: Date.now() + ENSURE_CACHE_TTL_MS
+  });
+}
+
+export function clearCachedNessieCustomer(userId) {
+  if (userId) {
+    ensureCache.delete(userId);
+  } else {
+    ensureCache.clear();
+  }
+}
+
 function buildUrl(path, query = {}) {
   if (!path.startsWith('/')) {
     throw new Error('Nessie API paths must start with a leading slash');
@@ -137,9 +168,17 @@ export async function persistNessieCustomerId({ userId, customerId, metadata = {
   return userData?.user ?? null;
 }
 
-export async function ensureNessieCustomer(user, { persist = true } = {}) {
+export async function ensureNessieCustomer(user, { persist = true, forceRefresh = false } = {}) {
   if (!user?.id) {
     throw new Error('ensureNessieCustomer requires an authenticated Supabase user');
+  }
+
+  const cachedEntry = !forceRefresh ? readEnsureCache(user.id) : null;
+  if (cachedEntry?.customerId) {
+    return {
+      customerId: cachedEntry.customerId,
+      user: cachedEntry.user ?? user
+    };
   }
 
   const metadataId = user.user_metadata?.nessieCustomerId ?? null;
@@ -154,7 +193,7 @@ export async function ensureNessieCustomer(user, { persist = true } = {}) {
   }
 
   let existingCustomer = null;
-  if (storedId) {
+  if (storedId && (forceRefresh || !metadataId || !cachedEntry)) {
     try {
       existingCustomer = await fetchCustomer(storedId);
     } catch (error) {
@@ -185,6 +224,8 @@ export async function ensureNessieCustomer(user, { persist = true } = {}) {
       console.error('Failed to persist Nessie customer id to Supabase', error);
     }
   }
+
+  writeEnsureCache(user.id, { customerId, user: updatedUser ?? user });
 
   return { customerId, user: updatedUser };
 }

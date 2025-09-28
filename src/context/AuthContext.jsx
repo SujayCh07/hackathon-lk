@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { supabase } from '../lib/supabase.js';
 import {
+  clearCachedNessieCustomer,
   ensureNessieCustomer,
   loadAccountsFromSupabase,
   loadTransactionsFromSupabase,
@@ -265,6 +266,7 @@ export function AuthProvider({ children }) {
     setNessieState(initialNessieState);
     activeSessionRef.current = null;
     clearCachedSession();
+    clearCachedNessieCustomer();
     try {
       const { error } = await supabase.auth.signOut({ scope: 'global' });
       if (error) {
