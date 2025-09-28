@@ -90,7 +90,70 @@ export default function Settings() {
   const [countriesError, setCountriesError] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const disableProfileInputs = false;
+  const disableProfileInputs = savingProfile;
+
+  const identityFallback = useMemo(() => {
+    if (!user) return '';
+    const md = user.user_metadata ?? {};
+    if (md.displayName && md.displayName.trim()) return md.displayName.trim();
+    if (user.email) return (user.email.split('@')[0] ?? '').trim();
+    return '';
+  }, [user]);
+
+  const applyFormSeed = useCallback((seed) => {
+    if (!seed) return;
+
+    setDisplayName((prev) => (prev === (seed.displayName ?? '') ? prev : seed.displayName ?? ''));
+    setMonthlyBudget((prev) => (prev === (seed.monthlyBudget ?? '') ? prev : seed.monthlyBudget ?? ''));
+    setAddressHouseNumber((prev) =>
+      prev === (seed.addressHouseNumber ?? '') ? prev : seed.addressHouseNumber ?? ''
+    );
+    setAddressStreet((prev) => (prev === (seed.addressStreet ?? '') ? prev : seed.addressStreet ?? ''));
+    setAddressCity((prev) => (prev === (seed.addressCity ?? '') ? prev : seed.addressCity ?? ''));
+    setAddressState((prev) => (prev === (seed.addressState ?? '') ? prev : seed.addressState ?? ''));
+    setCurrentCountryCode((prev) =>
+      prev === (seed.currentCountryCode ?? '') ? prev : seed.currentCountryCode ?? ''
+    );
+  }, []);
+
+  const buildFormSeed = useCallback(
+    (sourceProfile) => {
+      const resolvedName =
+        typeof sourceProfile?.name === 'string' && sourceProfile.name.trim().length > 0
+          ? sourceProfile.name.trim()
+          : identityFallback ?? '';
+
+      const monthlyBudgetValue =
+        sourceProfile?.monthlyBudget != null && !Number.isNaN(sourceProfile.monthlyBudget)
+          ? String(sourceProfile.monthlyBudget)
+          : '';
+
+      const normalisedAddress =
+        sourceProfile?.streetAddress && typeof sourceProfile.streetAddress === 'object'
+          ? normalizeAddress(sourceProfile.streetAddress)
+          : normalizeAddress();
+
+      const selectedCode = sourceProfile?.currentCountry?.code ?? '';
+      const normalisedCode =
+        typeof selectedCode === 'string' ? selectedCode.trim().toUpperCase() : '';
+
+      return {
+        displayName: resolvedName,
+        monthlyBudget: monthlyBudgetValue,
+        addressHouseNumber: normalisedAddress.houseNumber ?? '',
+        addressStreet: normalisedAddress.street ?? '',
+        addressCity: normalisedAddress.city ?? '',
+        addressState: normalisedAddress.state ?? '',
+        currentCountryCode: normalisedCode,
+      };
+    },
+    [identityFallback]
+  );
+
+  const profileSeed = useMemo(() => {
+    if (profileLoading) return null;
+    return buildFormSeed(profile ?? null);
+  }, [buildFormSeed, profile, profileLoading]);
 
   const showToast = useCallback((t) => setToast({ id: Date.now(), ...t }), []);
   const dismissToast = useCallback(() => setToast(null), []);
@@ -111,40 +174,11 @@ export default function Settings() {
     }
   }, [accountsError]);
 
-  const identityFallback = useMemo(() => {
-    if (!user) return '';
-    const md = user.user_metadata ?? {};
-    if (md.displayName && md.displayName.trim()) return md.displayName.trim();
-    if (user.email) return (user.email.split('@')[0] ?? '').trim();
-    return '';
-  }, [user]);
-
   // load profile -> seed form
   useEffect(() => {
-    if (profileLoading) return;
-    setDisplayName(profile?.name ?? identityFallback);
-    setMonthlyBudget(
-      profile?.monthlyBudget != null && !Number.isNaN(profile.monthlyBudget)
-        ? String(profile.monthlyBudget)
-        : ''
-    );
-    const addr = profile?.streetAddress ?? null;
-    if (addr && typeof addr === 'object') {
-      setAddressHouseNumber(addr.houseNumber ?? '');
-      setAddressStreet(addr.street ?? '');
-      setAddressCity(addr.city ?? '');
-      setAddressState(addr.state ? String(addr.state).toUpperCase() : '');
-    } else {
-      setAddressHouseNumber('');
-      setAddressStreet('');
-      setAddressCity('');
-      setAddressState('');
-    }
-    const selectedCode = profile?.currentCountry?.code ?? '';
-    setCurrentCountryCode(
-      typeof selectedCode === 'string' ? selectedCode.trim().toUpperCase() : ''
-    );
-  }, [profile, profileLoading, identityFallback]);
+    if (!profileSeed) return;
+    applyFormSeed(profileSeed);
+  }, [applyFormSeed, profileSeed]);
 
   useEffect(() => {
     if (profileActionState !== 'success') return undefined;
@@ -251,13 +285,28 @@ export default function Settings() {
     const currentCode = currentCountryCode?.trim()
       ? currentCountryCode.trim().toUpperCase()
       : null;
-    const street_address = serialiseAddress({
+    const normalisedAddress = normalizeAddress({
       houseNumber: addressHouseNumber,
       street: addressStreet,
       city: addressCity,
       state: addressState,
     });
+    const street_address = serialiseAddress(normalisedAddress);
 
+    const optimisticSeed = {
+      displayName: trimmedName,
+      monthlyBudget: budgetStr,
+      addressHouseNumber: normalisedAddress.houseNumber,
+      addressStreet: normalisedAddress.street,
+      addressCity: normalisedAddress.city,
+      addressState: normalisedAddress.state,
+      currentCountryCode: currentCode ?? '',
+    };
+    applyFormSeed(optimisticSeed);
+
+    setProfileStatus(null);
+    setSavingProfile(true);
+    setProfileActionState('saving');
 
     try {
       const updates = {
@@ -280,6 +329,10 @@ export default function Settings() {
         if (mdErr) throw mdErr;
       }
 
+      const refreshedProfile = await refreshProfile();
+      if (refreshedProfile) {
+        applyFormSeed(buildFormSeed(refreshedProfile));
+      }
 
       showToast({
         type: 'success',
@@ -289,6 +342,7 @@ export default function Settings() {
           : 'Your profile preferences are up to date.',
         duration: 4500,
       });
+      setProfileStatus(null);
       setProfileActionState('success');
     } catch (err) {
       const msg =
@@ -386,7 +440,7 @@ export default function Settings() {
                         fill="currentColor"
                       />
                     </svg>
-                    <span>Saved</span>
+                    <span>Saved ✅</span>
                   </div>
                 ) : (
                   <Button
