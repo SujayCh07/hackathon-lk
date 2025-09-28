@@ -392,6 +392,12 @@ function Planner() {
     fetchRunwayData();
   }, [debouncedBudget, fetchRunwayData]);
 
+  useEffect(() => {
+  if (!runwayData.length) return;
+  rankWithAI(runwayData);
+}, [budget, stayDuration, timeUnit, runwayData, rankWithAI]);
+
+
   // Only call “AI” once per page load (guarded)
   useEffect(() => {
     if (didCallAIRef.current) return;
@@ -436,28 +442,33 @@ function Planner() {
     }
 
     switch (sortOption) {
-      case 'alpha-asc':
-        data = data.slice().sort((a, b) => a.city.localeCompare(b.city));
-        break;
-      case 'alpha-desc':
-        data = data.slice().sort((a, b) => b.city.localeCompare(a.city));
-        break;
-      case 'cost-asc':
-        data = data.slice().sort((a, b) => (a.monthlyCost ?? Infinity) - (b.monthlyCost ?? Infinity));
-        break;
-      case 'cost-desc':
-        data = data.slice().sort((a, b) => (b.monthlyCost ?? 0) - (a.monthlyCost ?? 0));
-        break;
-      case 'runway':
-        data = data.slice().sort((a, b) => b.runway - a.runway);
-        break;
-      case 'ai':
-      default:
-        data = data
-          .slice()
-          .sort((a, b) => (b.aiScore ?? -1) - (a.aiScore ?? -1) || (b.runway - a.runway));
-        break;
-    }
+  case 'alpha-asc':
+    data = data.slice().sort((a, b) => a.city.localeCompare(b.city));
+    break;
+  case 'alpha-desc':
+    data = data.slice().sort((a, b) => b.city.localeCompare(a.city));
+    break;
+  case 'cost-asc':
+    data = data.slice().sort((a, b) => (a.monthlyCost ?? Infinity) - (b.monthlyCost ?? Infinity));
+    break;
+  case 'cost-desc':
+    data = data.slice().sort((a, b) => (b.monthlyCost ?? 0) - (a.monthlyCost ?? 0));
+    break;
+  case 'rank':
+    data = data
+      .slice()
+      .sort((a, b) => {
+        if (a.aiRank == null) return 1;
+        if (b.aiRank == null) return -1;
+        return a.aiRank - b.aiRank;
+      });
+    break;
+  case 'ai':
+  default:
+    data = data.slice().sort((a, b) => (b.aiScore ?? -1) - (a.aiScore ?? -1));
+    break;
+}
+
 
     return data;
   }, [continentFilter, curiousCities, maxMonthlyCost, runwayData, searchTerm, sortOption]);
@@ -610,7 +621,7 @@ function Planner() {
                 aria-label="Sort options"
               >
                 <option value="ai">Best (AI fit)</option>
-                <option value="runway">Longest runway</option>
+                <option value="rank">AI rank (1 → N)</option>
                 <option value="alpha-asc">Alphabetical (A–Z)</option>
                 <option value="alpha-desc">Alphabetical (Z–A)</option>
                 <option value="cost-asc">Monthly cost (low/high)</option>
