@@ -20,7 +20,7 @@ function formatUSD(n) {
 
 function getMonthlyCost(city) {
   const entry = Dictionary[city.toLowerCase()];
-  console.log
+  console.log(entry);
   return entry?.cost_of_living ?? null;
 }
 
@@ -28,7 +28,13 @@ function toTitleCase(s = '') {
   return s.replace(/\w\S*/g, (t) => t[0].toUpperCase() + t.slice(1).toLowerCase());
 }
 
+function getMonthlyCostFromDictionary(city) {
+  const entry = Dictionary[city.toLowerCase()];
+  return entry?.cost_of_living ?? null;
+}
+
 function getSampleDestinations(baseMonthlyBudget) {
+  
   const affordable = Object.entries(Dictionary)
     .map(([city, values]) => ({
       city: toTitleCase(city),
@@ -213,27 +219,6 @@ export function Dashboard() {
         setBalanceUSD(Number(acctRows[0].balance ?? 0));
       }
 
-      const currentCountry = (profile?.current_country_code || "united states").toLowerCase();
-const currentCost = Dictionary[currentCountry]?.cost_of_living ?? null;
-
-const similarDestinations = useMemo(() => {
-  if (!currentCost) return [];
-  return Object.entries(Dictionary)
-    .map(([country, values]) => ({
-      city: toTitleCase(country),
-      monthlyCost: values.cost_of_living ?? 0,
-    }))
-    .filter(
-      (d) =>
-        d.monthlyCost > 0 &&
-        d.city.toLowerCase() !== currentCountry && // exclude the current country
-        Math.abs(d.monthlyCost - currentCost) / currentCost <= 0.3 // within 30%
-    )
-    .slice(0, 3); // pick 3
-}, [currentCountry, currentCost]);
-
-
-
       const { data: txRows, error: txErr } = await supabase
         .from('transactions')
         .select('id, merchant, amount, category, ts')
@@ -330,7 +315,15 @@ const similarDestinations = useMemo(() => {
   }
 
   const sampleDestinations = useMemo(() => getSampleDestinations(baseMonthlyBudget), [baseMonthlyBudget]);
-  const enrichedPPP = pppTop.length > 0 ? pppTop : sampleDestinations;
+const enrichedPPP = (pppTop.length > 0 ? pppTop : sampleDestinations)
+  .map((d) => {
+    const monthlyCost = getMonthlyCostFromDictionary(d.city) ?? d.monthlyCost ?? 0;
+    return {
+      ...d,
+      monthlyCost,         // ✅ always from Dictionary.js if available
+    };
+  })
+  .filter((d) => d.city.toLowerCase() !== "united states"); // 🚫 filter out USA
 
   useEffect(() => {
     let alive = true;
@@ -427,26 +420,6 @@ const similarDestinations = useMemo(() => {
   [pppTop, weeklyChange, budgetDelta, avgDailySpend, enrichedPPP]
 );
 
-const currentCountry = (profile?.current_country_code || "united states").toLowerCase();
-const currentCost = Dictionary[currentCountry]?.cost_of_living ?? null;
-
-const similarDestinations = useMemo(() => {
-  if (!currentCost) return [];
-  return Object.entries(Dictionary)
-    .map(([country, values]) => ({
-      city: toTitleCase(country),
-      monthlyCost: values.cost_of_living ?? 0,
-    }))
-    .filter(
-      (d) =>
-        d.monthlyCost > 0 &&
-        d.city.toLowerCase() !== currentCountry && // exclude the current country
-        Math.abs(d.monthlyCost - currentCost) / currentCost <= 0.5 // within 30%
-    )
-    .slice(0, 3); // pick 3
-}, [currentCountry, currentCost]);
-
-
   const heroLabel = displayName ? `${displayName.split(' ')[0]}'s budget` : 'Your budget';
   const heroSubtitle = baseMonthlyBudget
     ? `Here’s how $${Number(baseMonthlyBudget).toLocaleString()}/month stretches across the globe.`
@@ -539,14 +512,14 @@ const similarDestinations = useMemo(() => {
         </Card>
 
         <div className="grid grid-cols-1 gap-4">
-         <SavingsRunwayPanel
-  destinations={similarDestinations}
-  stayLengthMonths={1}
-  currentCountry={(profile?.current_country_code || "united states").toLowerCase()} 
+          <SavingsRunwayPanel
+  destinations={enrichedPPP.map((d) => ({
+    city: d.city,
+    monthlyCost: d.monthlyCost,
+    savings: d.savingsPct,
+  }))}
+  stayLengthMonths={6}
 />
-
-
-
 
       
         </div>
