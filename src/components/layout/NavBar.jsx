@@ -48,7 +48,7 @@ export function NavBar() {
     try {
       setIsSigningOut(true);
       await signOut();
-      navigate('/', { replace: true });
+      navigate('/login', { replace: true });
     } finally {
       setIsSigningOut(false);
     }
