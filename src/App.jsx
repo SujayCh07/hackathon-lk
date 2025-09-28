@@ -11,6 +11,8 @@ import LoginPage from './pages/LoginPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import Settings from './pages/Settings.jsx';
 import { useAuth } from './hooks/useAuth.js';
+import DemoConsole from './pages/DemoConsole.jsx';
+import DemoAdminStatus from './pages/DemoAdminStatus.jsx';
 
 function App() {
   const location = useLocation();
@@ -78,6 +80,14 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/demo/nessie"
+            element={<DemoConsole />}
+          />
+          <Route
+            path="/demo/admin"
+            element={<DemoAdminStatus />}
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </RouteTransitions>
@@ -143,3 +153,4 @@ function FullPageLoader({ message }) {
     </div>
   );
 }
+

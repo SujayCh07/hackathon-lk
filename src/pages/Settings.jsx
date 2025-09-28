@@ -1,3 +1,4 @@
+// src/pages/Settings.jsx
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Button from '../components/ui/Button.jsx';
@@ -5,6 +6,7 @@ import { SettingsSection } from '../components/settings/SettingsSection.jsx';
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import { supabase } from '../lib/supabase.js';
+import { syncNessie } from '../lib/api'; // ⬅️ NEW: calls the nessie-sync Edge Function
 
 function formatCurrency(amount, currency = 'USD') {
   try {
@@ -13,28 +15,19 @@ function formatCurrency(amount, currency = 'USD') {
       currency,
       maximumFractionDigits: 2
     }).format(amount);
-  } catch (error) {
+  } catch {
     return `$${Number(amount ?? 0).toFixed(2)}`;
   }
 }
 
-const EMPTY_ADDRESS_FORM = {
-  houseNumber: '',
-  street: '',
-  city: '',
-  state: '',
-};
+const EMPTY_ADDRESS_FORM = { houseNumber: '', street: '', city: '', state: '' };
 
 function normaliseAddressInput(parts = EMPTY_ADDRESS_FORM) {
   return {
-    houseNumber:
-      typeof parts.houseNumber === 'string' ? parts.houseNumber.trim() : EMPTY_ADDRESS_FORM.houseNumber,
+    houseNumber: typeof parts.houseNumber === 'string' ? parts.houseNumber.trim() : EMPTY_ADDRESS_FORM.houseNumber,
     street: typeof parts.street === 'string' ? parts.street.trim() : EMPTY_ADDRESS_FORM.street,
     city: typeof parts.city === 'string' ? parts.city.trim() : EMPTY_ADDRESS_FORM.city,
-    state:
-      typeof parts.state === 'string'
-        ? parts.state.trim().toUpperCase()
-        : EMPTY_ADDRESS_FORM.state,
+    state: typeof parts.state === 'string' ? parts.state.trim().toUpperCase() : EMPTY_ADDRESS_FORM.state,
   };
 }
 
@@ -48,15 +41,9 @@ function formatAddressPreview(parts) {
 function serialiseAddress(parts) {
   const normalised = normaliseAddressInput(parts);
   const formatted = formatAddressPreview(normalised);
-  const hasValue = Object.values(normalised).some((value) => value.length > 0);
+  const hasValue = Object.values(normalised).some((v) => v.length > 0);
 
-  if (!hasValue) {
-    return {
-      normalised,
-      formatted: '',
-      serialised: null,
-    };
-  }
+  if (!hasValue) return { normalised, formatted: '', serialised: null };
 
   return {
     normalised,
@@ -66,8 +53,11 @@ function serialiseAddress(parts) {
 }
 
 export default function Settings() {
-  const { user, nessie, isSyncingNessie, refreshNessie } = useAuth();
+  // We keep your auth hook for user + existing context,
+  // but balances will now come from Supabase (dbAccounts) first.
+  const { user, nessie } = useAuth();
   const userId = user?.id ?? null;
+
   const {
     profile,
     loading: profileLoading,
@@ -75,6 +65,7 @@ export default function Settings() {
     refresh: refreshProfile
   } = useUserProfile(userId);
 
+  // ---------------- Profile state (unchanged) ----------------
   const [displayName, setDisplayName] = useState('');
   const [monthlyBudget, setMonthlyBudget] = useState('');
   const [addressHouseNumber, setAddressHouseNumber] = useState('');
@@ -91,21 +82,45 @@ export default function Settings() {
   const [countriesError, setCountriesError] = useState(null);
   const [profileToast, setProfileToast] = useState(null);
 
+  // ---------------- NEW: balances from DB ----------------
+  const [dbAccounts, setDbAccounts] = useState([]);
+  const [syncing, setSyncing] = useState(false);
+
+  // Load latest balances for this user from v_latest_account
+  async function refreshDbAccounts() {
+    if (!userId) {
+      setDbAccounts([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from('v_latest_account')
+      .select('nessie_account_id, account_type, account_number_masked, balance, currency_code')
+      .eq('user_id', userId);
+
+    if (error) {
+      // Don’t hard fail the page; just show message on the card
+      setAccountsStatus({ type: 'error', message: error.message || 'Unable to load balances.' });
+      setDbAccounts([]);
+      return;
+    }
+    setDbAccounts(Array.isArray(data) ? data : []);
+  }
+
+  useEffect(() => {
+    refreshDbAccounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
   const countryOptions = useMemo(() => {
     const map = new Map();
     const push = (entry) => {
       if (!entry) return;
       const code = typeof entry.code === 'string' ? entry.code.trim() : '';
       const name = typeof entry.name === 'string' ? entry.name.trim() : null;
-      if (!code) {
-        return;
-      }
+      if (!code) return;
       const key = code.toUpperCase();
       if (!map.has(key)) {
-        map.set(key, {
-          code,
-          name: name && name.length > 0 ? name : code
-        });
+        map.set(key, { code, name: name && name.length > 0 ? name : code });
       }
     };
 
@@ -117,42 +132,24 @@ export default function Settings() {
   }, [countries, profile?.currentCountry, profile?.homeCountry]);
 
   useEffect(() => {
-    if (!profileToast) {
-      return undefined;
-    }
-
-    const timeout = setTimeout(() => {
-      setProfileToast(null);
-    }, profileToast.duration ?? 4800);
-
-    return () => {
-      clearTimeout(timeout);
-    };
+    if (!profileToast) return undefined;
+    const timeout = setTimeout(() => setProfileToast(null), profileToast.duration ?? 4800);
+    return () => clearTimeout(timeout);
   }, [profileToast]);
 
   const identityFallback = useMemo(() => {
-    if (!user) {
-      return '';
-    }
-
+    if (!user) return '';
     const metadataName = user.user_metadata?.displayName;
-    if (metadataName && metadataName.trim()) {
-      return metadataName.trim();
-    }
-
+    if (metadataName && metadataName.trim()) return metadataName.trim();
     if (user.email) {
       const [local] = user.email.split('@');
       return local ?? '';
     }
-
     return '';
   }, [user]);
 
   useEffect(() => {
-    if (profileLoading) {
-      return;
-    }
-
+    if (profileLoading) return;
     setDisplayName(profile?.name ?? identityFallback);
     setMonthlyBudget(
       profile?.monthlyBudget != null && !Number.isNaN(profile.monthlyBudget)
@@ -180,58 +177,39 @@ export default function Settings() {
       .limit(300)
       .then(({ data, error }) => {
         if (!active) return;
-        if (error) {
-          throw error;
-        }
-
-        const normalised = (data ?? []).map((country) => ({
-          code: typeof country.code === 'string' ? country.code.trim() : '',
-          name:
-            typeof country.country === 'string' && country.country.trim().length > 0
-              ? country.country.trim()
-              : typeof country.code === 'string'
-              ? country.code.trim()
-              : 'Unnamed country'
+        if (error) throw error;
+        const normalised = (data ?? []).map((c) => ({
+          code: typeof c.code === 'string' ? c.code.trim() : '',
+          name: typeof c.country === 'string' && c.country.trim().length > 0 ? c.country.trim() : (c.code ?? '').trim() || 'Unnamed country'
         }));
         setCountries(normalised);
       })
       .catch((cause) => {
         if (!active) return;
-        const message =
-          cause instanceof Error ? cause.message : 'Unable to load countries right now.';
+        const message = cause instanceof Error ? cause.message : 'Unable to load countries right now.';
         setCountriesError(message);
         setCountries([]);
       })
       .finally(() => {
-        if (active) {
-          setCountriesLoading(false);
-        }
+        if (active) setCountriesLoading(false);
       });
 
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
+
+  // Prefer DB accounts; fallback to the old nessie context if empty
   const totalBalance = useMemo(() => {
-    if (!Array.isArray(nessie?.accounts)) {
-      return 0;
-    }
+    const fromDb = dbAccounts.reduce((sum, a) => sum + (typeof a.balance === 'number' ? a.balance : 0), 0);
+    if (fromDb > 0) return fromDb;
+    if (!Array.isArray(nessie?.accounts)) return 0;
+    return nessie.accounts.reduce((sum, a) => sum + (typeof a.balance === 'number' ? a.balance : 0), 0);
+  }, [dbAccounts, nessie]);
 
-    return nessie.accounts.reduce((sum, account) => {
-      return sum + (typeof account.balance === 'number' ? account.balance : 0);
-    }, 0);
-  }, [nessie]);
-
-  const headlineCurrency = nessie?.accounts?.[0]?.currencyCode ?? 'USD';
+  const headlineCurrency =
+    (dbAccounts[0]?.currency_code ?? nessie?.accounts?.[0]?.currencyCode ?? 'USD');
 
   const addressPreview = useMemo(
-    () =>
-      formatAddressPreview({
-        houseNumber: addressHouseNumber,
-        street: addressStreet,
-        city: addressCity,
-        state: addressState,
-      }),
+    () => formatAddressPreview({ houseNumber: addressHouseNumber, street: addressStreet, city: addressCity, state: addressState }),
     [addressHouseNumber, addressStreet, addressCity, addressState]
   );
 
@@ -276,13 +254,10 @@ export default function Settings() {
       };
 
       const { error } = await supabase.from('user_profile').upsert(updates, { onConflict: 'user_id' });
-
       if (error) throw error;
 
       if (trimmedName) {
-        const { error: metadataError } = await supabase.auth.updateUser({
-          data: { displayName: trimmedName },
-        });
+        const { error: metadataError } = await supabase.auth.updateUser({ data: { displayName: trimmedName } });
         if (metadataError) throw metadataError;
       }
 
@@ -290,10 +265,9 @@ export default function Settings() {
       setProfileStatus(null);
       setProfileToast({
         title: 'Profile saved',
-        description:
-          addressResult.formatted
-            ? `Mailing address saved as ${addressResult.formatted.replace(/\n/g, ', ')}.`
-            : 'Your profile preferences were saved successfully.',
+        description: addressResult.formatted
+          ? `Mailing address saved as ${addressResult.formatted.replace(/\n/g, ', ')}.`
+          : 'Your profile preferences were saved successfully.',
         duration: 5200,
       });
     } catch (error) {
@@ -304,19 +278,23 @@ export default function Settings() {
     }
   }
 
-
+  // ⬇️ UPDATED: call Edge Function then refresh balances from DB
   async function handleRefreshAccounts() {
-    if (typeof refreshNessie !== 'function') {
-      return;
-    }
-
+    if (!userId) return;
     setAccountsStatus(null);
+    setSyncing(true);
     try {
-      await refreshNessie();
-      setAccountsStatus({ type: 'success', message: 'Account balances refreshed.' });
+      const res = await syncNessie(); // calls /functions/v1/nessie-sync with mapped customer_id
+      await refreshDbAccounts();      // re-read balances from v_latest_account
+      setAccountsStatus({
+        type: 'success',
+        message: `Balances refreshed. Imported ${res.insertedTransactions ?? 0} transactions.`,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to refresh accounts right now.';
       setAccountsStatus({ type: 'error', message });
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -376,6 +354,8 @@ export default function Settings() {
             }
           >
             <form id="profile-form" onSubmit={handleSaveProfile} className="grid gap-6">
+              {/* --- your existing profile fields, unchanged --- */}
+              {/* Display Name */}
               <div className="grid gap-2">
                 <label htmlFor="display-name" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
                   Display name
@@ -384,16 +364,15 @@ export default function Settings() {
                   id="display-name"
                   type="text"
                   value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
+                  onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="How should we greet you?"
                   className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
                   disabled={savingProfile}
                 />
-                <p className="text-xs text-slate/60">
-                  This name appears on your dashboard and shared parity summaries.
-                </p>
+                <p className="text-xs text-slate/60">This name appears on your dashboard and shared parity summaries.</p>
               </div>
 
+              {/* Monthly budget */}
               <div className="grid gap-2">
                 <label htmlFor="monthly-budget" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
                   Monthly travel budget (USD)
@@ -404,47 +383,31 @@ export default function Settings() {
                   min="0"
                   step="50"
                   value={monthlyBudget}
-                  onChange={(event) => setMonthlyBudget(event.target.value)}
+                  onChange={(e) => setMonthlyBudget(e.target.value)}
                   placeholder="e.g. 2500"
                   className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
                   disabled={savingProfile}
                 />
-                <p className="text-xs text-slate/60">
-                  We use this number to calculate how long you can stay in each destination.
-                </p>
+                <p className="text-xs text-slate/60">We use this number to calculate how long you can stay in each destination.</p>
               </div>
 
+              {/* Address fields (unchanged) */}
               <fieldset className="grid gap-3">
-                <legend className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
-                  Mailing address
-                </legend>
+                <legend className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">Mailing address</legend>
                 <div className="grid gap-4 sm:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
                   <div className="grid gap-1.5">
-                    <label htmlFor="address-house-number" className="text-xs font-medium text-slate/70">
-                      House number
-                    </label>
-                    <input
-                      id="address-house-number"
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="address-line1"
-                      value={addressHouseNumber}
-                      onChange={(event) => setAddressHouseNumber(event.target.value)}
+                    <label htmlFor="address-house-number" className="text-xs font-medium text-slate/70">House number</label>
+                    <input id="address-house-number" type="text" inputMode="numeric" autoComplete="address-line1"
+                      value={addressHouseNumber} onChange={(e) => setAddressHouseNumber(e.target.value)}
                       placeholder="e.g. 123"
                       className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
                       disabled={savingProfile}
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <label htmlFor="address-street" className="text-xs font-medium text-slate/70">
-                      Street
-                    </label>
-                    <input
-                      id="address-street"
-                      type="text"
-                      autoComplete="address-line1"
-                      value={addressStreet}
-                      onChange={(event) => setAddressStreet(event.target.value)}
+                    <label htmlFor="address-street" className="text-xs font-medium text-slate/70">Street</label>
+                    <input id="address-street" type="text" autoComplete="address-line1"
+                      value={addressStreet} onChange={(e) => setAddressStreet(e.target.value)}
                       placeholder="Market Street"
                       className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
                       disabled={savingProfile}
@@ -453,34 +416,21 @@ export default function Settings() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
                   <div className="grid gap-1.5">
-                    <label htmlFor="address-city" className="text-xs font-medium text-slate/70">
-                      City
-                    </label>
-                    <input
-                      id="address-city"
-                      type="text"
-                      autoComplete="address-level2"
-                      value={addressCity}
-                      onChange={(event) => setAddressCity(event.target.value)}
+                    <label htmlFor="address-city" className="text-xs text-slate/70 font-medium">City</label>
+                    <input id="address-city" type="text" autoComplete="address-level2"
+                      value={addressCity} onChange={(e) => setAddressCity(e.target.value)}
                       placeholder="San Francisco"
                       className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
                       disabled={savingProfile}
                     />
                   </div>
                   <div className="grid gap-1.5">
-                    <label htmlFor="address-state" className="text-xs font-medium text-slate/70">
-                      State / region
-                    </label>
-                    <input
-                      id="address-state"
-                      type="text"
-                      autoComplete="address-level1"
-                      value={addressState}
-                      onChange={(event) => setAddressState(event.target.value.toUpperCase())}
-                      placeholder="CA"
+                    <label htmlFor="address-state" className="text-xs text-slate/70 font-medium">State / region</label>
+                    <input id="address-state" type="text" autoComplete="address-level1"
+                      value={addressState} onChange={(e) => setAddressState(e.target.value.toUpperCase())}
+                      placeholder="CA" maxLength={32}
                       className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
                       disabled={savingProfile}
-                      maxLength={32}
                     />
                   </div>
                 </div>
@@ -494,72 +444,48 @@ export default function Settings() {
                     <p className="text-xs text-slate/60">We'll format your address automatically as you type.</p>
                   )}
                 </div>
-                <p className="text-xs text-slate/60">
-                  This stays private and helps us tailor exchange rates and insights for your home base.
-                </p>
+                <p className="text-xs text-slate/60">This stays private and helps us tailor exchange rates and insights for your home base.</p>
               </fieldset>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
-                  <label htmlFor="current-country" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
-                    Current country
-                  </label>
+                  <label htmlFor="current-country" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">Current country</label>
                   <select
                     id="current-country"
                     value={currentCountryCode}
-                    onChange={(event) => setCurrentCountryCode(event.target.value)}
+                    onChange={(e) => setCurrentCountryCode(e.target.value)}
                     className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
                     disabled={savingProfile || countriesLoading}
                   >
                     <option value="">Select a country</option>
-                    {countriesLoading ? (
-                      <option value="" disabled>
-                        Loading countries…
-                      </option>
-                    ) : null}
+                    {countriesLoading ? <option value="" disabled>Loading countries…</option> : null}
                     {countryOptions.map((country) => (
-                      <option key={country.code} value={country.code}>
-                        {country.name}
-                      </option>
+                      <option key={country.code} value={country.code}>{country.name}</option>
                     ))}
                   </select>
-                  <p className="text-xs text-slate/60">
-                    Where you are based today. Update this when you travel to keep PPP insights accurate.
-                  </p>
+                  <p className="text-xs text-slate/60">Where you are based today. Update this when you travel to keep PPP insights accurate.</p>
                 </div>
                 <div className="grid gap-2">
-                  <label htmlFor="home-country" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">
-                    Home country
-                  </label>
+                  <label htmlFor="home-country" className="text-xs font-semibold uppercase tracking-[0.2em] text-slate/60">Home country</label>
                   <select
                     id="home-country"
                     value={homeCountryCode}
-                    onChange={(event) => setHomeCountryCode(event.target.value)}
+                    onChange={(e) => setHomeCountryCode(e.target.value)}
                     className="w-full rounded-2xl border border-slate/20 bg-white/80 px-4 py-3 text-sm text-navy shadow-inner shadow-white/40 transition focus:border-red focus:outline-none focus:ring-2 focus:ring-red/20"
                     disabled={savingProfile || countriesLoading}
                   >
                     <option value="">Select a country</option>
-                    {countriesLoading ? (
-                      <option value="" disabled>
-                        Loading countries…
-                      </option>
-                    ) : null}
+                    {countriesLoading ? <option value="" disabled>Loading countries…</option> : null}
                     {countryOptions.map((country) => (
-                      <option key={`home-${country.code}`} value={country.code}>
-                        {country.name}
-                      </option>
+                      <option key={`home-${country.code}`} value={country.code}>{country.name}</option>
                     ))}
                   </select>
-                  <p className="text-xs text-slate/60">
-                    Helps us compare your purchasing power with where you grew up or keep ties.
-                  </p>
+                  <p className="text-xs text-slate/60">Helps us compare your purchasing power with where you grew up or keep ties.</p>
                 </div>
               </div>
 
               {countriesError ? (
-                <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-xs text-red">
-                  {countriesError}
-                </div>
+                <div className="rounded-2xl border border-red/40 bg-red/5 px-4 py-3 text-xs text-red">{countriesError}</div>
               ) : null}
             </form>
           </SettingsSection>
@@ -573,9 +499,9 @@ export default function Settings() {
                 variant="secondary"
                 className="px-4 py-2 text-sm"
                 onClick={handleRefreshAccounts}
-                disabled={isSyncingNessie}
+                disabled={syncing || !userId}
               >
-                {isSyncingNessie ? 'Refreshing…' : 'Refresh balances'}
+                {syncing ? 'Refreshing…' : 'Refresh balances'}
               </Button>
             }
             footer="Balances are simulated for the hackathon environment and reset frequently."
@@ -589,12 +515,21 @@ export default function Settings() {
             </div>
 
             <div className="space-y-3">
-              {Array.isArray(nessie?.accounts) && nessie.accounts.length > 0 ? (
+              {dbAccounts.length > 0 ? (
+                dbAccounts.map((a) => (
+                  <div key={a.nessie_account_id} className="flex items-center justify-between rounded-2xl border border-slate/15 bg-white/70 px-4 py-3 shadow-sm shadow-white/60">
+                    <div>
+                      <p className="text-sm font-semibold text-navy">{a.account_type ?? 'Account'}</p>
+                      <p className="text-xs text-slate/60">•••• {a.account_number_masked ?? '0000'}</p>
+                    </div>
+                    <p className="text-sm font-semibold text-slate/80">
+                      {formatCurrency(a.balance ?? 0, a.currency_code ?? 'USD')}
+                    </p>
+                  </div>
+                ))
+              ) : Array.isArray(nessie?.accounts) && nessie.accounts.length > 0 ? (
                 nessie.accounts.map((account) => (
-                  <div
-                    key={account.id}
-                    className="flex items-center justify-between rounded-2xl border border-slate/15 bg-white/70 px-4 py-3 shadow-sm shadow-white/60"
-                  >
+                  <div key={account.id} className="flex items-center justify-between rounded-2xl border border-slate/15 bg-white/70 px-4 py-3 shadow-sm shadow-white/60">
                     <div>
                       <p className="text-sm font-semibold text-navy">{account.name ?? 'Account'}</p>
                       <p className="text-xs text-slate/60">•••• {account.mask ?? '0000'}</p>
