@@ -9,7 +9,7 @@ import { useAuth } from './useAuth.js';
 
 const MS_IN_DAY = 1000 * 60 * 60 * 24;
 
-export function useTransactions({ limit = 5, monthlyBudget, balanceUSD, customerId: providedCustomerId } = {}) {
+export function useTransactions({ limit = 5, monthlyBudget, balanceUSD } = {}) {
   const { user } = useAuth();
   const userId = user?.id ?? null;
 
@@ -17,22 +17,6 @@ export function useTransactions({ limit = 5, monthlyBudget, balanceUSD, customer
   const [isLoading, setIsLoading] = useState(Boolean(userId));
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const isCustomerIdControlled = providedCustomerId !== undefined;
-  const [resolvedCustomerId, setResolvedCustomerId] = useState(
-    (isCustomerIdControlled ? providedCustomerId : user?.user_metadata?.nessieCustomerId) ?? null
-  );
-
-  useEffect(() => {
-    if (isCustomerIdControlled) {
-      setResolvedCustomerId(providedCustomerId ?? null);
-    }
-  }, [isCustomerIdControlled, providedCustomerId]);
-
-  useEffect(() => {
-    if (!isCustomerIdControlled) {
-      setResolvedCustomerId(user?.user_metadata?.nessieCustomerId ?? null);
-    }
-  }, [isCustomerIdControlled, user?.id, user?.user_metadata?.nessieCustomerId]);
 
   useEffect(() => {
     let active = true;
@@ -67,22 +51,14 @@ export function useTransactions({ limit = 5, monthlyBudget, balanceUSD, customer
     };
   }, [userId]);
 
-  const refresh = useCallback(async ({ forceRefresh = false } = {}) => {
+  const refresh = useCallback(async () => {
     if (!userId || !user) {
       return [];
     }
 
     setIsRefreshing(true);
     try {
-      let customerId = resolvedCustomerId ?? null;
-      if (!customerId || forceRefresh) {
-        const ensured = await ensureNessieCustomer(user, { forceRefresh });
-        customerId = ensured.customerId;
-        if (!isCustomerIdControlled) {
-          setResolvedCustomerId(customerId);
-        }
-      }
-
+      const { customerId } = await ensureNessieCustomer(user);
       const rows = await syncTransactionsFromNessie({ userId, customerId });
       const mapped = rows.map((row) => mapTransactionRow(row)).filter(Boolean);
       setTransactions(mapped);
@@ -106,7 +82,7 @@ export function useTransactions({ limit = 5, monthlyBudget, balanceUSD, customer
       setIsRefreshing(false);
       setIsLoading(false);
     }
-  }, [isCustomerIdControlled, resolvedCustomerId, user, userId]);
+  }, [user, userId]);
 
   const orderedTransactions = useMemo(() => {
     return [...transactions].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -177,7 +153,6 @@ export function useTransactions({ limit = 5, monthlyBudget, balanceUSD, customer
     isLoading,
     isRefreshing,
     error,
-    refresh,
-    customerId: resolvedCustomerId
+    refresh
   };
 }
