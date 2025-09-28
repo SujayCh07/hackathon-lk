@@ -21,7 +21,7 @@ const RECENT_DAYS = 30;
 const WEEKLY_DAYS = 7;
 const MIN_NUDGE_AMOUNT = 20;
 const MAX_NUDGES = 3;
-const MAX_DESTINATIONS = 5;
+const MAX_DESTINATIONS = 6;
 const COST_SIMILARITY_THRESHOLD = 0.4;
 const MIN_TRANSACTION_DAYS = 2;
 const WEEKLY_AFFORDABILITY_THRESHOLD = 0.5;
@@ -222,7 +222,7 @@ function getSimilarCostDestinations(currentCountryCost, costDict) {
         difference: diff
       };
     })
-    .filter(dest => dest.difference >= 0.10 && dest.difference <= 0.30) // ✅ 15%–30%
+    .filter(dest => dest.difference >= 0.13 && dest.difference <= 0.25) // ✅ 15%–30%
     .sort((a, b) => a.difference - b.difference)
     .slice(0, MAX_DESTINATIONS);
 }
