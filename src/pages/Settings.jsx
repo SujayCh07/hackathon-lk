@@ -91,8 +91,6 @@ export default function Settings() {
 
   const {
     accounts,
-    balanceUSD,
-    customerId,
     isRefreshing: accountsRefreshing,
     error: accountsError,
     refresh: refreshAccounts,
@@ -102,12 +100,7 @@ export default function Settings() {
     typeof profile?.monthlyBudget === 'number' ? profile.monthlyBudget : null;
 
   const { isRefreshing: transactionsRefreshing, refresh: refreshTransactions } =
-    useTransactions({
-      limit: 5,
-      monthlyBudget: monthlyBudgetNumber,
-      balanceUSD,
-      customerId,
-    });
+    useTransactions({ limit: 5, monthlyBudget: monthlyBudgetNumber, balanceUSD: 0 });
 
   // form state (persisted as a local draft and overwritten by saved profile)
   const [displayName, setDisplayName] = useState('');
