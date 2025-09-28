@@ -26,6 +26,8 @@ function App() {
     });
   }, [location.key, refreshSession]);
 
+  const transitionKey = `${location.key ?? 'root'}:${location.pathname}${location.search}${location.hash}`;
+
   return (
     <div className="relative min-h-screen overflow-hidden text-charcoal">
       <div className="pointer-events-none absolute inset-0 -z-10">
@@ -35,8 +37,8 @@ function App() {
         <div className="absolute inset-x-0 bottom-[-20%] h-[18rem] bg-gradient-to-t from-navy/15 via-transparent to-transparent blur-3xl" />
       </div>
       <NavBar />
-      <RouteTransitions key={location.pathname}>
-        <Routes location={location}>
+      <RouteTransitions transitionKey={transitionKey}>
+        <Routes location={location} key={transitionKey}>
           <Route path="/" element={<HomeRoute />} />
           <Route
             path="/login"
