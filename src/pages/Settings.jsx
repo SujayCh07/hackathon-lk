@@ -160,10 +160,14 @@ export default function Settings() {
           ? String(sourceProfile.monthlyBudget)
           : '';
 
-      const normalisedAddress =
-        sourceProfile?.streetAddress && typeof sourceProfile.streetAddress === 'object'
-          ? normalizeAddress(sourceProfile.streetAddress)
-          : normalizeAddress();
+      let normalisedAddress = normalizeAddress();
+      if (sourceProfile?.streetAddress && typeof sourceProfile.streetAddress === 'object') {
+        normalisedAddress = normalizeAddress(sourceProfile.streetAddress);
+      } else if (sourceProfile?.streetAddressRaw) {
+        normalisedAddress = normalizeAddress(
+          parsePersistedAddress(sourceProfile.streetAddressRaw)
+        );
+      }
 
       const selectedCode =
         sourceProfile?.currentCountry?.code ?? sourceProfile?.currentCountryCode ?? '';
@@ -324,7 +328,7 @@ export default function Settings() {
       city: addressCity,
       state: addressState,
     });
-    const street_address = addressPreview; // plain string
+    const streetAddressPayload = serialiseAddress(normalisedAddress);
 
     const optimisticSeed = {
       displayName: trimmedName,
@@ -347,7 +351,7 @@ export default function Settings() {
         name: trimmedName || null,
         monthly_budget: parsedBudget,
         current_country_code: currentCode,
-        street_address,
+        street_address: streetAddressPayload,
       };
 
       const { data: persistedProfile, error } = await supabase
@@ -414,7 +418,7 @@ export default function Settings() {
       showToast({
         type: 'success',
         title: 'Settings saved',
-        description: street_address
+        description: streetAddressPayload
           ? `Mailing address saved. ${addressPreview.replace(/\n/g, ', ')}`
           : 'Your profile preferences are up to date.',
         duration: 4500,
