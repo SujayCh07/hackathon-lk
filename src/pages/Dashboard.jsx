@@ -321,11 +321,7 @@ export function Dashboard() {
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
       <OnboardingModal
-        isOpen={showOnboarding}
-        defaultValues={personalization}
-        onComplete={handleOnboardingComplete}
         onSkip={() => completeOnboarding({ ...personalization, onboardingComplete: true })}
-        displayName={displayName}
       />
 
       {/* Hero cards */}
