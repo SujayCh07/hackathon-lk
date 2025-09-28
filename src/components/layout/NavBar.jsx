@@ -10,7 +10,6 @@ const authenticatedLinks = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/planner', label: 'GeoBudget' },
   { to: '/insights', label: 'Smart-Spend' },
-  { to: '/share', label: 'Share' },
   { to: '/settings', label: 'Settings' }
 ];
 
@@ -62,9 +61,9 @@ export function NavBar() {
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-8 py-3" aria-label="Primary">
 
         {/* ✅ Changed: Logo + Wordmark (stronger branding) */}
-        <NavLink to="/" className="flex items-center gap-3">
+        <NavLink to="/" className="flex items-center gap-5">
           {/* <img src={Logo} alt="Parity Logo" className="h-9 w-9 object-contain" /> */}
-          <span className="text-2xl font-extrabold bg-gradient-to-r from-red to-navy bg-clip-text text-transparent">
+          <span className="text-4xl font-extrabold bg-gradient-to-r from-red to-navy bg-clip-text text-transparent">
             Parity
           </span>
         </NavLink>
