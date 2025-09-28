@@ -13,6 +13,7 @@
     "@heroicons/react": "^2.2.0",
     "@supabase/supabase-js": "^2.44.4",
     "clsx": "^2.1.0",
+    "csv-parse": "^6.1.0",
     "framer-motion": "^11.1.7",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",

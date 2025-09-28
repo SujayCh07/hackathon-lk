@@ -181,35 +181,59 @@ const capitals = {
 };
 
 // --- Fetch real monthly cost of living (USD) from Numbeo ---
-async function fetchMonthlyLivingCost(cityName) {
+async function fetchMonthlyLivingCost(cityName, countryName = '') {
+  const apiKey = import.meta.env.VITE_NUMBEO_KEY;
+  if (!apiKey) {
+    console.warn('No Numbeo API key configured');
+    return 2000;
+  }
+
+  const queryParam =
+    countryName && cityName ? `${cityName}, ${countryName}` : cityName;
+
+  const url = new URL('https://www.numbeo.com/api/city_prices');
+  url.searchParams.set('api_key', apiKey);
+  url.searchParams.set('query', queryParam);
+  url.searchParams.set('currency', 'USD');
+
   try {
-    const url = `https://www.numbeo.com/api/city_prices?api_key=${
-      import.meta.env.VITE_NUMBEO_KEY
-    }&query=${encodeURIComponent(cityName)}`;
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      throw new Error(`Numbeo returned status ${res.status}`);
+    }
+    const data = await res.json();
 
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Bad response for ${cityName}`);
+    // 🔍 Print entire API response for debugging
+    console.log(`Numbeo API response for "${queryParam}":`, data);
 
-    const data = await response.json();
-
-    if (!data?.prices || !Array.isArray(data.prices)) {
-      console.warn(`No prices found for ${cityName}, fallback=2000`);
+    if (!Array.isArray(data.prices)) {
+      console.warn(`No prices array in response for ${queryParam}`);
       return 2000;
     }
 
-    // Example aggregation: rent + groceries + restaurants
-    const rent = data.prices.find((p) => p.item_id === 8)?.average_price ?? 800;
-    const food = data.prices.find((p) => p.item_id === 1)?.average_price ?? 300;
-    const restaurant = data.prices.find((p) => p.item_id === 13)?.average_price ?? 200;
+    const rent = data.prices.find((p) => p.item_id === 8)?.average_price ?? null;
+    const food = data.prices.find((p) => p.item_id === 1)?.average_price ?? null;
+    const restaurant = data.prices.find((p) => p.item_id === 13)?.average_price ?? null;
 
-    const monthly = rent + food + restaurant * 10 + 400;
+    if (rent == null && food == null && restaurant == null) {
+      console.warn(`No usable items in response for ${queryParam}`);
+      return 2000;
+    }
 
-    return Math.max(150, Math.min(8000, Math.round(monthly)));
+    const rentVal = rent ?? 0;
+    const foodVal = food ?? 0;
+    const restVal = restaurant ?? 0;
+
+    const monthly = rentVal + foodVal * 30 + restVal * 10 + 400;
+
+    return Math.max(150, Math.min(20000, Math.round(monthly)));
   } catch (err) {
-    console.error('fetchMonthlyLivingCost failed for', cityName, err);
+    console.error('fetchMonthlyLivingCost error for', queryParam, err);
     return 2000;
   }
 }
+
+
 
 // --- Hook ---
 export function usePPP() {

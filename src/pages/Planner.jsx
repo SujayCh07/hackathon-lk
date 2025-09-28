@@ -3,10 +3,12 @@ import BudgetSlider from '../components/planner/BudgetSlider.jsx';
 import RunwayCard from '../components/planner/RunwayCard.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
 import { useAccount } from '../hooks/useAccount.js';
-import { usePPP } from '../hooks/usePPP.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import usePersonalization from '../hooks/usePersonalization.js';
+
+// ✅ Import the dictionary
+import Dictionary from './Dictionary.js';
 
 // Debounce hook
 function useDebounce(value, delay = 300) {
@@ -24,7 +26,6 @@ function Planner() {
   const { profile, loading: profileLoading } = useUserProfile(userId);
   const { data: personalization } = usePersonalization(userId);
   const { balanceUSD } = useAccount();
-  const { cities, calculateRunway, isLoading: citiesLoading } = usePPP();
 
   const [budget, setBudget] = useState(2500);
   const [runwayData, setRunwayData] = useState([]);
@@ -45,9 +46,9 @@ function Planner() {
     }
   }, [profile, profileLoading]);
 
-  // Calculate runway data using Numbeo monthly cost
+  // Calculate runway data using Dictionary.js
   useEffect(() => {
-    if (!debouncedBudget || cities.length === 0) return;
+    if (!debouncedBudget) return;
 
     let cancelled = false;
 
@@ -55,25 +56,19 @@ function Planner() {
       setIsCalculating(true);
 
       try {
-        const results = await Promise.all(
-          cities.map(async (city) => {
-            // Use city.monthlyCost directly from Numbeo
-            const runway = await calculateRunway(
-              debouncedBudget,
-              null,
-              null,
-              city.monthlyCost
-            );
+        // Loop through all dictionary entries
+        const results = Object.entries(Dictionary).map(([country, values]) => {
+          const monthlyCost = values.cost_of_living;
+          const runway = monthlyCost > 0 ? debouncedBudget / monthlyCost : 0;
 
-            return {
-              city: city.city,
-              country: city.country,
-              runway: Number.isFinite(runway) ? runway : 0,
-              monthlyCost: city.monthlyCost,
-              currency: city.currency,
-            };
-          })
-        );
+          return {
+            city: country.charAt(0).toUpperCase() + country.slice(1), // title-case country
+            country,
+            runway: Number.isFinite(runway) ? runway : 0,
+            monthlyCost,
+            currency: 'USD',
+          };
+        });
 
         if (!cancelled) {
           setRunwayData(results);
@@ -91,7 +86,7 @@ function Planner() {
     return () => {
       cancelled = true;
     };
-  }, [debouncedBudget, cities, calculateRunway]);
+  }, [debouncedBudget]);
 
   // Curious cities
   const curiousCities = useMemo(() => {
@@ -118,14 +113,18 @@ function Planner() {
   const filteredAndSortedData = useMemo(() => {
     let data = runwayData.map((entry) => ({
       ...entry,
-      isCurious: curiousCities.some((city) => entry.city.toLowerCase().includes(city)),
+      isCurious: curiousCities.some((city) =>
+        entry.city.toLowerCase().includes(city)
+      ),
       breakdown: focusBreakdown,
     }));
 
     // Search
     if (searchTerm.trim() !== '') {
       const lowerTerm = searchTerm.toLowerCase();
-      data = data.filter((entry) => entry.city.toLowerCase().includes(lowerTerm));
+      data = data.filter((entry) =>
+        entry.city.toLowerCase().includes(lowerTerm)
+      );
     }
 
     // Max price filter
@@ -145,8 +144,10 @@ function Planner() {
       case 'closest':
         data = data
           .slice()
-          .sort((a, b) =>
-            Math.abs(a.monthlyCost - budget) - Math.abs(b.monthlyCost - budget)
+          .sort(
+            (a, b) =>
+              Math.abs(a.monthlyCost - budget) -
+              Math.abs(b.monthlyCost - budget)
           );
         break;
       case 'az':
@@ -165,7 +166,8 @@ function Planner() {
   // Highlight best city
   const highlightCity = useMemo(() => {
     return filteredAndSortedData.reduce(
-      (best, current) => (current.runway > best.runway ? current : best),
+      (best, current) =>
+        current.runway > best.runway ? current : best,
       { city: 'No data', runway: 0, monthlyCost: 0, currency: 'USD' }
     );
   }, [filteredAndSortedData]);
@@ -189,12 +191,18 @@ function Planner() {
             <p className="text-sm text-charcoal/70">
               Adjust your monthly spend target to understand how far your money stretches in each destination.
             </p>
-            <p className="mt-1 text-xs text-charcoal/60">GeoBudget = plan your travels with budget forecasting.</p>
+            <p className="mt-1 text-xs text-charcoal/60">
+              GeoBudget = plan your travels with budget forecasting.
+            </p>
           </div>
           <div className="flex flex-col items-start gap-2 text-sm font-semibold text-teal md:items-end">
             <div className="rounded-2xl bg-turquoise/15 px-4 py-2 shadow-sm shadow-teal/10">
               Monthly budget: {formatPrice(budget)}
-              {isCalculating && <span className="ml-2 text-xs opacity-70">(calculating...)</span>}
+              {isCalculating && (
+                <span className="ml-2 text-xs opacity-70">
+                  (calculating…)
+                </span>
+              )}
             </div>
             <div className="rounded-2xl bg-white/70 px-4 py-2 text-teal/80 shadow-sm shadow-white/40">
               Available balance: {formatPrice(balanceUSD)}
@@ -209,19 +217,25 @@ function Planner() {
           <div className="mt-6 rounded-3xl border border-teal/30 bg-turquoise/10 p-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-teal">Stay duration timeline</p>
+                <p className="text-sm font-semibold text-teal">
+                  Stay duration timeline
+                </p>
                 <p className="text-xs text-charcoal/60">
                   Drag to see how long your savings last across destinations.
                 </p>
               </div>
-              <span className="text-sm font-semibold text-teal">{stayDuration} months</span>
+              <span className="text-sm font-semibold text-teal">
+                {stayDuration} months
+              </span>
             </div>
             <input
               type="range"
               min={1}
               max={36}
               value={stayDuration}
-              onChange={(event) => setStayDuration(Number(event.target.value))}
+              onChange={(event) =>
+                setStayDuration(Number(event.target.value))
+              }
               className="mt-3 h-2 w-full appearance-none rounded-full bg-teal/30 accent-teal"
             />
           </div>
@@ -271,8 +285,12 @@ function Planner() {
         <div className="rounded-3xl border border-teal/30 bg-turquoise/10 px-6 py-5 text-sm text-teal">
           With a <strong>{formatPrice(budget)}</strong> monthly budget,{' '}
           <strong>{highlightCity.city}</strong> gives you the most value — your budget lasts{' '}
-          <strong>{Number.isFinite(highlightCity.runway) ? highlightCity.runway.toFixed(1) : 'N/A'} months</strong> there.
-          Plan a {stayDuration}-month stay for around{' '}
+          <strong>
+            {Number.isFinite(highlightCity.runway)
+              ? highlightCity.runway.toFixed(1)
+              : 'N/A'} months
+          </strong>{' '}
+          there. Plan a {stayDuration}-month stay for around{' '}
           <strong>
             {Number.isFinite(highlightCity.monthlyCost)
               ? formatPrice(highlightCity.monthlyCost * stayDuration)
@@ -290,12 +308,18 @@ function Planner() {
             {...entry}
             stayDurationMonths={stayDuration}
             isHighlighted={entry.city === highlightCity.city}
-            badgeLabel={entry.isCurious ? 'On your wishlist' : entry.city === highlightCity.city ? 'Best pick' : null}
+            badgeLabel={
+              entry.isCurious
+                ? 'On your wishlist'
+                : entry.city === highlightCity.city
+                ? 'Best pick'
+                : null
+            }
           />
         ))}
       </div>
 
-      {(isCalculating || citiesLoading) && runwayData.length === 0 && (
+      {isCalculating && runwayData.length === 0 && (
         <div className="text-center text-charcoal/60">
           <p>Calculating purchasing power across destinations...</p>
         </div>

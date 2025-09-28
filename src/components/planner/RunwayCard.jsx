@@ -1,6 +1,7 @@
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { Card } from '../ui/Card.jsx';
 import Progress from '../ui/Progress.jsx';
+import capitals from './capitals.js'; // adjust path if needed
 
 function formatRunway(runway) {
   const num = Number(runway);
@@ -18,6 +19,12 @@ function formatCurrency(amount, currency) {
   if (!Number.isFinite(amount)) return '—';
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 }
+
+function capitalizeFirstLetter(str) {
+  if (!str) return "";
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+}
+
 
 export function RunwayCard({
   city,
@@ -50,7 +57,17 @@ export function RunwayCard({
       <div className="flex items-start justify-between">
         <div>
           <h4 className="font-poppins text-lg font-semibold text-teal">{city}</h4>
-          <p className="mt-1 text-xs text-charcoal/60">Estimated cost of living in {country}</p>
+<p className="mt-1 text-xs text-charcoal/60">
+  {(() => {
+    const capital = capitals[country?.toLowerCase()];
+    var countryLocal = capitalizeFirstLetter(country);
+    if (capital) {
+      return `Estimated cost of living in ${capital}, ${countryLocal}`;
+    } else {
+      return `Estimated cost of living in ${countryLocal}`;
+    }
+  })()}
+</p>
         </div>
         <span className="rounded-full bg-turquoise/20 px-3 py-1 text-xs font-semibold text-teal">
           {formatRunway(runway)}
@@ -78,8 +95,6 @@ export function RunwayCard({
             </ul>
           ) : (
             <p>
-              We estimate your rent, food, and leisure mix using Numbeo’s local price data +
-              PPP adjustments.
             </p>
           )}
         </div>
