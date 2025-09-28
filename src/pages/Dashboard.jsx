@@ -1,3 +1,4 @@
+// src/pages/Dashboard.jsx
 import { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
 import WorldMap from '../components/score/WorldMap.jsx';
@@ -5,15 +6,13 @@ import CityCard from '../components/score/CityCard.jsx';
 import SpendingTrendChart from '../components/dashboard/SpendingTrendChart.jsx';
 import SavingsRunwayPanel from '../components/dashboard/SavingsRunwayPanel.jsx';
 import NotificationsWidget from '../components/dashboard/NotificationsWidget.jsx';
-import { useAccount } from '../hooks/useAccount.js';
-import { useTransactions } from '../hooks/useTransactions.js';
-import { usePPP } from '../hooks/usePPP.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
 import usePersonalization from '../hooks/usePersonalization.js';
 import OnboardingModal from '../components/onboarding/OnboardingModal.jsx';
+import { supabase } from '../lib/supabase.js';
 
-// --- Helpers ---
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function formatUSD(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(n) ?? 0);
 }
@@ -24,7 +23,6 @@ function toTitleCase(s = '') {
 
 function groupTransactionsByWeek(transactions) {
   if (!Array.isArray(transactions) || transactions.length === 0) return [];
-
   const weekMap = new Map();
 
   transactions.forEach((txn) => {
@@ -32,7 +30,7 @@ function groupTransactionsByWeek(transactions) {
     if (Number.isNaN(ts.getTime())) return;
     const monday = new Date(ts);
     const day = monday.getDay();
-    const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
+    const diff = monday.getDate() - day + (day === 0 ? -6 : 1); // move to Monday
     monday.setDate(diff);
     monday.setHours(0, 0, 0, 0);
     const label = monday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -77,24 +75,28 @@ function buildNotifications({ bestCity, runnerUp, weeklyChange, budgetDelta }) {
   return notes;
 }
 
-// --- API: fetch country coordinates ---
+// Fetch approximate country center from OpenStreetMap (fallback if we don’t have coords)
 async function getCountryCoords(countryName) {
-  const resp = await fetch(
-    `https://nominatim.openstreetmap.org/search?country=${encodeURIComponent(countryName)}&format=json&limit=1`
-  );
-  const data = await resp.json();
-  if (data.length > 0) {
-    return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-  }
+  try {
+    const resp = await fetch(
+      `https://nominatim.openstreetmap.org/search?country=${encodeURIComponent(countryName)}&format=json&limit=1`
+    );
+    const data = await resp.json();
+    if (Array.isArray(data) && data.length > 0) {
+      return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+    }
+  } catch {}
   return null;
 }
 
-// --- Main Component ---
+// ── Main Component ────────────────────────────────────────────────────────────
 export function Dashboard() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const { profile } = useUserProfile(userId);
+  const { data: personalization, loading: personalizationLoading, completeOnboarding } = usePersonalization(userId);
 
+  // Identity & budget display
   const identityFallback = useMemo(() => {
     if (!user) return '';
     const md = user.user_metadata ?? {};
@@ -104,24 +106,86 @@ export function Dashboard() {
   }, [user]);
 
   const displayName = profile?.name ?? identityFallback;
-
-  const { data: personalization, loading: personalizationLoading, completeOnboarding } = usePersonalization(userId);
-
-  const { balanceUSD = 0 } = useAccount();
   const baseMonthlyBudget = useMemo(() => {
     if (personalization?.monthlyBudget) return personalization.monthlyBudget;
-    if (profile?.monthlyBudget) return profile.monthlyBudget;
+    if (profile?.monthly_budget) return profile.monthly_budget;
     return 2500;
-  }, [personalization?.monthlyBudget, profile?.monthlyBudget]);
+  }, [personalization?.monthlyBudget, profile?.monthly_budget]);
 
-  const { transactions, recent, spendingMetrics } = useTransactions({
-    limit: 6,
-    monthlyBudget: baseMonthlyBudget,
-    balanceUSD,
-  });
+  // ── Supabase-backed account & transactions ────────────────────────────────
+  const [balanceUSD, setBalanceUSD] = useState(0);
+  const [recent, setRecent] = useState([]);           // last ~10 transactions
+  const [allTxForTrends, setAllTxForTrends] = useState([]); // last 90 days for charts
 
-  const trendData = useMemo(() => groupTransactionsByWeek(transactions), [transactions]);
+  useEffect(() => {
+    let alive = true;
+    if (!userId) return;
 
+    (async () => {
+      // Balance: latest snapshot in accounts table
+      const { data: acctRows, error: acctErr } = await supabase
+        .from('accounts')
+        .select('balance, currency_code, snapshot_ts')
+        .eq('user_id', userId)
+        .order('snapshot_ts', { ascending: false })
+        .limit(1);
+
+      if (!acctErr && acctRows?.length > 0 && alive) {
+        setBalanceUSD(Number(acctRows[0].balance ?? 0));
+      }
+
+      // Recent transactions (10)
+      const { data: txRows, error: txErr } = await supabase
+        .from('transactions')
+        .select('id, merchant, amount, category, ts')
+        .eq('user_id', userId)
+        .order('ts', { ascending: false })
+        .limit(10);
+
+      if (!txErr && Array.isArray(txRows) && alive) {
+        setRecent(
+          txRows.map((t) => ({
+            id: t.id,
+            merchant: t.merchant ?? 'Unknown merchant',
+            amount: Number(t.amount ?? 0),
+            category: t.category ?? 'General',
+            timestamp: t.ts,
+          }))
+        );
+      }
+
+      // Transactions for last 90 days (for trend chart & budget math)
+      const since = new Date();
+      since.setDate(since.getDate() - 90);
+      const { data: tx90, error: tx90Err } = await supabase
+        .from('transactions')
+        .select('id, merchant, amount, category, ts')
+        .eq('user_id', userId)
+        .gte('ts', since.toISOString())
+        .order('ts', { ascending: true });
+
+      if (!tx90Err && Array.isArray(tx90) && alive) {
+        setAllTxForTrends(
+          tx90.map((t) => ({
+            id: t.id,
+            merchant: t.merchant ?? 'Unknown merchant',
+            amount: Number(t.amount ?? 0),
+            category: t.category ?? 'General',
+            timestamp: t.ts,
+          }))
+        );
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
+
+  // Trend data (weekly sums)
+  const trendData = useMemo(() => groupTransactionsByWeek(allTxForTrends), [allTxForTrends]);
+
+  // Weekly change % (last week vs prior)
   const weeklyChange = useMemo(() => {
     if (trendData.length < 2) return null;
     const last = trendData[trendData.length - 1].amount;
@@ -131,87 +195,129 @@ export function Dashboard() {
     return Number.isFinite(delta) ? delta : null;
   }, [trendData]);
 
-  const { rankedBySavings } = usePPP();
+  // Budget delta (last 30 days spend vs baseMonthlyBudget)
+  const budgetDelta = useMemo(() => {
+    const cut = new Date();
+    cut.setDate(cut.getDate() - 30);
+    const last30 = allTxForTrends.filter((t) => new Date(t.timestamp) >= cut);
+    const spent = last30.reduce((s, t) => s + Math.max(0, Number(t.amount ?? 0)), 0);
+    if (!baseMonthlyBudget) return null;
+    return Number(baseMonthlyBudget) - spent; // positive = under budget
+  }, [allTxForTrends, baseMonthlyBudget]);
 
-  const topDestinations = useMemo(() => {
-    if (!Array.isArray(rankedBySavings)) return [];
-    const focus = personalization?.budgetFocus ?? 'Balanced';
-    return rankedBySavings.slice(0, 6).map((city) => ({
-      ...city,
-      city: toTitleCase(city.city ?? ''),
-      context:
-        focus === 'Rent'
-          ? 'Best rent-to-income ratio'
-          : focus === 'Food'
-          ? 'Strong dining affordability'
-          : focus === 'Leisure'
-          ? 'Leisure spending goes further here'
-          : 'Balanced across categories',
-      runwayMonths:
-        Number.isFinite(city.monthlyCost) && city.monthlyCost > 0
-          ? (baseMonthlyBudget ?? 0) / city.monthlyCost
-          : null,
-    }));
-  }, [rankedBySavings, personalization?.budgetFocus, baseMonthlyBudget]);
-
-  // fetch dynamic coords
+  // ── PPP from Supabase ppp_country (country-level) ─────────────────────────
+  const [pppTop, setPppTop] = useState([]);
+  const [pppMarkers, setPppMarkers] = useState([]);
   const [coordsCache, setCoordsCache] = useState({});
+
   useEffect(() => {
-    const fetchCoords = async () => {
+    let alive = true;
+    if (!userId) return;
+
+    (async () => {
+      const { data: prof } = await supabase
+        .from('user_profile')
+        .select('current_country_code')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const currentCode = (prof?.current_country_code || 'USA').toUpperCase();
+
+      const { data: rows } = await supabase
+        .from('ppp_country')
+        .select('code, country, 2024_y')
+        .not('2024_y', 'is', null)
+        .limit(300);
+
+      if (!Array.isArray(rows) || rows.length === 0) return;
+
+      const items = rows
+        .map((r) => ({
+          code: String(r.code || '').toUpperCase(),
+          name: String(r.country || '').toLowerCase(),
+          ppp: Number(r['2024_y']),
+        }))
+        .filter((r) => r.ppp > 0);
+
+      const baseline = items.find((r) => r.code === currentCode);
+      const baselinePPP = baseline?.ppp ?? (() => {
+        const sorted = [...items].sort((a, b) => a.ppp - b.ppp);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted[mid]?.ppp ?? 100;
+      })();
+
+      const enriched = items
+        .map((r) => {
+          const savings = (baselinePPP - r.ppp) / baselinePPP;
+          return {
+            city: toTitleCase(r.name),     // display label
+            country: toTitleCase(r.name),  // for coords lookup
+            ppp: r.ppp,
+            savingsPct: Math.max(-1, Math.min(1, savings)),
+          };
+        })
+        .sort((a, b) => b.savingsPct - a.savingsPct);
+
+      const top = enriched.slice(0, 6);
+
+      // fetch coords for the top options (cache)
       const updates = {};
-      for (const city of topDestinations) {
-        const key = (city.country ?? city.city)?.toLowerCase();
+      for (const dest of top) {
+        const key = (dest.country ?? dest.city)?.toLowerCase();
         if (!key || coordsCache[key]) continue;
-        const coords = await getCountryCoords(city.country || city.city);
+        const coords = await getCountryCoords(dest.country || dest.city);
         if (coords) updates[key] = coords;
       }
-      if (Object.keys(updates).length > 0) {
+      if (alive && Object.keys(updates).length > 0) {
         setCoordsCache((prev) => ({ ...prev, ...updates }));
       }
+
+      if (alive) {
+        setPppTop(top.slice(0, 3));
+        setPppMarkers(
+          top
+            .map((d) => {
+              const key = (d.country ?? d.city)?.toLowerCase();
+              const coords = coordsCache[key];
+              if (!coords) return null;
+              return { city: d.city, coords, ppp: d.ppp };
+            })
+            .filter(Boolean)
+            .slice(0, 5)
+        );
+      }
+    })();
+
+    return () => {
+      alive = false;
     };
-    fetchCoords();
-  }, [topDestinations]);
+    // include coordsCache so markers update as we fetch coords
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, coordsCache]);
 
-  const pppMarkers = useMemo(() => {
-    return topDestinations
-      .map((city) => {
-        const key = (city.country ?? city.city)?.toLowerCase();
-        const coords = coordsCache[key];
-        if (!coords) return null;
-        return {
-          city: city.city,
-          coords,
-          ppp: city.ppp ?? 1,
-          context: city.context,
-        };
-      })
-      .filter(Boolean)
-      .slice(0, 5);
-  }, [topDestinations, coordsCache]);
-
-  const pppTop = topDestinations.slice(0, 3);
-
+  // Notifications based on PPP + spend
   const notifications = useMemo(
     () =>
       buildNotifications({
-        bestCity: topDestinations[0],
-        runnerUp: topDestinations[1],
+        bestCity: pppTop[0],
+        runnerUp: pppTop[1],
         weeklyChange,
-        budgetDelta: spendingMetrics?.budgetDelta ?? null,
+        budgetDelta,
       }),
-    [spendingMetrics?.budgetDelta, topDestinations, weeklyChange]
+    [pppTop, weeklyChange, budgetDelta]
   );
 
+  // UI labels
   const heroLabel = displayName ? `${displayName.split(' ')[0]}'s budget` : 'Your budget';
   const heroSubtitle = baseMonthlyBudget
     ? `Here’s how $${Number(baseMonthlyBudget).toLocaleString()}/month stretches across the globe.`
     : 'Let’s see how your money travels.';
-
   const showOnboarding = !personalizationLoading && !personalization?.onboardingComplete;
   const handleOnboardingComplete = async (payload) => {
     await completeOnboarding(payload);
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
       <OnboardingModal
@@ -306,7 +412,38 @@ export function Dashboard() {
         </Card>
 
         <div className="grid grid-cols-1 gap-4">
-          <SavingsRunwayPanel destinations={topDestinations} stayLengthMonths={6} />
+          <SavingsRunwayPanel
+            destinations={pppTop.map((d) => ({
+              city: d.city,
+              monthlyCost: d.ppp, // If your component expects a modeled monthly cost, you can map PPP → cost elsewhere.
+              ppp: d.ppp,
+              savings: d.savingsPct,
+            }))}
+            stayLengthMonths={6}
+          />
+          <Card className="bg-white/90">
+            <CardHeader>
+              <CardTitle>Top PPP picks</CardTitle>
+              <p className="text-sm text-charcoal/70">
+                GeoBudget = personalized travel & budget forecasting.
+              </p>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {pppTop.map((dest) => (
+                <CityCard
+                  key={dest.city}
+                  city={dest.city}
+                  ppp={dest.ppp}
+                  savingsPct={dest.savingsPct}
+                />
+              ))}
+              {pppTop.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-navy/20 px-4 py-6 text-sm text-charcoal/60">
+                  We’re fetching PPP insights — check back shortly.
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
@@ -314,3 +451,5 @@ export function Dashboard() {
 }
 
 export default Dashboard;
+
+
