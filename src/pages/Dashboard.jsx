@@ -1,5 +1,5 @@
 // src/pages/Dashboard.jsx
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
 import WorldMap from '../components/score/WorldMap.jsx';
 import CityCard from '../components/score/CityCard.jsx';
@@ -52,6 +52,26 @@ export default function Dashboard() {
   const userId = user?.id ?? null;
   const { profile } = useUserProfile(userId);
   const { data: personalization, loading: personalizationLoading, completeOnboarding } = usePersonalization(userId);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (personalizationLoading) return;
+    const shouldOpen = Boolean(userId) && !personalization?.onboardingComplete;
+    setShowOnboarding(shouldOpen);
+  }, [personalization?.onboardingComplete, personalizationLoading, userId]);
+
+  const handleOnboardingComplete = useCallback(
+    async (payload) => {
+      await completeOnboarding({ ...(personalization ?? {}), ...payload, onboardingComplete: true });
+      setShowOnboarding(false);
+    },
+    [completeOnboarding, personalization]
+  );
+
+  const handleOnboardingSkip = useCallback(async () => {
+    await completeOnboarding({ ...(personalization ?? {}), onboardingComplete: true });
+    setShowOnboarding(false);
+  }, [completeOnboarding, personalization]);
 
   // identity/budget
   const identityFallback = useMemo(() => {
@@ -356,7 +376,13 @@ export default function Dashboard() {
   // Render
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-      <OnboardingModal onSkip={() => completeOnboarding({ ...personalization, onboardingComplete: true })} />
+      <OnboardingModal
+        isOpen={showOnboarding}
+        defaultValues={personalization ?? {}}
+        displayName={displayName}
+        onComplete={handleOnboardingComplete}
+        onSkip={handleOnboardingSkip}
+      />
 
       {/* Hero / Accounts */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
