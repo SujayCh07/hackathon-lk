@@ -8,7 +8,6 @@ const authenticatedLinks = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/planner', label: 'GeoBudget' },
   { to: '/insights', label: 'Smart-Spend' },
-  { to: '/share', label: 'Share' },
   { to: '/settings', label: 'Settings' }
 ];
 
