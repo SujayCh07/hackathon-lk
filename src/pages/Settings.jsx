@@ -217,7 +217,7 @@ export default function Settings() {
         );
         setCountries([]);
       })
-      .finally(() => active && setCountriesLoading(false));
+      .finally(() => active && setCountriesLoading(true));
 
     return () => {
       active = false;
