@@ -20,7 +20,7 @@ function formatCurrency(amount, currency) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 }
 
-function capitalizeWords(str) {
+function capitalizeFirstLetter(str) {
   if (!str) return "";
   return str
     .split(" ")
