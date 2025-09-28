@@ -200,13 +200,6 @@ const CONTINENT_GROUPS = {
   Oceania: ['australia', 'fiji', 'kiribati', 'marshall islands', 'nauru', 'new zealand'],
 };
 
-const LIFESTYLE_OPTIONS = [
-  { key: 'nature', label: 'Nature' },
-  { key: 'nightlife', label: 'Nightlife' },
-  { key: 'safety', label: 'Safety' },
-  { key: 'internet', label: 'Internet' },
-];
-
 function normalizeKey(value) {
   return value?.toLowerCase?.() ?? '';
 }
@@ -253,35 +246,6 @@ function computeBreakdown(values) {
   };
 }
 
-function deriveLifestyleTags(country, values) {
-  const tags = new Set();
-  const continent = getContinent(country);
-  const cost = Number(values.cost_of_living) || 0;
-  const rent = Number(values.rent) || 0;
-
-  if (cost <= 800 || ['Africa', 'Oceania'].includes(continent)) {
-    tags.add('nature');
-  }
-
-  if (cost <= 900 || rent <= cost * 0.35) {
-    tags.add('safety');
-  }
-
-  if (cost >= 1100 || ['Europe', 'Asia'].includes(continent)) {
-    tags.add('nightlife');
-  }
-
-  if (cost >= 900 || ['Europe', 'Asia', 'North America'].includes(continent)) {
-    tags.add('internet');
-  }
-
-  if (tags.size === 0) {
-    tags.add('nature');
-  }
-
-  return Array.from(tags);
-}
-
 function computeSafetyScore(breakdown) {
   const rentShare = breakdown?.rent ?? 0.45;
   const transportShare = breakdown?.transport ?? 0.15;
@@ -319,9 +283,16 @@ function Planner() {
   const [searchTerm, setSearchTerm] = useState('');
   const [continentFilter, setContinentFilter] = useState('All');
   const [maxMonthlyCost, setMaxMonthlyCost] = useState(2500);
-  const [activeTags, setActiveTags] = useState([]);
   const [sortOption, setSortOption] = useState('runway');
   const [stayDuration, setStayDuration] = useState(6);
+
+  const formatLocationName = useCallback((value) => {
+    return String(value)
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(' ');
+  }, []);
 
   const debouncedBudget = useDebounce(budget, 300);
 
@@ -364,12 +335,11 @@ function Planner() {
         const runway = monthlyCost > 0 ? debouncedBudget / monthlyCost : 0;
         const breakdown = computeBreakdown(values);
         const continent = getContinent(country);
-        const lifestyleTags = deriveLifestyleTags(country, values);
         const safetyScore = computeSafetyScore(breakdown);
         const funScore = computeFunScore(breakdown);
 
         return {
-          city: country.charAt(0).toUpperCase() + country.slice(1),
+          city: formatLocationName(country),
           country,
           runway: Number.isFinite(runway) ? runway : 0,
           monthlyCost,
@@ -377,7 +347,6 @@ function Planner() {
           breakdown,
           rentUSD: Number(values.rent) || null,
           continent,
-          lifestyleTags,
           safetyScore,
           funScore,
         };
@@ -390,7 +359,7 @@ function Planner() {
     } finally {
       setIsCalculating(false);
     }
-  }, [debouncedBudget]);
+  }, [debouncedBudget, formatLocationName]);
 
   useEffect(() => {
     if (!debouncedBudget) return;
@@ -401,18 +370,6 @@ function Planner() {
     if (!personalization?.curiousCities) return [];
     return personalization.curiousCities.map((city) => normalizeKey(city));
   }, [personalization?.curiousCities]);
-
-  const toggleTag = useCallback((tag) => {
-    setActiveTags((prev) => {
-      const next = new Set(prev);
-      if (next.has(tag)) {
-        next.delete(tag);
-      } else {
-        next.add(tag);
-      }
-      return Array.from(next);
-    });
-  }, []);
 
   const filteredAndSortedData = useMemo(() => {
     let data = runwayData.map((entry) => ({
@@ -435,28 +392,26 @@ function Planner() {
       data = data.filter((entry) => entry.monthlyCost <= maxMonthlyCost);
     }
 
-    if (activeTags.length > 0) {
-      data = data.filter((entry) => activeTags.every((tag) => entry.lifestyleTags.includes(tag)));
-    }
-
     switch (sortOption) {
-      case 'rent':
-        data = data.slice().sort((a, b) => (a.rentUSD ?? Infinity) - (b.rentUSD ?? Infinity));
+      case 'alpha-asc':
+        data = data.slice().sort((a, b) => a.city.localeCompare(b.city));
         break;
-      case 'safety':
-        data = data.slice().sort((a, b) => b.safetyScore - a.safetyScore);
+      case 'alpha-desc':
+        data = data.slice().sort((a, b) => b.city.localeCompare(a.city));
         break;
-      case 'fun':
-        data = data.slice().sort((a, b) => b.funScore - a.funScore);
+      case 'cost-asc':
+        data = data.slice().sort((a, b) => (a.monthlyCost ?? Infinity) - (b.monthlyCost ?? Infinity));
         break;
-      case 'runway':
+      case 'cost-desc':
+        data = data.slice().sort((a, b) => (b.monthlyCost ?? 0) - (a.monthlyCost ?? 0));
+        break;
       default:
         data = data.slice().sort((a, b) => b.runway - a.runway);
         break;
     }
 
     return data;
-  }, [activeTags, continentFilter, curiousCities, maxMonthlyCost, runwayData, searchTerm, sortOption]);
+  }, [continentFilter, curiousCities, maxMonthlyCost, runwayData, searchTerm, sortOption]);
 
   const highlightCity = useMemo(() => {
     return filteredAndSortedData.reduce(
@@ -469,23 +424,8 @@ function Planner() {
     fetchRunwayData();
   }, [fetchRunwayData]);
 
-  const headline = useMemo(() => {
-    if (!highlightCity || !Number.isFinite(highlightCity.runway) || highlightCity.city === 'No data') {
-      return null;
-    }
-
-    const months = highlightCity.runway.toFixed(1);
-    return `With a ${formatPrice(budget)} monthly budget, you can stretch your spending for up to ${months} months in ${highlightCity.city}.`;
-  }, [budget, formatPrice, highlightCity]);
-
   return (
     <div className="mx-auto max-w-6xl flex flex-col gap-10 px-6 py-12">
-      {headline && (
-        <div className="rounded-3xl bg-gradient-to-r from-teal/90 to-coral/80 px-6 py-5 text-white shadow-lg">
-          <p className="font-semibold tracking-wide">{headline}</p>
-        </div>
-      )}
-
       <Card className="bg-white/85">
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -562,9 +502,10 @@ function Planner() {
                 aria-label="Sort options"
               >
                 <option value="runway">Longest runway</option>
-                <option value="rent">Lowest rent</option>
-                <option value="safety">Safest</option>
-                <option value="fun">Most fun</option>
+                <option value="alpha-asc">Alphabetical (A–Z)</option>
+                <option value="alpha-desc">Alphabetical (Z–A)</option>
+                <option value="cost-asc">Monthly cost (low to high)</option>
+                <option value="cost-desc">Monthly cost (high to low)</option>
               </select>
             </div>
 
@@ -592,24 +533,6 @@ function Planner() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              {LIFESTYLE_OPTIONS.map((option) => {
-                const isActive = activeTags.includes(option.key);
-                return (
-                  <button
-                    key={option.key}
-                    type="button"
-                    onClick={() => toggleTag(option.key)}
-                    className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                      isActive
-                        ? 'border-teal bg-teal text-white shadow-sm shadow-teal/40'
-                        : 'border-gray-200 bg-white text-charcoal/70 hover:border-teal/60 hover:text-teal'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-
               <button
                 type="button"
                 onClick={handleRefresh}
