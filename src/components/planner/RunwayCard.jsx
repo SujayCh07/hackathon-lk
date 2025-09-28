@@ -1,7 +1,15 @@
 // src/components/planner/RunwayCard.jsx
+import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { Card } from '../ui/Card.jsx';
 import Progress from '../ui/Progress.jsx';
 import capitals from './capitals.js';
+
+const CATEGORY_LABELS = {
+  rent: 'Rent',
+  food: 'Food',
+  transport: 'Transport',
+  leisure: 'Leisure',
+};
 
 function toNumber(value) {
   if (value == null) return NaN;
@@ -30,7 +38,7 @@ function formatRunway(runway) {
   }
 
   const years = Math.floor(num / 12);
-  const monthsPartRaw = num % 12;
+  const monthsPartRaw = (num % 12);
   const monthsPart = Math.round(monthsPartRaw * 10) / 10;
   const parts = [];
   if (years > 0) parts.push(`${years} year${years > 1 ? 's' : ''}`);
@@ -65,13 +73,17 @@ export function RunwayCard({
   monthlyCost,
   currency = 'USD',
   stayDurationMonths = 6,
+  breakdown = {},
   continent,
+  safetyScore,
+  funScore,
   qolScore,      // shown on chip
   affordability, // shown on chip
   isHighlighted = false,
   badgeLabel = null,
   aiScore = null,
   aiRank = null,
+  aiReason = null,
 }) {
   const runwayNum = toNumber(runway);
   const durationNum = toNumber(stayDurationMonths);
@@ -81,17 +93,19 @@ export function RunwayCard({
       : 0;
 
   const monthCostNum = toNumber(monthlyCost);
-  const stayCost =
-    Number.isFinite(monthCostNum) && Number.isFinite(durationNum)
-      ? monthCostNum * durationNum
-      : NaN;
+  const stayCost = Number.isFinite(monthCostNum) && Number.isFinite(durationNum)
+    ? monthCostNum * durationNum
+    : NaN;
 
+  const segments = Object.entries(breakdown);
   const normalizedCountry = country?.toLowerCase?.() ?? '';
   const capital = capitals[normalizedCountry];
   const countryName = capitalizeFirstLetter(country);
   const infoLine = capital
     ? `Estimated cost of living in ${capital}, ${countryName}`
     : `Estimated cost of living in ${countryName}`;
+
+  const sortedSegments = segments.slice().sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
 
   return (
     <Card
@@ -141,6 +155,14 @@ export function RunwayCard({
           <span className="rounded-full bg-turquoise/20 px-3 py-1 text-xs font-semibold text-teal">
             {formatRunway(runwayNum)}
           </span>
+          <div className="flex flex-col items-end text-[11px] font-semibold text-charcoal/60">
+            <span className="rounded-full bg-white px-2 py-1 shadow-sm">
+              Safety: {safetyScore ?? 0}
+            </span>
+            <span className="rounded-full bg-white px-2 py-1 shadow-sm">
+              Leisure: {funScore ?? 0}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -149,11 +171,43 @@ export function RunwayCard({
         {formatRunway(durationNum)}
       </p>
 
+      {aiReason && (
+        <p className="mt-2 text-xs text-charcoal/60">
+          <span className="font-semibold text-charcoal/70">Why it ranks here:</span> {aiReason}
+        </p>
+      )}
+
       <Progress value={percent} className="mt-4" />
+
+      <div className="mt-3 flex items-start gap-2 text-xs text-charcoal/70">
+        <InformationCircleIcon className="mt-0.5 h-4 w-4 text-teal" aria-hidden="true" />
+        <div className="w-full">
+          {sortedSegments.length > 0 ? (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {sortedSegments.map(([label, value]) => {
+                const key = String(label).toLowerCase();
+                const displayLabel = CATEGORY_LABELS[key] ?? label;
+
+                return (
+                  <li
+                    key={label}
+                    className="rounded-xl bg-turquoise/15 px-3 py-2 text-left text-sm text-charcoal/80"
+                  >
+                    <p className="font-semibold text-teal">{displayLabel}</p>
+                    <p className="text-xs text-charcoal/60">
+                      Approximate share of monthly budget: {Math.round((value ?? 0) * 100)}%
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p>No budget breakdown available.</p>
+          )}
+        </div>
+      </div>
     </Card>
   );
 }
 
-
-import React from "react";
-export default React.memo(RunwayCard);
+export default RunwayCard;
