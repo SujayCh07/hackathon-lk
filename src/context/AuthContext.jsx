@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { supabase, supabaseAuthStorageKey } from '../lib/supabase.js';
+import { supabase } from '../lib/supabase.js';
 import {
   ensureNessieCustomer,
   loadAccountsFromSupabase,
@@ -23,25 +23,18 @@ const initialNessieState = {
   transactions: []
 };
 
-const SESSION_VALIDITY_GRACE_MS = 30 * 1000;
-
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const initialAuthSnapshot = useMemo(() => getInitialAuthSnapshot(), []);
-  const [session, setSession] = useState(initialAuthSnapshot.session);
-  const [user, setUser] = useState(initialAuthSnapshot.user);
-  const [isLoading, setIsLoading] = useState(!initialAuthSnapshot.hydrated);
+  const [session, setSession] = useState(null);
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [nessieState, setNessieState] = useState(initialNessieState);
   const [isSyncingNessie, setIsSyncingNessie] = useState(false);
   const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
     const initialise = async () => {
-      if (!initialAuthSnapshot.hydrated) {
-        setIsLoading(true);
-      }
-
       const { data, error } = await supabase.auth.getSession();
       if (error) {
         setAuthError(error);
@@ -69,8 +62,6 @@ export function AuthProvider({ children }) {
         await syncNessie(nextSession.user);
       } else {
         setNessieState(initialNessieState);
-        setIsLoading(false);
-        clearCachedSupabaseSession();
       }
     });
 
@@ -148,17 +139,10 @@ export function AuthProvider({ children }) {
   );
 
   const signOut = useCallback(async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      console.error('Supabase sign-out failed, clearing local state', error);
-    } finally {
-      setSession(null);
-      setUser(null);
-      setNessieState(initialNessieState);
-      setIsLoading(false);
-      clearCachedSupabaseSession();
-    }
+    await supabase.auth.signOut();
+    setSession(null);
+    setUser(null);
+    setNessieState(initialNessieState);
   }, []);
 
   const value = useMemo(
@@ -252,75 +236,4 @@ async function ensureUserIdentity(authUser) {
   }
 
   return authUser;
-}
-
-function getInitialAuthSnapshot() {
-  if (typeof window === 'undefined') {
-    return { session: null, user: null, hydrated: false };
-  }
-
-  if (!supabaseAuthStorageKey) {
-    return { session: null, user: null, hydrated: true };
-  }
-
-  try {
-    const raw = window.localStorage.getItem(supabaseAuthStorageKey);
-    if (!raw) {
-      return { session: null, user: null, hydrated: true };
-    }
-
-    const parsed = JSON.parse(raw);
-    const storedSession = parsed?.currentSession ?? parsed?.session ?? null;
-    const storedUser =
-      parsed?.currentUser ?? parsed?.user ?? storedSession?.user ?? null;
-
-    if (!isSessionValid(storedSession)) {
-      clearCachedSupabaseSession();
-      return { session: null, user: null, hydrated: true };
-    }
-
-    return {
-      session: storedSession,
-      user: storedUser ?? null,
-      hydrated: true
-    };
-  } catch (error) {
-    console.warn('Failed to read cached Supabase session', error);
-    return { session: null, user: null, hydrated: true };
-  }
-}
-
-function isSessionValid(session) {
-  if (!session) {
-    return false;
-  }
-
-  const rawExpiry = session.expires_at ?? session.expiry_time ?? null;
-  if (!rawExpiry) {
-    return true;
-  }
-
-  const expirySeconds = typeof rawExpiry === 'number' ? rawExpiry : Number(rawExpiry);
-  if (Number.isNaN(expirySeconds)) {
-    return true;
-  }
-
-  const expiryWithGrace = expirySeconds * 1000 - SESSION_VALIDITY_GRACE_MS;
-  return expiryWithGrace > Date.now();
-}
-
-function clearCachedSupabaseSession() {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  if (!supabaseAuthStorageKey) {
-    return;
-  }
-
-  try {
-    window.localStorage.removeItem(supabaseAuthStorageKey);
-  } catch (error) {
-    console.warn('Failed to clear cached Supabase session', error);
-  }
 }
