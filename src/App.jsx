@@ -27,7 +27,6 @@ function App() {
   }, [location.key, refreshSession]);
 
   const transitionKey = `${location.key ?? 'root'}:${location.pathname}${location.search}${location.hash}`;
-
   return (
     <div className="relative min-h-screen overflow-hidden text-charcoal">
       <div className="pointer-events-none absolute inset-0 -z-10">
