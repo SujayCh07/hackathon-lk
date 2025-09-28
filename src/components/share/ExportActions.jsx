@@ -1,34 +1,53 @@
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
-import Button from '../ui/Button.jsx';
 
-export function ExportActions({ targetRef }) {
+export default function ExportActions({ targetRef }) {
   const exportPNG = async () => {
-    if (!targetRef.current) return;
-    const canvas = await html2canvas(targetRef.current, { scale: 2, backgroundColor: '#FAF9F6' });
-    const link = document.createElement('a');
-    link.download = 'ppp-summary.png';
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    if (!targetRef?.current) return;
+    try {
+      const dataUrl = await toPng(targetRef.current, { cacheBust: true });
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = 'ppp-summary.png';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('PNG export failed:', err);
+    }
   };
 
   const exportPDF = async () => {
-    if (!targetRef.current) return;
-    const canvas = await html2canvas(targetRef.current, { scale: 2, backgroundColor: '#FAF9F6' });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
-    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-    pdf.save('ppp-summary.pdf');
+    if (!targetRef?.current) return;
+    try {
+      const dataUrl = await toPng(targetRef.current, { cacheBust: true });
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save('ppp-summary.pdf');
+    } catch (err) {
+      console.error('PDF export failed:', err);
+    }
   };
 
   return (
-    <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
-      <Button onClick={exportPNG}>Export PNG</Button>
-      <Button variant="secondary" onClick={exportPDF}>
+    <div className="flex gap-4">
+      <button
+        type="button"
+        onClick={exportPNG}
+        className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+      >
+        Export PNG
+      </button>
+      <button
+        type="button"
+        onClick={exportPDF}
+        className="rounded bg-green-500 px-4 py-2 text-white hover:bg-green-600"
+      >
         Export PDF
-      </Button>
+      </button>
     </div>
   );
 }
-
-export default ExportActions;

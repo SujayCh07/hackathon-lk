@@ -1,6 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
-import { ensureNessieCustomer, fetchNessieOverview } from '../lib/nessie.js';
+import {
+  ensureNessieCustomer,
+  loadAccountsFromSupabase,
+  loadTransactionsFromSupabase,
+  mapAccountRow,
+  mapTransactionRow,
+  syncAccountsFromNessie,
+  syncTransactionsFromNessie
+} from '../lib/nessie.js';
 import {
   fetchUserProfileName,
   upsertUserProfileName,
@@ -74,7 +82,16 @@ export function AuthProvider({ children }) {
           setUser(effectiveUser);
         }
 
-        const { accounts, transactions } = await fetchNessieOverview(customerId);
+        await Promise.all([
+          syncAccountsFromNessie({ userId: effectiveUser?.id, customerId }),
+          syncTransactionsFromNessie({ userId: effectiveUser?.id, customerId })
+        ]);
+
+        const [accounts, transactions] = await Promise.all([
+          loadAccountsFromSupabase(effectiveUser?.id),
+          loadTransactionsFromSupabase(effectiveUser?.id)
+        ]);
+
         setNessieState({
           customerId,
           accounts: normaliseAccounts(accounts),
@@ -82,6 +99,24 @@ export function AuthProvider({ children }) {
         });
       } catch (error) {
         console.error('Failed to synchronise Nessie data', error);
+        try {
+          const [accounts, transactions] = await Promise.all([
+            loadAccountsFromSupabase(authUser?.id),
+            loadTransactionsFromSupabase(authUser?.id)
+          ]);
+
+          if ((accounts?.length ?? 0) > 0 || (transactions?.length ?? 0) > 0) {
+            setNessieState({
+              customerId: authUser?.user_metadata?.nessieCustomerId ?? null,
+              accounts: normaliseAccounts(accounts),
+              transactions: normaliseTransactions(transactions)
+            });
+            return;
+          }
+        } catch (loadError) {
+          console.warn('Failed to load cached Nessie data from Supabase', loadError);
+        }
+
         setNessieState({
           customerId: authUser?.user_metadata?.nessieCustomerId ?? null,
           accounts: [
@@ -140,14 +175,9 @@ function normaliseAccounts(accounts) {
     return [];
   }
 
-  return accounts.map((account) => ({
-    id: account._id ?? account.id,
-    name: account.nickname ?? account.name ?? account.type ?? 'Account',
-    balance: Number(account.balance ?? account.balanceUSD ?? 0),
-    currencyCode: account.currency ?? account.currency_code ?? 'USD',
-    type: account.type ?? 'checking',
-    mask: account.account_number_masked ?? account.account_number ?? '••••'
-  }));
+  return accounts
+    .map((account) => mapAccountRow(account))
+    .filter(Boolean);
 }
 
 function normaliseTransactions(transactions) {
@@ -155,21 +185,20 @@ function normaliseTransactions(transactions) {
     return [];
   }
 
-  return transactions.map((transaction) => ({
-    id: transaction._id ?? transaction.id,
-    merchant:
-      transaction.payee ??
-      transaction.merchant ??
-      transaction.description ??
-      transaction.purchase_description ??
-      'Merchant',
-    amount: Math.abs(Number(transaction.amount ?? transaction.purchase_amount ?? 0)),
-    date: transaction.transaction_date ?? transaction.date ?? new Date().toISOString(),
-    category: Array.isArray(transaction.category)
-      ? transaction.category[0]
-      : transaction.category ?? transaction.type ?? 'General',
-    raw: transaction
-  }));
+  return transactions
+    .map((transaction) => {
+      const mapped = mapTransactionRow(transaction);
+      if (!mapped) return null;
+      return {
+        id: mapped.id,
+        merchant: mapped.merchant,
+        amount: Math.abs(Number(mapped.amount ?? 0)),
+        date: mapped.timestamp,
+        category: mapped.category,
+        raw: transaction
+      };
+    })
+    .filter(Boolean);
 }
 
 async function ensureUserIdentity(authUser) {

@@ -18,8 +18,13 @@ function App() {
   const location = useLocation();
 
   return (
-    <div className="relative min-h-screen text-charcoal">
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.7),rgba(255,255,255,0))]" />
+    <div className="relative min-h-screen overflow-hidden text-charcoal">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -left-24 -top-32 h-[28rem] w-[28rem] rounded-full bg-gradient-to-br from-navy/40 via-sky/20 to-transparent blur-3xl" />
+        <div className="absolute right-[-18%] top-[12%] h-[22rem] w-[22rem] rounded-full bg-gradient-to-br from-red/40 via-red/10 to-transparent blur-3xl" />
+        <div className="absolute left-[20%] bottom-[-18%] h-[32rem] w-[32rem] rounded-full bg-gradient-to-tr from-turquoise/35 via-teal/20 to-transparent blur-3xl" />
+        <div className="absolute inset-x-0 bottom-[-20%] h-[18rem] bg-gradient-to-t from-navy/15 via-transparent to-transparent blur-3xl" />
+      </div>
       <NavBar />
       <RouteTransitions key={location.pathname}>
         <Routes location={location}>

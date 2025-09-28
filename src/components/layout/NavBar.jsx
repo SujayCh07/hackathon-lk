@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Button from '../ui/Button.jsx';
 import { useAuth } from '../../hooks/useAuth.js';
@@ -21,6 +21,19 @@ export function NavBar() {
   const navigate = useNavigate();
   const { user, signOut, isLoading } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'light';
+    return window.localStorage.getItem('ppp-theme') ?? 'light';
+  });
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.setAttribute('data-theme', theme);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('ppp-theme', theme);
+    }
+  }, [theme]);
+
   const links = user ? authenticatedLinks : [];
 
   const identityLabel = useMemo(() => {
@@ -137,7 +150,7 @@ export function NavBar() {
                   </NavLink>
                 </li>
               ))}
-              <li className="pt-3">
+             <li className="pt-3">
                 {user ? (
                   <div className="space-y-2">
                     <NavLink
