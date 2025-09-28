@@ -1,5 +1,5 @@
 // src/pages/Dashboard.jsx
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card.jsx';
 import WorldMap from '../components/score/WorldMap.jsx';
 import CityCard from '../components/score/CityCard.jsx';
@@ -8,8 +8,6 @@ import SavingsRunwayPanel from '../components/dashboard/SavingsRunwayPanel.jsx';
 import NotificationsWidget from '../components/dashboard/NotificationsWidget.jsx';
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
-import usePersonalization from '../hooks/usePersonalization.js';
-import OnboardingModal from '../components/onboarding/OnboardingModal.jsx';
 import { supabase } from '../lib/supabase.js';
 import Dictionary from './Dictionary.js';
 
@@ -180,9 +178,7 @@ export function Dashboard() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const { profile } = useUserProfile(userId);
-  const { data: personalization, loading: personalizationLoading, completeOnboarding } = usePersonalization(userId);
-
-  // Identity & budget display
+  // identity/budget
   const identityFallback = useMemo(() => {
     if (!user) return '';
     const md = user.user_metadata ?? {};
@@ -193,10 +189,9 @@ export function Dashboard() {
 
   const displayName = profile?.name ?? identityFallback;
   const baseMonthlyBudget = useMemo(() => {
-    if (personalization?.monthlyBudget) return personalization.monthlyBudget;
     if (profile?.monthly_budget) return profile.monthly_budget;
     return 2500;
-  }, [personalization?.monthlyBudget, profile?.monthly_budget]);
+  }, [profile?.monthly_budget]);
 
   // ── Supabase-backed account & transactions ────────────────────────────────
   const [balanceUSD, setBalanceUSD] = useState(0);
@@ -427,9 +422,7 @@ const enrichedPPP = (pppTop.length > 0 ? pppTop : sampleDestinations)
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-      <OnboardingModal onSkip={() => completeOnboarding({ ...personalization, onboardingComplete: true })} />
-
-      {/* Hero cards */}
+      {/* Hero / Accounts */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <Card className="col-span-1 bg-white/90">
           <CardHeader>
