@@ -8,6 +8,8 @@ import SavingsRunwayPanel from '../components/dashboard/SavingsRunwayPanel.jsx';
 import NotificationsWidget from '../components/dashboard/NotificationsWidget.jsx';
 import { useAuth } from '../hooks/useAuth.js';
 import { useUserProfile } from '../hooks/useUserProfile.js';
+import { useAccount } from '../hooks/useAccount.js';
+import { useTransactions } from '../hooks/useTransactions.js';
 import usePersonalization from '../hooks/usePersonalization.js';
 import OnboardingModal from '../components/onboarding/OnboardingModal.jsx';
 import { supabase } from '../lib/supabase.js';
@@ -96,94 +98,41 @@ export function Dashboard() {
   const { profile } = useUserProfile(userId);
   const { data: personalization, loading: personalizationLoading, completeOnboarding } = usePersonalization(userId);
 
-  // Identity & budget display
   const identityFallback = useMemo(() => {
     if (!user) return '';
-    const md = user.user_metadata ?? {};
+    const md = user?.user_metadata ?? {};
     if (md.displayName && md.displayName.trim()) return md.displayName.trim();
-    if (user.email) return user.email.split('@')[0] ?? '';
+    if (user?.email) return user.email.split('@')[0] ?? '';
     return '';
   }, [user]);
 
-  const displayName = profile?.name ?? identityFallback;
+  const displayName = profile?.displayName ?? profile?.name ?? identityFallback;
+
   const baseMonthlyBudget = useMemo(() => {
     if (personalization?.monthlyBudget) return personalization.monthlyBudget;
-    if (profile?.monthly_budget) return profile.monthly_budget;
+    if (profile?.monthlyBudget) return profile.monthlyBudget;
     return 2500;
-  }, [personalization?.monthlyBudget, profile?.monthly_budget]);
+  }, [personalization?.monthlyBudget, profile?.monthlyBudget]);
 
-  // ── Supabase-backed account & transactions ────────────────────────────────
-  const [balanceUSD, setBalanceUSD] = useState(0);
-  const [recent, setRecent] = useState([]);           // last ~10 transactions
-  const [allTxForTrends, setAllTxForTrends] = useState([]); // last 90 days for charts
+  const { balanceUSD } = useAccount();
+  const {
+    transactions,
+    recent,
+    spendingMetrics,
+  } = useTransactions({ limit: 10, monthlyBudget: baseMonthlyBudget, balanceUSD });
 
-  useEffect(() => {
-    let alive = true;
-    if (!userId) return;
-
-    (async () => {
-      // Balance: latest snapshot in accounts table
-      const { data: acctRows, error: acctErr } = await supabase
-        .from('accounts')
-        .select('balance, currency_code, snapshot_ts')
-        .eq('user_id', userId)
-        .order('snapshot_ts', { ascending: false })
-        .limit(1);
-
-      if (!acctErr && acctRows?.length > 0 && alive) {
-        setBalanceUSD(Number(acctRows[0].balance ?? 0));
-      }
-
-      // Recent transactions (10)
-      const { data: txRows, error: txErr } = await supabase
-        .from('transactions')
-        .select('id, merchant, amount, category, ts')
-        .eq('user_id', userId)
-        .order('ts', { ascending: false })
-        .limit(10);
-
-      if (!txErr && Array.isArray(txRows) && alive) {
-        setRecent(
-          txRows.map((t) => ({
-            id: t.id,
-            merchant: t.merchant ?? 'Unknown merchant',
-            amount: Number(t.amount ?? 0),
-            category: t.category ?? 'General',
-            timestamp: t.ts,
-          }))
-        );
-      }
-
-      // Transactions for last 90 days (for trend chart & budget math)
-      const since = new Date();
-      since.setDate(since.getDate() - 90);
-      const { data: tx90, error: tx90Err } = await supabase
-        .from('transactions')
-        .select('id, merchant, amount, category, ts')
-        .eq('user_id', userId)
-        .gte('ts', since.toISOString())
-        .order('ts', { ascending: true });
-
-      if (!tx90Err && Array.isArray(tx90) && alive) {
-        setAllTxForTrends(
-          tx90.map((t) => ({
-            id: t.id,
-            merchant: t.merchant ?? 'Unknown merchant',
-            amount: Number(t.amount ?? 0),
-            category: t.category ?? 'General',
-            timestamp: t.ts,
-          }))
-        );
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, [userId]);
+  const transactionsLast90 = useMemo(() => {
+    if (!Array.isArray(transactions)) return [];
+    const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000;
+    return transactions.filter((txn) => {
+      const ts = new Date(txn.timestamp ?? txn.date ?? txn.ts ?? Date.now());
+      const ms = ts.getTime();
+      return !Number.isNaN(ms) && ms >= cutoff;
+    });
+  }, [transactions]);
 
   // Trend data (weekly sums)
-  const trendData = useMemo(() => groupTransactionsByWeek(allTxForTrends), [allTxForTrends]);
+  const trendData = useMemo(() => groupTransactionsByWeek(transactionsLast90), [transactionsLast90]);
 
   // Weekly change % (last week vs prior)
   const weeklyChange = useMemo(() => {
@@ -197,13 +146,9 @@ export function Dashboard() {
 
   // Budget delta (last 30 days spend vs baseMonthlyBudget)
   const budgetDelta = useMemo(() => {
-    const cut = new Date();
-    cut.setDate(cut.getDate() - 30);
-    const last30 = allTxForTrends.filter((t) => new Date(t.timestamp) >= cut);
-    const spent = last30.reduce((s, t) => s + Math.max(0, Number(t.amount ?? 0)), 0);
-    if (!baseMonthlyBudget) return null;
-    return Number(baseMonthlyBudget) - spent; // positive = under budget
-  }, [allTxForTrends, baseMonthlyBudget]);
+    const delta = spendingMetrics?.budgetDelta;
+    return Number.isFinite(delta) ? delta : null;
+  }, [spendingMetrics]);
 
   // ── PPP from Supabase ppp_country (country-level) ─────────────────────────
   const [pppTop, setPppTop] = useState([]);

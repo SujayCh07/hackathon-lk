@@ -31,6 +31,57 @@ function normalizeAddress(parts = EMPTY_ADDRESS) {
   };
 }
 
+function parseAddressString(value) {
+  if (!value || typeof value !== 'string') return { ...EMPTY_ADDRESS };
+
+  const cleaned = value.replace(/\r/g, '').trim();
+  if (!cleaned) return { ...EMPTY_ADDRESS };
+
+  const lines = cleaned
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  let lineOne = lines[0] ?? '';
+  let remainder = lines.slice(1).join(', ');
+
+  if (!remainder && lineOne.includes(',')) {
+    const [first, ...rest] = lineOne
+      .split(',')
+      .map((segment) => segment.trim())
+      .filter((segment) => segment.length > 0);
+    lineOne = first ?? '';
+    remainder = rest.join(', ');
+  }
+
+  const parts = { ...EMPTY_ADDRESS };
+  const numberMatch = lineOne.match(/^(?<number>[\dA-Za-z-]+)\s+(?<street>.*)$/);
+  if (numberMatch?.groups) {
+    parts.houseNumber = numberMatch.groups.number?.trim() ?? '';
+    parts.street = numberMatch.groups.street?.trim() ?? '';
+  } else {
+    parts.street = lineOne.trim();
+  }
+
+  const locality = remainder || lines[1] || '';
+  const localityParts = locality
+    .split(',')
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+
+  if (localityParts.length === 1) {
+    if (localityParts[0].length <= 3) {
+      parts.state = localityParts[0].toUpperCase();
+    } else {
+      parts.city = localityParts[0];
+    }
+  } else if (localityParts.length > 1) {
+    [parts.city, parts.state] = [localityParts[0], localityParts[1]?.toUpperCase() ?? ''];
+  }
+
+  return parts;
+}
+
 function parsePersistedAddress(value) {
   if (!value) return { ...EMPTY_ADDRESS };
 
@@ -46,9 +97,9 @@ function parsePersistedAddress(value) {
         };
       }
     } catch (error) {
-      // fall through to object parsing below
+      // Fall through to string parsing below
     }
-    return { ...EMPTY_ADDRESS };
+    return parseAddressString(value);
   }
 
   if (typeof value === 'object') {
@@ -73,8 +124,8 @@ function formatAddressPreview(parts) {
 function serialiseAddress(parts) {
   const normalised = normalizeAddress(parts);
   const formatted = formatAddressPreview(normalised);
-  const hasAny = Object.values(normalised).some(v => v.length > 0);
-  return hasAny ? JSON.stringify({ ...normalised, formatted }) : null;
+  const hasAny = Object.values(normalised).some((v) => v.length > 0);
+  return hasAny ? formatted : null;
 }
 
 /* ---------- page ---------- */
@@ -122,7 +173,7 @@ export default function Settings() {
   const [countriesError, setCountriesError] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const disableProfileInputs = savingProfile;
+  const disableProfileInputs = savingProfile || profileLoading;
 
   const identityFallback = useMemo(() => {
     if (!user) return '';
@@ -226,7 +277,7 @@ export default function Settings() {
   // countries list
   useEffect(() => {
     let active = true;
-    setCountriesLoading(false);
+    setCountriesLoading(true);
     setCountriesError(null);
 
     supabase
