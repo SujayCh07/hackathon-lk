@@ -1,14 +1,6 @@
-import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { Card } from '../ui/Card.jsx';
 import Progress from '../ui/Progress.jsx';
 import capitals from './capitals.js';
-
-const CATEGORY_LABELS = {
-  rent: 'Rent',
-  food: 'Food',
-  transport: 'Transport',
-  leisure: 'Leisure',
-};
 
 function toNumber(value) {
   if (value == null) return NaN;
@@ -33,11 +25,11 @@ function formatRunway(runway) {
       const intMonths = Math.round(num);
       return `${intMonths} month${intMonths === 1 ? '' : 's'}`;
     }
-    return `${num.toFixed(1)} month${Math.abs(num - 1) < 1e-9 ? '' : 's'}`;
+    return `${num.toFixed(1)} months`;
   }
 
   const years = Math.floor(num / 12);
-  const monthsPartRaw = (num % 12);
+  const monthsPartRaw = num % 12;
   const monthsPart = Math.round(monthsPartRaw * 10) / 10;
   const parts = [];
   if (years > 0) parts.push(`${years} year${years > 1 ? 's' : ''}`);
@@ -72,7 +64,6 @@ export function RunwayCard({
   monthlyCost,
   currency = 'USD',
   stayDurationMonths = 6,
-  breakdown = {},
   continent,
   isHighlighted = false,
   badgeLabel = null,
@@ -85,19 +76,17 @@ export function RunwayCard({
       : 0;
 
   const monthCostNum = toNumber(monthlyCost);
-  const stayCost = Number.isFinite(monthCostNum) && Number.isFinite(durationNum)
-    ? monthCostNum * durationNum
-    : NaN;
+  const stayCost =
+    Number.isFinite(monthCostNum) && Number.isFinite(durationNum)
+      ? monthCostNum * durationNum
+      : NaN;
 
-  const segments = Object.entries(breakdown);
   const normalizedCountry = country?.toLowerCase?.() ?? '';
   const capital = capitals[normalizedCountry];
   const countryName = capitalizeFirstLetter(country);
   const infoLine = capital
     ? `Estimated cost of living in ${capital}, ${countryName}`
     : `Estimated cost of living in ${countryName}`;
-
-  const sortedSegments = segments.slice().sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0));
 
   return (
     <Card
@@ -123,9 +112,11 @@ export function RunwayCard({
             )}
           </div>
         </div>
-        <span className="rounded-full bg-turquoise/20 px-3 py-1 text-xs font-semibold text-teal">
-          {formatRunway(runwayNum)}
-        </span>
+        <div className="flex flex-col items-end gap-1 text-right">
+          <span className="rounded-full bg-turquoise/20 px-3 py-1 text-xs font-semibold text-teal">
+            {formatRunway(runwayNum)}
+          </span>
+        </div>
       </div>
 
       <p className="mt-3 text-sm text-charcoal/70">
@@ -134,34 +125,6 @@ export function RunwayCard({
       </p>
 
       <Progress value={percent} className="mt-4" />
-
-      <div className="mt-3 flex items-start gap-2 text-xs text-charcoal/70">
-        <InformationCircleIcon className="mt-0.5 h-4 w-4 text-teal" aria-hidden="true" />
-        <div className="w-full">
-          {sortedSegments.length > 0 ? (
-            <ul className="grid gap-2 sm:grid-cols-2">
-              {sortedSegments.map(([label, value]) => {
-                const key = String(label).toLowerCase();
-                const displayLabel = CATEGORY_LABELS[key] ?? label;
-
-                return (
-                  <li
-                    key={label}
-                    className="rounded-xl bg-turquoise/15 px-3 py-2 text-left text-sm text-charcoal/80"
-                  >
-                    <p className="font-semibold text-teal">{displayLabel}</p>
-                    <p className="text-xs text-charcoal/60">
-                      Approximate share of monthly budget: {Math.round((value ?? 0) * 100)}%
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p>No budget breakdown available.</p>
-          )}
-        </div>
-      </div>
     </Card>
   );
 }

@@ -9,195 +9,12 @@ import usePersonalization from '../hooks/usePersonalization.js';
 import Dictionary from './Dictionary.js';
 
 const CONTINENT_GROUPS = {
-  Africa: [
-    'algeria',
-    'angola',
-    'benin',
-    'botswana',
-    'burkina faso',
-    'burundi',
-    'cameroon',
-    'cape verde',
-    'central african republic',
-    'chad',
-    'comoros',
-    'democratic republic of the congo',
-    'djibouti',
-    'egypt',
-    'equatorial guinea',
-    'eritrea',
-    'eswatini',
-    'ethiopia',
-    'gabon',
-    'gambia, the',
-    'ghana',
-    'guinea',
-    'guinea-bissau',
-    'ivory coast',
-    'kenya',
-    'lesotho',
-    'liberia',
-    'libya',
-    'madagascar',
-    'malawi',
-    'mali',
-    'mauritania',
-    'mauritius',
-    'morocco',
-    'mozambique',
-    'namibia',
-    'niger',
-    'nigeria',
-    'republic of congo',
-    'rwanda',
-    'senegal',
-    'seychelles',
-    'sierra leone',
-    'somalia',
-    'south africa',
-    'south sudan',
-    'sudan',
-    'tanzania',
-    'togo',
-    'tunisia',
-    'uganda',
-    'zambia',
-    'zimbabwe',
-  ],
-  Asia: [
-    'afghanistan',
-    'armenia',
-    'azerbaijan',
-    'bahrain',
-    'bangladesh',
-    'bhutan',
-    'brunei',
-    'cambodia',
-    'china',
-    'cyprus',
-    'georgia',
-    'india',
-    'indonesia',
-    'iran',
-    'iraq',
-    'israel',
-    'japan',
-    'jordan',
-    'kazakhstan',
-    'kuwait',
-    'kyrgyzstan',
-    'laos',
-    'lebanon',
-    'malaysia',
-    'maldives',
-    'mongolia',
-    'myanmar',
-    'nepal',
-    'north korea',
-    'oman',
-    'pakistan',
-    'palestine',
-    'philippines',
-    'qatar',
-    'saudi arabia',
-    'singapore',
-    'south korea',
-    'sri lanka',
-    'syria',
-    'taiwan',
-    'tajikistan',
-    'thailand',
-    'timor-leste',
-    'turkey',
-    'turkmenistan',
-    'uae',
-    'uzbekistan',
-    'vietnam',
-    'yemen',
-  ],
-  Europe: [
-    'albania',
-    'andorra',
-    'austria',
-    'belarus',
-    'belgium',
-    'bosnia and herzegovina',
-    'bulgaria',
-    'croatia',
-    'czech republic',
-    'denmark',
-    'estonia',
-    'finland',
-    'france',
-    'germany',
-    'greece',
-    'hungary',
-    'iceland',
-    'ireland',
-    'italy',
-    'latvia',
-    'liechtenstein',
-    'lithuania',
-    'luxembourg',
-    'malta',
-    'moldova',
-    'montenegro',
-    'netherlands',
-    'north macedonia',
-    'norway',
-    'poland',
-    'portugal',
-    'romania',
-    'serbia',
-    'slovakia',
-    'slovenia',
-    'spain',
-    'sweden',
-    'switzerland',
-    'ukraine',
-    'united kingdom',
-  ],
-  'North America': [
-    'antigua and barbuda',
-    'bahamas',
-    'barbados',
-    'belize',
-    'canada',
-    'costa rica',
-    'cuba',
-    'dominica',
-    'dominican republic',
-    'el salvador',
-    'grenada',
-    'guatemala',
-    'haiti',
-    'honduras',
-    'jamaica',
-    'mexico',
-    'nicaragua',
-    'panama',
-    'saint kitts and nevis',
-    'saint lucia',
-    'saint vincent and the grenadines',
-    'trinidad and tobago',
-    'united states',
-    'united states of america',
-  ],
-  'South America': [
-    'argentina',
-    'bolivia',
-    'brazil',
-    'chile',
-    'colombia',
-    'ecuador',
-    'guyana',
-    'paraguay',
-    'peru',
-    'suriname',
-    'uruguay',
-    'venezuela',
-  ],
-  Oceania: ['australia', 'fiji', 'kiribati', 'marshall islands', 'nauru', 'new zealand'],
+  Africa: ['algeria', 'angola', 'egypt', 'ghana', 'kenya', 'morocco', 'nigeria', 'south africa', 'tunisia', 'uganda', 'zambia', 'zimbabwe'],
+  Asia: ['china', 'india', 'indonesia', 'japan', 'malaysia', 'philippines', 'singapore', 'south korea', 'taiwan', 'thailand', 'turkey', 'vietnam'],
+  Europe: ['austria', 'belgium', 'france', 'germany', 'greece', 'ireland', 'italy', 'netherlands', 'norway', 'poland', 'portugal', 'spain', 'sweden', 'switzerland', 'united kingdom'],
+  'North America': ['canada', 'costa rica', 'dominican republic', 'mexico', 'panama', 'united states'],
+  'South America': ['argentina', 'brazil', 'chile', 'colombia', 'ecuador', 'peru', 'uruguay'],
+  Oceania: ['australia', 'fiji', 'new zealand'],
 };
 
 function normalizeKey(value) {
@@ -210,52 +27,6 @@ function getContinent(countryKey) {
     Object.entries(CONTINENT_GROUPS).find(([, list]) => list.includes(normalized))?.[0] ??
     'Global'
   );
-}
-
-function computeBreakdown(values) {
-  const total = Number(values.cost_of_living) || 0;
-  if (!total) {
-    return {
-      rent: 0.45,
-      food: 0.25,
-      transport: 0.15,
-      leisure: 0.15,
-    };
-  }
-
-  const rent = Math.max(Number(values.rent) || 0, 0);
-  const food = Math.max(Number(values.groceries) || 0, 0);
-  const transport = Math.max(Number(values.transportation) || 0, 0);
-  const leisure = Math.max(total - (rent + food + transport), 0);
-  const sum = rent + food + transport + leisure;
-
-  if (!sum) {
-    return {
-      rent: 0.45,
-      food: 0.25,
-      transport: 0.15,
-      leisure: 0.15,
-    };
-  }
-
-  return {
-    rent: rent / sum,
-    food: food / sum,
-    transport: transport / sum,
-    leisure: leisure / sum,
-  };
-}
-
-function computeSafetyScore(breakdown) {
-  const rentShare = breakdown?.rent ?? 0.45;
-  const transportShare = breakdown?.transport ?? 0.15;
-  const baseScore = 100 - rentShare * 90;
-  return Math.round(Math.max(0, Math.min(100, baseScore - transportShare * 15)));
-}
-
-function computeFunScore(breakdown) {
-  const leisureShare = breakdown?.leisure ?? 0.15;
-  return Math.round(Math.max(0, Math.min(100, leisureShare * 120)));
 }
 
 function useDebounce(value, delay = 300) {
@@ -282,7 +53,7 @@ function Planner() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [continentFilter, setContinentFilter] = useState('All');
-  const [maxMonthlyCost, setMaxMonthlyCost] = useState(2500);
+  const [maxMonthlyCost, setMaxMonthlyCost] = useState(null);
   const [sortOption, setSortOption] = useState('runway');
   const [stayDuration, setStayDuration] = useState(6);
   const [timeUnit, setTimeUnit] = useState('months'); // 'months' or 'days'
@@ -296,17 +67,6 @@ function Planner() {
   }, []);
 
   const debouncedBudget = useDebounce(budget, 300);
-
-  const budgetFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }),
-    []
-  );
 
   const formatPrice = useCallback((value) => {
     if (!value || value <= 0) return 'N/A';
@@ -322,8 +82,7 @@ function Planner() {
     const saved = profile?.monthlyBudget;
     if (!profileLoading && typeof saved === 'number' && Number.isFinite(saved)) {
       setBudget(saved);
-      const clamped = Math.min(4000, Math.max(300, saved));
-      setMaxMonthlyCost(clamped);
+      setMaxMonthlyCost(null); // show all by default
     }
   }, [profile, profileLoading]);
 
@@ -333,20 +92,16 @@ function Planner() {
     try {
       const results = Object.entries(Dictionary).map(([country, values]) => {
         const monthlyCost = values.cost_of_living;
-        const dailyCost = monthlyCost / 30; // Convert monthly to daily cost
-        
-        // Calculate runway in the selected time unit
+        const dailyCost = monthlyCost / 30;
+
         let runway;
         if (timeUnit === 'days') {
           runway = dailyCost > 0 ? debouncedBudget / dailyCost : 0;
         } else {
           runway = monthlyCost > 0 ? debouncedBudget / monthlyCost : 0;
         }
-        
-        const breakdown = computeBreakdown(values);
+
         const continent = getContinent(country);
-        const safetyScore = computeSafetyScore(breakdown);
-        const funScore = computeFunScore(breakdown);
 
         return {
           city: formatLocationName(country),
@@ -355,12 +110,8 @@ function Planner() {
           monthlyCost,
           dailyCost,
           currency: 'USD',
-          breakdown,
-          rentUSD: Number(values.rent) || null,
           continent,
-          safetyScore,
-          funScore,
-          timeUnit, // Pass the time unit to the card
+          timeUnit,
         };
       });
 
@@ -391,8 +142,10 @@ function Planner() {
 
     if (searchTerm.trim()) {
       const lowerTerm = searchTerm.toLowerCase();
-      data = data.filter((entry) =>
-        entry.city.toLowerCase().includes(lowerTerm) || entry.country.toLowerCase().includes(lowerTerm)
+      data = data.filter(
+        (entry) =>
+          entry.city.toLowerCase().includes(lowerTerm) ||
+          entry.country.toLowerCase().includes(lowerTerm)
       );
     }
 
@@ -436,39 +189,33 @@ function Planner() {
     fetchRunwayData();
   }, [fetchRunwayData]);
 
-  const handleTimeUnitChange = useCallback((newTimeUnit) => {
-    setTimeUnit(newTimeUnit);
-    // Adjust stay duration when switching units
-    if (newTimeUnit === 'days' && timeUnit === 'months') {
-      setStayDuration(stayDuration * 30);
-    } else if (newTimeUnit === 'months' && timeUnit === 'days') {
-      setStayDuration(Math.max(1, Math.round(stayDuration / 30)));
-    }
-  }, [stayDuration, timeUnit]);
+  const handleTimeUnitChange = useCallback(
+    (newTimeUnit) => {
+      setTimeUnit(newTimeUnit);
+      if (newTimeUnit === 'days' && timeUnit === 'months') {
+        setStayDuration(stayDuration * 30);
+      } else if (newTimeUnit === 'months' && timeUnit === 'days') {
+        setStayDuration(Math.max(1, Math.round(stayDuration / 30)));
+      }
+    },
+    [stayDuration, timeUnit]
+  );
 
   const getStayDurationSliderProps = () => {
     if (timeUnit === 'days') {
       return {
         min: 1,
-        max: 1095, // 3 years in days
+        max: 1095,
         step: 1,
-        label: `${stayDuration} ${stayDuration === 1 ? 'day' : 'days'}`
+        label: `${stayDuration} ${stayDuration === 1 ? 'day' : 'days'}`,
       };
     } else {
       return {
         min: 1,
         max: 36,
         step: 1,
-        label: `${stayDuration} ${stayDuration === 1 ? 'month' : 'months'}`
+        label: `${stayDuration} ${stayDuration === 1 ? 'month' : 'months'}`,
       };
-    }
-  };
-
-  const calculateStayCost = (cost, duration) => {
-    if (timeUnit === 'days') {
-      return cost * duration;
-    } else {
-      return cost * duration;
     }
   };
 
@@ -483,7 +230,6 @@ function Planner() {
             <p className="text-sm text-charcoal/70">
               Adjust your monthly spend target to understand how far your money stretches in each destination.
             </p>
-            <p className="mt-1 text-xs text-charcoal/60">GeoBudget = plan your travels with budget forecasting.</p>
           </div>
           <div className="flex flex-col items-start gap-2 text-sm font-semibold text-teal md:items-end">
             <div className="rounded-2xl bg-turquoise/15 px-4 py-2 shadow-sm shadow-teal/10">
@@ -503,9 +249,7 @@ function Planner() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-teal">Stay duration timeline</p>
-                <p className="text-xs text-charcoal/60">
-                  Drag to see how long your savings last across destinations.
-                </p>
+                <p className="text-xs text-charcoal/60">Drag to see how long your savings last across destinations.</p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex gap-2">
@@ -513,9 +257,7 @@ function Planner() {
                     type="button"
                     onClick={() => handleTimeUnitChange('months')}
                     className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
-                      timeUnit === 'months' 
-                        ? 'bg-teal text-white' 
-                        : 'bg-white/50 text-teal hover:bg-white/70'
+                      timeUnit === 'months' ? 'bg-teal text-white' : 'bg-white/50 text-teal hover:bg-white/70'
                     }`}
                   >
                     Months
@@ -524,9 +266,7 @@ function Planner() {
                     type="button"
                     onClick={() => handleTimeUnitChange('days')}
                     className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
-                      timeUnit === 'days' 
-                        ? 'bg-teal text-white' 
-                        : 'bg-white/50 text-teal hover:bg-white/70'
+                      timeUnit === 'days' ? 'bg-teal text-white' : 'bg-white/50 text-teal hover:bg-white/70'
                     }`}
                   >
                     Days
@@ -605,17 +345,17 @@ function Planner() {
             With a <strong>{formatPrice(budget)}</strong> monthly budget,{' '}
             <strong>{highlightCity.city}</strong> gives you the most value — your budget lasts{' '}
             <strong>
-              {Number.isFinite(highlightCity.runway) 
-                ? `${highlightCity.runway.toFixed(1)} ${timeUnit === 'days' ? (highlightCity.runway === 1 ? 'day' : 'days') : (highlightCity.runway === 1 ? 'month' : 'months')}` 
+              {Number.isFinite(highlightCity.runway)
+                ? `${highlightCity.runway.toFixed(1)} ${timeUnit === 'days' ? (highlightCity.runway === 1 ? 'day' : 'days') : (highlightCity.runway === 1 ? 'month' : 'months')}`
                 : 'N/A'}
             </strong>{' '}
             there.
           </p>
           <p className="mt-1 font-semibold text-teal/80">
-            Plan a {stayDuration}-{timeUnit === 'days' ? (stayDuration === 1 ? 'day' : 'day') : (stayDuration === 1 ? 'month' : 'month')} stay for{' '}
+            Plan a {stayDuration}-{timeUnit} stay for{' '}
             {formatPrice(
-              timeUnit === 'days' 
-                ? highlightCity.dailyCost * stayDuration 
+              timeUnit === 'days'
+                ? highlightCity.dailyCost * stayDuration
                 : highlightCity.monthlyCost * stayDuration
             )}.
           </p>
