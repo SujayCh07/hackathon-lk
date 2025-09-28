@@ -210,4 +210,6 @@ export function RunwayCard({
   );
 }
 
-export default RunwayCard;
+
+import React from "react";
+export default React.memo(RunwayCard);
