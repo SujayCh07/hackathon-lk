@@ -285,6 +285,7 @@ function Planner() {
   const [maxMonthlyCost, setMaxMonthlyCost] = useState(2500);
   const [sortOption, setSortOption] = useState('runway');
   const [stayDuration, setStayDuration] = useState(6);
+  const [timeUnit, setTimeUnit] = useState('months'); // 'months' or 'days'
 
   const formatLocationName = useCallback((value) => {
     return String(value)
@@ -332,7 +333,16 @@ function Planner() {
     try {
       const results = Object.entries(Dictionary).map(([country, values]) => {
         const monthlyCost = values.cost_of_living;
-        const runway = monthlyCost > 0 ? debouncedBudget / monthlyCost : 0;
+        const dailyCost = monthlyCost / 30; // Convert monthly to daily cost
+        
+        // Calculate runway in the selected time unit
+        let runway;
+        if (timeUnit === 'days') {
+          runway = dailyCost > 0 ? debouncedBudget / dailyCost : 0;
+        } else {
+          runway = monthlyCost > 0 ? debouncedBudget / monthlyCost : 0;
+        }
+        
         const breakdown = computeBreakdown(values);
         const continent = getContinent(country);
         const safetyScore = computeSafetyScore(breakdown);
@@ -343,12 +353,14 @@ function Planner() {
           country,
           runway: Number.isFinite(runway) ? runway : 0,
           monthlyCost,
+          dailyCost,
           currency: 'USD',
           breakdown,
           rentUSD: Number(values.rent) || null,
           continent,
           safetyScore,
           funScore,
+          timeUnit, // Pass the time unit to the card
         };
       });
 
@@ -359,7 +371,7 @@ function Planner() {
     } finally {
       setIsCalculating(false);
     }
-  }, [debouncedBudget, formatLocationName]);
+  }, [debouncedBudget, formatLocationName, timeUnit]);
 
   useEffect(() => {
     if (!debouncedBudget) return;
@@ -416,13 +428,51 @@ function Planner() {
   const highlightCity = useMemo(() => {
     return filteredAndSortedData.reduce(
       (best, current) => (current.runway > best.runway ? current : best),
-      { city: 'No data', runway: 0, monthlyCost: 0, currency: 'USD' }
+      { city: 'No data', runway: 0, monthlyCost: 0, dailyCost: 0, currency: 'USD' }
     );
   }, [filteredAndSortedData]);
 
   const handleRefresh = useCallback(() => {
     fetchRunwayData();
   }, [fetchRunwayData]);
+
+  const handleTimeUnitChange = useCallback((newTimeUnit) => {
+    setTimeUnit(newTimeUnit);
+    // Adjust stay duration when switching units
+    if (newTimeUnit === 'days' && timeUnit === 'months') {
+      setStayDuration(stayDuration * 30);
+    } else if (newTimeUnit === 'months' && timeUnit === 'days') {
+      setStayDuration(Math.max(1, Math.round(stayDuration / 30)));
+    }
+  }, [stayDuration, timeUnit]);
+
+  const getStayDurationSliderProps = () => {
+    if (timeUnit === 'days') {
+      return {
+        min: 1,
+        max: 1095, // 3 years in days
+        step: 1,
+        label: `${stayDuration} ${stayDuration === 1 ? 'day' : 'days'}`
+      };
+    } else {
+      return {
+        min: 1,
+        max: 36,
+        step: 1,
+        label: `${stayDuration} ${stayDuration === 1 ? 'month' : 'months'}`
+      };
+    }
+  };
+
+  const calculateStayCost = (cost, duration) => {
+    if (timeUnit === 'days') {
+      return cost * duration;
+    } else {
+      return cost * duration;
+    }
+  };
+
+  const sliderProps = getStayDurationSliderProps();
 
   return (
     <div className="mx-auto max-w-6xl flex flex-col gap-10 px-6 py-12">
@@ -457,12 +507,39 @@ function Planner() {
                   Drag to see how long your savings last across destinations.
                 </p>
               </div>
-              <span className="text-sm font-semibold text-teal">{stayDuration} months</span>
+              <div className="flex items-center gap-4">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTimeUnitChange('months')}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                      timeUnit === 'months' 
+                        ? 'bg-teal text-white' 
+                        : 'bg-white/50 text-teal hover:bg-white/70'
+                    }`}
+                  >
+                    Months
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTimeUnitChange('days')}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                      timeUnit === 'days' 
+                        ? 'bg-teal text-white' 
+                        : 'bg-white/50 text-teal hover:bg-white/70'
+                    }`}
+                  >
+                    Days
+                  </button>
+                </div>
+                <span className="text-sm font-semibold text-teal">{sliderProps.label}</span>
+              </div>
             </div>
             <input
               type="range"
-              min={1}
-              max={36}
+              min={sliderProps.min}
+              max={sliderProps.max}
+              step={sliderProps.step}
               value={stayDuration}
               onChange={(event) => setStayDuration(Number(event.target.value))}
               className="mt-3 h-2 w-full appearance-none rounded-full bg-teal/30 accent-teal"
@@ -504,8 +581,8 @@ function Planner() {
                 <option value="runway">Longest runway</option>
                 <option value="alpha-asc">Alphabetical (A–Z)</option>
                 <option value="alpha-desc">Alphabetical (Z–A)</option>
-                <option value="cost-asc">Monthly cost (low to high)</option>
-                <option value="cost-desc">Monthly cost (high to low)</option>
+                <option value="cost-asc">Monthly cost (low/high)</option>
+                <option value="cost-desc">Monthly cost (high/low)</option>
               </select>
             </div>
 
@@ -550,11 +627,20 @@ function Planner() {
           <p>
             With a <strong>{formatPrice(budget)}</strong> monthly budget,{' '}
             <strong>{highlightCity.city}</strong> gives you the most value — your budget lasts{' '}
-            <strong>{Number.isFinite(highlightCity.runway) ? highlightCity.runway.toFixed(1) : 'N/A'} months</strong>{' '}
+            <strong>
+              {Number.isFinite(highlightCity.runway) 
+                ? `${highlightCity.runway.toFixed(1)} ${timeUnit === 'days' ? (highlightCity.runway === 1 ? 'day' : 'days') : (highlightCity.runway === 1 ? 'month' : 'months')}` 
+                : 'N/A'}
+            </strong>{' '}
             there.
           </p>
           <p className="mt-1 font-semibold text-teal/80">
-            Plan a {stayDuration}-month stay for {formatPrice(highlightCity.monthlyCost * stayDuration)}.
+            Plan a {stayDuration}-{timeUnit === 'days' ? (stayDuration === 1 ? 'day' : 'day') : (stayDuration === 1 ? 'month' : 'month')} stay for{' '}
+            {formatPrice(
+              timeUnit === 'days' 
+                ? highlightCity.dailyCost * stayDuration 
+                : highlightCity.monthlyCost * stayDuration
+            )}.
           </p>
         </div>
       )}
@@ -564,7 +650,8 @@ function Planner() {
           <RunwayCard
             key={entry.city}
             {...entry}
-            stayDurationMonths={stayDuration}
+            stayDurationMonths={timeUnit === 'months' ? stayDuration : stayDuration / 30}
+            stayDurationDays={timeUnit === 'days' ? stayDuration : stayDuration * 30}
             isHighlighted={entry.city === highlightCity.city}
             badgeLabel={entry.city === highlightCity.city ? 'Best pick' : entry.isCurious ? 'On your wishlist' : null}
           />
