@@ -96,9 +96,6 @@ export function SignupPage() {
     if (data.user) {
       await persistUserIdentity(data.user, displayName.trim());
       setCreatedUser(data.user);
-    }
-
-    if (data.session && data.user) {
       setShowOnboarding(true);
       setIsSubmitting(false);
       return;
