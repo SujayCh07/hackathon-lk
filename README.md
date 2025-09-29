@@ -1,38 +1,149 @@
-# Parity
+🌍 Parity – Global GeoBudget & Smart Spend
 
-Parity is a minimalist travel-fintech playground that showcases how far your dollars stretch around the world with purchasing power parity (PPP) insights. The app is built with Vite, React 19, TailwindCSS, and animated routing via Framer Motion.
+Parity helps travelers and remote workers understand where their money stretches furthest by combining:
 
-## Getting started
+PPP (Purchasing Power Parity) Data
 
-```bash
+Personalized Budgeting
+
+Simulated Capital One™ Accounts (via Nessie API)
+
+Transactions, Categorization, and Runway Insights
+
+Instead of just comparing exchange rates, Parity personalizes recommendations based on lifestyle, budget goals, and transaction history—making it more than just a budgeting app.
+
+🚀 Features
+
+Authentication & Profiles
+
+Supabase auth with email + password.
+
+Onboarding personalization: user selects budget focus (Rent, Food, Leisure, Balanced).
+
+Profile stores monthly budget, home/current city, and country preferences.
+
+Budget Dashboard
+
+Displays balances and budget coverage.
+
+Savings runway panel: “Your balance covers ~X months of your lifestyle.”
+
+PPP heatmap & top destination cards.
+
+Weekly spending trends & notifications.
+
+Transactions & Accounts
+
+Uses Nessie API for mock Capital One™ accounts and transactions.
+
+Categorizes transactions into Rent, Food, Transport, etc.
+
+Dashboard updates spending metrics automatically.
+
+Personalization
+
+Recommends top 4 cities globally where your PPP-adjusted budget works best.
+
+Context (e.g. “Best rent-to-income ratio” if Rent is focus).
+
+Personal nudges (under/over budget alerts).
+
+🛠️ Tech Stack
+
+Frontend: React + Vite + TailwindCSS + Framer Motion
+
+Auth & DB: Supabase (Postgres)
+
+Mock Banking Data: Capital One Nessie API
+
+Visualization: Recharts, custom World Map (Leaflet/GeoJSON)
+
+Hosting: Vercel
+
+📊 Database Schema
+user_profile
+
+Stores personalization + budget preferences.
+
+CREATE TABLE public.user_profile (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id),
+  name text,
+  current_city_code text REFERENCES public.ppp_city(code),
+  home_city_code text REFERENCES public.ppp_city(code),
+  monthly_budget numeric,
+  home_country_code text REFERENCES public.country_ref(code),
+  current_country_code text REFERENCES public.country_ref(code),
+  street_address text
+);
+
+user_integrations
+
+Maps Supabase users to Nessie customers.
+
+CREATE TABLE public.user_integrations (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id),
+  nessie_customer_id text,
+  last_sync timestamptz
+);
+
+accounts / transactions
+
+Pulled from Nessie and cached locally.
+
+🔑 Environment Variables
+
+Create a .env file in the root:
+
+VITE_SUPABASE_URL=your-supabase-url
+VITE_SUPABASE_ANON_KEY=your-supabase-key
+VITE_NESSIE_BASE_URL=https://api.nessieisreal.com
+VITE_NESSIE_API_KEY=your-nessie-key
+
+⚡ Getting Started
+
+Clone repo
+
+git clone https://github.com/your-org/parity.git
+cd parity
+
+
+Install dependencies
+
 npm install
+# or
+pnpm install
+
+
+Run locally
+
 npm run dev
-```
 
-The development server will be available at the URL printed in your terminal (defaults to http://localhost:5173).
 
-## Features
+Deploy to Vercel
 
-- Hero carousel with travel imagery and CTA into the dashboard.
-- Dashboard with mock Capital One balance, transactions, PPP world map, and top city savings cards.
-- GeoBudget planner with interactive budget slider and runway visualizations.
-- Smart-Spend insights comparing category spending and PPP-adjusted savings with Recharts.
-- Share page that exports Parity summaries as PNG or PDF via html2canvas and jsPDF.
-- Mock data and hooks to simplify swapping in Supabase/Nessie APIs later.
+vercel
 
-## Tech stack
+🧑‍💻 API Calls Used
 
-- Vite + React 19 (RC)
-- TailwindCSS for styling
-- React Router v6 + Framer Motion transitions
-- Leaflet for world map visualization
-- Recharts for comparison charts
-- html2canvas + jsPDF for export actions
+POST /customers → Create Nessie customer
 
-## Accessibility & design notes
+GET /customers/{id}/accounts → Fetch accounts
 
-- Travel-inspired color palette with high contrast.
-- Semantic headings, focus states, and ARIA labelling on interactive elements.
-- Responsive layouts across breakpoints.
+GET /customers/{id}/transactions → Fetch transactions
 
-Enjoy exploring how far your money can go globally with Parity!
+POST /accounts + POST /transactions → Simulated data (if needed)
+
+🎯 Future Improvements
+
+Richer transaction categorization (merchant → category → insights).
+
+AI nudges for smarter budgeting (not just numbers).
+
+Social layer: compare PPP-adjusted budgets with friends.
+
+Integrate real banking APIs (Plaid, Teller) instead of demo Nessie.
+
+🙌 Credits
+
+Built at HackGT by Sujay Chava, Akshaj Nadimpalli, Aditya Jha
+Special thanks to Capital One for the Nessie API and PPP datasets powering this project.
